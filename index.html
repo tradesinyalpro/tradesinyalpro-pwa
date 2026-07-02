@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0a0f1e">
+<title>TradeSinyalPro</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0f1e; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+  .header { background: #111827; border-bottom: 1px solid #1e293b; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  .logo { font-size: 16px; font-weight: 600; color: #fff; }
+  .logo span { color: #3b82f6; }
+  .live-badge { background: #052e16; color: #4ade80; font-size: 11px; padding: 4px 10px; border-radius: 20px; font-weight: 500; display: flex; align-items: center; gap: 5px; }
+  .live-dot { width: 6px; height: 6px; background: #4ade80; border-radius: 50%; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .tabs { display: flex; background: #111827; border-bottom: 1px solid #1e293b; overflow-x: auto; }
+  .tab { flex: 1; padding: 12px 8px; text-align: center; font-size: 12px; color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; min-width: 80px; }
+  .tab.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+  .content { padding: 12px; max-width: 600px; margin: 0 auto; }
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+  .stat-card { background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 12px; }
+  .stat-label { font-size: 11px; color: #64748b; margin-bottom: 4px; }
+  .stat-val { font-size: 22px; font-weight: 600; }
+  .stat-val.green { color: #4ade80; }
+  .stat-val.red { color: #f87171; }
+  .stat-val.blue { color: #60a5fa; }
+  .section-title { font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; margin: 16px 0 8px; }
+  .signal-card { background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 14px; margin-bottom: 8px; }
+  .signal-card.long { border-left: 3px solid #4ade80; }
+  .signal-card.short { border-left: 3px solid #f87171; }
+  .signal-card.tp { border-left: 3px solid #60a5fa; opacity: 0.7; }
+  .signal-card.stop { border-left: 3px solid #f87171; opacity: 0.7; }
+  .sig-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .sig-symbol { font-size: 14px; font-weight: 600; }
+  .sig-badges { display: flex; gap: 6px; align-items: center; }
+  .badge { font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 20px; }
+  .badge.long { background: #052e16; color: #4ade80; }
+  .badge.short { background: #2d0a0a; color: #f87171; }
+  .badge.tp { background: #0c1a3d; color: #60a5fa; }
+  .badge.stop { background: #2d0a0a; color: #f87171; }
+  .badge.bot { background: #1e1b4b; color: #a5b4fc; }
+  .sig-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
+  .sig-key { font-size: 12px; color: #64748b; }
+  .sig-val { font-size: 12px; font-weight: 500; }
+  .sig-val.green { color: #4ade80; }
+  .sig-val.red { color: #f87171; }
+  .sig-val.blue { color: #60a5fa; }
+  .sig-time { font-size: 11px; color: #475569; margin-top: 8px; }
+  .empty { text-align: center; padding: 40px 20px; color: #475569; font-size: 14px; }
+  .refresh-btn { background: #1e293b; border: none; color: #94a3b8; padding: 8px 14px; border-radius: 8px; font-size: 12px; cursor: pointer; }
+  .refresh-btn:active { background: #334155; }
+  .bot-filter { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 12px; }
+  .bot-btn { background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 6px 12px; border-radius: 20px; font-size: 11px; cursor: pointer; white-space: nowrap; }
+  .bot-btn.active { background: #1e3a8a; border-color: #3b82f6; color: #93c5fd; }
+  .loading { text-align: center; padding: 30px; color: #475569; }
+  .error { background: #2d0a0a; border: 1px solid #7f1d1d; border-radius: 12px; padding: 16px; text-align: center; color: #f87171; font-size: 13px; margin: 16px 0; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">Trade<span>Sinyal</span>Pro</div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="refresh-btn" onclick="veriYukle()">↻ Yenile</button>
+    <div class="live-badge"><div class="live-dot"></div>Canlı</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="sekmeAc('sinyaller',this)">📡 Sinyaller</div>
+  <div class="tab" onclick="sekmeAc('performans',this)">📊 Performans</div>
+  <div class="tab" onclick="sekmeAc('gecmis',this)">📋 Geçmiş</div>
+</div>
+
+<div class="content">
+  <!-- SİNYALLER -->
+  <div id="sinyaller">
+    <div class="bot-filter">
+      <button class="bot-btn active" onclick="botFiltre('hepsi',this)">Tümü</button>
+      <button class="bot-btn" onclick="botFiltre('EMA_HACIM',this)">EMA Hacim</button>
+      <button class="bot-btn" onclick="botFiltre('BYBIT_24COIN',this)">Bybit 24Coin</button>
+      <button class="bot-btn" onclick="botFiltre('BINANCE_EKLEMELI',this)">Binance Eklemeli</button>
+      <button class="bot-btn" onclick="botFiltre('VIP_RADAR',this)">VIP Radar</button>
+    </div>
+    <div id="sinyal-listesi"><div class="loading">Yükleniyor...</div></div>
+  </div>
+
+  <!-- PERFORMANS -->
+  <div id="performans" style="display:none">
+    <div id="performans-icerik"><div class="loading">Yükleniyor...</div></div>
+  </div>
+
+  <!-- GEÇMİŞ -->
+  <div id="gecmis" style="display:none">
+    <div id="gecmis-icerik"><div class="loading">Yükleniyor...</div></div>
+  </div>
+</div>
+
+<script>
+const API = "https://abundant-light-production-fb25.up.railway.app";
+const API_KEY = "tradesinyalpro2024";
+let tumVeriler = {};
+let aktifBot = "hepsi";
+let aktifSekme = "sinyaller";
+
+async function veriYukle() {
+  try {
+    const res = await fetch(`${API}/sinyaller`, {
+      headers: { "X-API-Key": API_KEY }
+    });
+    tumVeriler = await res.json();
+    guncelle();
+  } catch(e) {
+    document.getElementById("sinyal-listesi").innerHTML = 
+      `<div class="error">⚠️ API'ye bağlanılamadı.<br>Lütfen internet bağlantınızı kontrol edin.</div>`;
+  }
+}
+
+function guncelle() {
+  if (aktifSekme === "sinyaller") sinyalleriGoster();
+  if (aktifSekme === "performans") performansGoster();
+  if (aktifSekme === "gecmis") gecmisGoster();
+}
+
+function botAdi(bot) {
+  const adlar = {
+    "EMA_HACIM": "EMA Hacim",
+    "BYBIT_24COIN": "Bybit 24Coin",
+    "BINANCE_EKLEMELI": "Binance Eklemeli",
+    "VIP_RADAR": "VIP Radar"
+  };
+  return adlar[bot] || bot;
+}
+
+function sinyalleriGoster() {
+  let html = "";
+  let toplam = 0;
+  for (const [bot, data] of Object.entries(tumVeriler)) {
+    if (aktifBot !== "hepsi" && aktifBot !== bot) continue;
+    const aktif = data.sinyaller.filter(s => s.durum === "aktif");
+    for (const s of aktif) {
+      toplam++;
+      const yon = s.yon || s.Yön || "";
+      const cls = yon === "LONG" ? "long" : "short";
+      html += `
+        <div class="signal-card ${cls}">
+          <div class="sig-header">
+            <div class="sig-symbol">#${s.sembol}</div>
+            <div class="sig-badges">
+              <span class="badge ${cls}">${yon}</span>
+              <span class="badge bot">${botAdi(bot)}</span>
+            </div>
+          </div>
+          <div class="sig-row"><span class="sig-key">Giriş</span><span class="sig-val">${s.giris || s.maliyet || "-"}</span></div>
+          <div class="sig-row"><span class="sig-key">Hedef</span><span class="sig-val green">${s.hedef || "-"}</span></div>
+          <div class="sig-row"><span class="sig-key">Stop</span><span class="sig-val red">${s.stop || "-"}</span></div>
+          ${s.e1 ? `<div class="sig-row"><span class="sig-key">E1</span><span class="sig-val blue">${s.e1}</span></div>` : ""}
+          ${s.asama ? `<div class="sig-row"><span class="sig-key">Kademe</span><span class="sig-val">${s.asama}</span></div>` : ""}
+          <div class="sig-time">🕐 ${s.zaman || ""}</div>
+        </div>`;
+    }
+  }
+  if (toplam === 0) {
+    html = `<div class="empty">📭 Şu an aktif sinyal yok</div>`;
+  }
+  document.getElementById("sinyal-listesi").innerHTML = html;
+}
+
+function performansGoster() {
+  let html = "";
+  let toplamTp = 0, toplamStop = 0, toplamAktif = 0;
+  for (const [bot, data] of Object.entries(tumVeriler)) {
+    const tp = data.tp || 0;
+    const stop = data.stop || 0;
+    const aktif = data.sinyaller.filter(s => s.durum === "aktif").length;
+    const toplam = tp + stop;
+    const basari = toplam > 0 ? Math.round(tp / toplam * 100) : 0;
+    toplamTp += tp; toplamStop += stop; toplamAktif += aktif;
+    html += `
+      <div class="signal-card" style="margin-bottom:8px">
+        <div class="sig-header">
+          <div class="sig-symbol">${botAdi(bot)}</div>
+          <span class="badge bot">${basari}% başarı</span>
+        </div>
+        <div class="sig-row"><span class="sig-key">✅ TP</span><span class="sig-val green">${tp}</span></div>
+        <div class="sig-row"><span class="sig-key">🛑 Stop</span><span class="sig-val red">${stop}</span></div>
+        <div class="sig-row"><span class="sig-key">📡 Aktif</span><span class="sig-val blue">${aktif}</span></div>
+      </div>`;
+  }
+  const genelToplam = toplamTp + toplamStop;
+  const genelBasari = genelToplam > 0 ? Math.round(toplamTp / genelToplam * 100) : 0;
+  const ozet = `
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Toplam TP</div><div class="stat-val green">${toplamTp}</div></div>
+      <div class="stat-card"><div class="stat-label">Toplam Stop</div><div class="stat-val red">${toplamStop}</div></div>
+      <div class="stat-card"><div class="stat-label">Aktif Sinyal</div><div class="stat-val blue">${toplamAktif}</div></div>
+      <div class="stat-card"><div class="stat-label">Genel Başarı</div><div class="stat-val green">${genelBasari}%</div></div>
+    </div>
+    <div class="section-title">Bot Bazlı Performans</div>`;
+  document.getElementById("performans-icerik").innerHTML = ozet + html;
+}
+
+function gecmisGoster() {
+  let html = "";
+  let toplam = 0;
+  for (const [bot, data] of Object.entries(tumVeriler)) {
+    const bitti = data.sinyaller.filter(s => s.durum === "tp" || s.durum === "stop");
+    for (const s of bitti) {
+      toplam++;
+      const yon = s.yon || s.Yön || "";
+      const sonuc = s.durum === "tp" ? "tp" : "stop";
+      const sonucYazi = s.durum === "tp" ? "✅ TP" : "🛑 Stop";
+      html += `
+        <div class="signal-card ${sonuc}">
+          <div class="sig-header">
+            <div class="sig-symbol">#${s.sembol}</div>
+            <div class="sig-badges">
+              <span class="badge ${sonuc}">${sonucYazi}</span>
+              <span class="badge bot">${botAdi(bot)}</span>
+            </div>
+          </div>
+          <div class="sig-row"><span class="sig-key">Yön</span><span class="sig-val">${yon}</span></div>
+          <div class="sig-row"><span class="sig-key">Giriş</span><span class="sig-val">${s.giris || s.maliyet || "-"}</span></div>
+          <div class="sig-time">🕐 ${s.zaman || ""}</div>
+        </div>`;
+    }
+  }
+  if (toplam === 0) {
+    html = `<div class="empty">📋 Henüz tamamlanmış işlem yok</div>`;
+  }
+  document.getElementById("gecmis-icerik").innerHTML = html;
+}
+
+function sekmeAc(id, el) {
+  aktifSekme = id;
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  el.classList.add("active");
+  document.querySelectorAll(".content > div").forEach(d => d.style.display = "none");
+  document.getElementById(id).style.display = "block";
+  guncelle();
+}
+
+function botFiltre(bot, el) {
+  aktifBot = bot;
+  document.querySelectorAll(".bot-btn").forEach(b => b.classList.remove("active"));
+  el.classList.add("active");
+  sinyalleriGoster();
+}
+
+// İlk yükleme
+veriYukle();
+// Her 30 saniyede otomatik yenile
+setInterval(veriYukle, 30000);
+</script>
+</body>
+</html>
