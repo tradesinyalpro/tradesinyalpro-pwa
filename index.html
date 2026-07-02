@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#0a0f1e">
 <title>TradeSinyalPro</title>
-<link rel="manifest" href="manifest.json">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #0a0f1e; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
@@ -15,8 +14,8 @@
   .live-badge { background: #052e16; color: #4ade80; font-size: 11px; padding: 4px 10px; border-radius: 20px; font-weight: 500; display: flex; align-items: center; gap: 5px; }
   .live-dot { width: 6px; height: 6px; background: #4ade80; border-radius: 50%; animation: pulse 1.5s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-  .tabs { display: flex; background: #111827; border-bottom: 1px solid #1e293b; overflow-x: auto; }
-  .tab { flex: 1; padding: 12px 8px; text-align: center; font-size: 12px; color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; min-width: 80px; }
+  .tabs { display: flex; background: #111827; border-bottom: 1px solid #1e293b; }
+  .tab { flex: 1; padding: 12px 8px; text-align: center; font-size: 12px; color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; }
   .tab.active { color: #3b82f6; border-bottom-color: #3b82f6; }
   .content { padding: 12px; max-width: 600px; margin: 0 auto; }
   .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
@@ -50,7 +49,6 @@
   .sig-time { font-size: 11px; color: #475569; margin-top: 8px; }
   .empty { text-align: center; padding: 40px 20px; color: #475569; font-size: 14px; }
   .refresh-btn { background: #1e293b; border: none; color: #94a3b8; padding: 8px 14px; border-radius: 8px; font-size: 12px; cursor: pointer; }
-  .refresh-btn:active { background: #334155; }
   .bot-filter { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 12px; }
   .bot-btn { background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 6px 12px; border-radius: 20px; font-size: 11px; cursor: pointer; white-space: nowrap; }
   .bot-btn.active { background: #1e3a8a; border-color: #3b82f6; color: #93c5fd; }
@@ -75,24 +73,21 @@
 </div>
 
 <div class="content">
-  <!-- SİNYALLER -->
   <div id="sinyaller">
     <div class="bot-filter">
       <button class="bot-btn active" onclick="botFiltre('hepsi',this)">Tümü</button>
-      <button class="bot-btn" onclick="botFiltre('EMA_HACIM',this)">EMA Hacim</button>
-      <button class="bot-btn" onclick="botFiltre('BYBIT_24COIN',this)">Bybit 24Coin</button>
-      <button class="bot-btn" onclick="botFiltre('BINANCE_EKLEMELI',this)">Binance Eklemeli</button>
-      <button class="bot-btn" onclick="botFiltre('VIP_RADAR',this)">VIP Radar</button>
+      <button class="bot-btn" onclick="botFiltre('SINYAL_ODA_1',this)">Sinyal Oda 1</button>
+      <button class="bot-btn" onclick="botFiltre('SINYAL_ODA_2',this)">Sinyal Oda 2</button>
+      <button class="bot-btn" onclick="botFiltre('SINYAL_ODA_3',this)">Sinyal Oda 3</button>
+      <button class="bot-btn" onclick="botFiltre('SINYAL_ODA_4',this)">Sinyal Oda 4</button>
     </div>
     <div id="sinyal-listesi"><div class="loading">Yükleniyor...</div></div>
   </div>
 
-  <!-- PERFORMANS -->
   <div id="performans" style="display:none">
     <div id="performans-icerik"><div class="loading">Yükleniyor...</div></div>
   </div>
 
-  <!-- GEÇMİŞ -->
   <div id="gecmis" style="display:none">
     <div id="gecmis-icerik"><div class="loading">Yükleniyor...</div></div>
   </div>
@@ -113,7 +108,7 @@ async function veriYukle() {
     tumVeriler = await res.json();
     guncelle();
   } catch(e) {
-    document.getElementById("sinyal-listesi").innerHTML = 
+    document.getElementById("sinyal-listesi").innerHTML =
       `<div class="error">⚠️ API'ye bağlanılamadı.<br>Lütfen internet bağlantınızı kontrol edin.</div>`;
   }
 }
@@ -126,10 +121,10 @@ function guncelle() {
 
 function botAdi(bot) {
   const adlar = {
-    "EMA_HACIM": "EMA Hacim",
-    "BYBIT_24COIN": "Bybit 24Coin",
-    "BINANCE_EKLEMELI": "Binance Eklemeli",
-    "VIP_RADAR": "VIP Radar"
+    "SINYAL_ODA_1": "Sinyal Oda 1",
+    "SINYAL_ODA_2": "Sinyal Oda 2",
+    "SINYAL_ODA_3": "Sinyal Oda 3",
+    "SINYAL_ODA_4": "Sinyal Oda 4"
   };
   return adlar[bot] || bot;
 }
@@ -142,7 +137,7 @@ function sinyalleriGoster() {
     const aktif = data.sinyaller.filter(s => s.durum === "aktif");
     for (const s of aktif) {
       toplam++;
-      const yon = s.yon || s.Yön || "";
+      const yon = s.yon || s.Yon || "";
       const cls = yon === "LONG" ? "long" : "short";
       html += `
         <div class="signal-card ${cls}">
@@ -157,6 +152,8 @@ function sinyalleriGoster() {
           <div class="sig-row"><span class="sig-key">Hedef</span><span class="sig-val green">${s.hedef || "-"}</span></div>
           <div class="sig-row"><span class="sig-key">Stop</span><span class="sig-val red">${s.stop || "-"}</span></div>
           ${s.e1 ? `<div class="sig-row"><span class="sig-key">E1</span><span class="sig-val blue">${s.e1}</span></div>` : ""}
+          ${s.e2 ? `<div class="sig-row"><span class="sig-key">E2</span><span class="sig-val blue">${s.e2}</span></div>` : ""}
+          ${s.e3 ? `<div class="sig-row"><span class="sig-key">E3</span><span class="sig-val blue">${s.e3}</span></div>` : ""}
           ${s.asama ? `<div class="sig-row"><span class="sig-key">Kademe</span><span class="sig-val">${s.asama}</span></div>` : ""}
           <div class="sig-time">🕐 ${s.zaman || ""}</div>
         </div>`;
@@ -198,7 +195,7 @@ function performansGoster() {
       <div class="stat-card"><div class="stat-label">Aktif Sinyal</div><div class="stat-val blue">${toplamAktif}</div></div>
       <div class="stat-card"><div class="stat-label">Genel Başarı</div><div class="stat-val green">${genelBasari}%</div></div>
     </div>
-    <div class="section-title">Bot Bazlı Performans</div>`;
+    <div class="section-title">Oda Bazlı Performans</div>`;
   document.getElementById("performans-icerik").innerHTML = ozet + html;
 }
 
@@ -209,7 +206,7 @@ function gecmisGoster() {
     const bitti = data.sinyaller.filter(s => s.durum === "tp" || s.durum === "stop");
     for (const s of bitti) {
       toplam++;
-      const yon = s.yon || s.Yön || "";
+      const yon = s.yon || s.Yon || "";
       const sonuc = s.durum === "tp" ? "tp" : "stop";
       const sonucYazi = s.durum === "tp" ? "✅ TP" : "🛑 Stop";
       html += `
@@ -249,9 +246,7 @@ function botFiltre(bot, el) {
   sinyalleriGoster();
 }
 
-// İlk yükleme
 veriYukle();
-// Her 30 saniyede otomatik yenile
 setInterval(veriYukle, 30000);
 </script>
 </body>
