@@ -26,6 +26,12 @@
   .stat-val.green { color: #4ade80; }
   .stat-val.red { color: #f87171; }
   .stat-val.blue { color: #60a5fa; }
+  .dom-bar { background: #1e293b; border-radius: 6px; height: 6px; overflow: hidden; margin-top: 8px; }
+  .dom-fill { height: 100%; border-radius: 6px; }
+  .price-change { font-size: 13px; font-weight: 500; margin-top: 4px; }
+  .price-change.up { color: #4ade80; }
+  .price-change.down { color: #f87171; }
+  .market-note { font-size: 11px; color: #64748b; padding: 10px 12px; background: #111827; border: 1px dashed #334155; border-radius: 10px; margin-bottom: 8px; }
   .section-title { font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; margin: 16px 0 8px; }
   .signal-card { background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 14px; margin-bottom: 8px; }
   .signal-card.long { border-left: 3px solid #4ade80; }
@@ -87,6 +93,7 @@
   <div class="tab" onclick="sekmeAc('performans',this)">Performans</div>
   <div class="tab" onclick="sekmeAc('gecmis',this)">Gecmis</div>
   <div class="tab" onclick="sekmeAc('rapor',this)">Gunluk Rapor</div>
+  <div class="tab" onclick="sekmeAc('piyasa',this)">Piyasa</div>
   <div class="tab" onclick="sekmeAc('haberler',this)">Haberler</div>
 </div>
 
@@ -114,6 +121,10 @@
     <div id="rapor-icerik"><div class="loading">Yukleniyor...</div></div>
   </div>
 
+  <div id="piyasa" style="display:none">
+    <div id="piyasa-icerik"><div class="loading">Yukleniyor...</div></div>
+  </div>
+
   <div id="haberler" style="display:none">
     <div class="bot-filter">
       <button class="bot-btn active" onclick="haberFiltre('hepsi',this)">Tumu</button>
@@ -132,6 +143,8 @@ var API_KEY = "tradesinyalpro2024";
 var tumVeriler = {};
 var tumHaberler = [];
 var tumRaporlar = [];
+var piyasaVerisi = null;
+var piyasaSonGuncelleme = 0;
 var aktifBot = "hepsi";
 var aktifHaberKategori = "hepsi";
 var aktifSekme = "sinyaller";
@@ -194,6 +207,7 @@ function guncelle() {
   if (aktifSekme === "performans") performansGoster();
   if (aktifSekme === "gecmis") gecmisGoster();
   if (aktifSekme === "rapor") raporGoster();
+  if (aktifSekme === "piyasa") piyasaYukle(false);
   if (aktifSekme === "haberler") haberleriGoster();
 }
 
@@ -346,6 +360,115 @@ function raporGoster() {
     }
   }
   document.getElementById("rapor-icerik").innerHTML = html;
+}
+
+function piyasaYukle(zorla) {
+  var simdi = Date.now();
+  if (!zorla && piyasaVerisi && (simdi - piyasaSonGuncelleme < 45000)) {
+    piyasaGoster();
+    return;
+  }
+  document.getElementById("piyasa-icerik").innerHTML = '<div class="loading">Yukleniyor...</div>';
+
+  var fiyatlar = null, global = null;
+
+  function tamamlandiKontrol() {
+    if (fiyatlar && global) {
+      piyasaVerisi = { fiyatlar: fiyatlar, global: global };
+      piyasaSonGuncelleme = Date.now();
+      piyasaGoster();
+    }
+  }
+
+  var x1 = new XMLHttpRequest();
+  x1.open("GET", "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true", true);
+  x1.onload = function() {
+    if (x1.status === 200) { fiyatlar = JSON.parse(x1.responseText); tamamlandiKontrol(); }
+    else piyasaHata();
+  };
+  x1.onerror = piyasaHata;
+  x1.send();
+
+  var x2 = new XMLHttpRequest();
+  x2.open("GET", "https://api.coingecko.com/api/v3/global", true);
+  x2.onload = function() {
+    if (x2.status === 200) { global = JSON.parse(x2.responseText).data; tamamlandiKontrol(); }
+    else piyasaHata();
+  };
+  x2.onerror = piyasaHata;
+  x2.send();
+}
+
+function piyasaHata() {
+  if (aktifSekme === "piyasa" && !piyasaVerisi) {
+    document.getElementById("piyasa-icerik").innerHTML = '<div class="error">Piyasa verisi alinamadi. Internet baglantisini kontrol edip tekrar dene.</div>';
+  }
+}
+
+function piyasaGoster() {
+  if (!piyasaVerisi) return;
+  var f = piyasaVerisi.fiyatlar;
+  var g = piyasaVerisi.global;
+
+  var btcFiyat = f.bitcoin ? f.bitcoin.usd : null;
+  var btcDegisim = f.bitcoin ? f.bitcoin.usd_24h_change : null;
+  var ethFiyat = f.ethereum ? f.ethereum.usd : null;
+  var ethDegisim = f.ethereum ? f.ethereum.usd_24h_change : null;
+
+  var toplamDeger = g.total_market_cap ? g.total_market_cap.usd : null;
+  var toplamDegisim = g.market_cap_change_percentage_24h_usd;
+
+  var btcD = g.market_cap_percentage ? g.market_cap_percentage.btc : null;
+  var ethD = g.market_cap_percentage ? g.market_cap_percentage.eth : null;
+  var usdtD = g.market_cap_percentage ? g.market_cap_percentage.usdt : null;
+  var othersD = (btcD != null && ethD != null && usdtD != null) ? Math.max(0, 100 - btcD - ethD - usdtD) : null;
+
+  function paraFormat(v) {
+    if (v == null) return "-";
+    if (v >= 1e12) return "$" + (v / 1e12).toFixed(2) + "T";
+    if (v >= 1e9) return "$" + (v / 1e9).toFixed(2) + "B";
+    if (v >= 1e6) return "$" + (v / 1e6).toFixed(2) + "M";
+    return "$" + Math.round(v).toLocaleString();
+  }
+  function degisimHtml(v) {
+    if (v == null) return "";
+    var yon = v >= 0 ? "up" : "down";
+    var ok = v >= 0 ? "▲" : "▼";
+    return '<div class="price-change ' + yon + '">' + ok + ' %' + Math.abs(v).toFixed(2) + '</div>';
+  }
+  function domBar(deger, renk) {
+    if (deger == null) return "";
+    return '<div class="dom-bar"><div class="dom-fill" style="width:' + Math.min(100, deger) + '%;background:' + renk + '"></div></div>';
+  }
+
+  var html = "";
+  html += '<div class="section-title">Canli Fiyatlar</div>';
+  html += '<div class="stats-grid">';
+  html += '<div class="stat-card"><div class="stat-label">₿ BTC</div><div class="stat-val">' + (btcFiyat != null ? "$" + Math.round(btcFiyat).toLocaleString() : "-") + '</div>' + degisimHtml(btcDegisim) + '</div>';
+  html += '<div class="stat-card"><div class="stat-label">Ξ ETH</div><div class="stat-val">' + (ethFiyat != null ? "$" + Math.round(ethFiyat).toLocaleString() : "-") + '</div>' + degisimHtml(ethDegisim) + '</div>';
+  html += '</div>';
+
+  html += '<div class="stat-card" style="margin-bottom:16px">';
+  html += '<div class="stat-label">TOTAL PIYASA DEGERI</div>';
+  html += '<div class="stat-val">' + paraFormat(toplamDeger) + '</div>';
+  html += degisimHtml(toplamDegisim);
+  html += '</div>';
+
+  html += '<div class="section-title">Dominans</div>';
+  html += '<div class="stats-grid">';
+  html += '<div class="stat-card"><div class="stat-label">BTC.D</div><div class="stat-val" style="color:#f59e0b">' + (btcD != null ? "%" + btcD.toFixed(1) : "-") + '</div>' + domBar(btcD, "#f59e0b") + '</div>';
+  html += '<div class="stat-card"><div class="stat-label">ETH.D</div><div class="stat-val blue">' + (ethD != null ? "%" + ethD.toFixed(1) : "-") + '</div>' + domBar(ethD, "#60a5fa") + '</div>';
+  html += '<div class="stat-card"><div class="stat-label">OTHERS.D</div><div class="stat-val" style="color:#a78bfa">' + (othersD != null ? "%" + othersD.toFixed(1) : "-") + '</div>' + domBar(othersD, "#a78bfa") + '</div>';
+  html += '<div class="stat-card"><div class="stat-label">USDT.D</div><div class="stat-val green">' + (usdtD != null ? "%" + usdtD.toFixed(1) : "-") + '</div>' + domBar(usdtD, "#4ade80") + '</div>';
+  html += '</div>';
+
+  html += '<div class="section-title">Likidasyonlar</div>';
+  html += '<div class="market-note">Bu veri henuz eklenmedi. Guvenilir Long/Short likidasyon verisi ucretsiz kaynaklarda bulunmuyor, ucretli bir veri saglayicisi gerekiyor.</div>';
+
+  html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="piyasaYukle(true)">Yenile</button></div>';
+  html += '<div class="sig-time" style="text-align:center;margin-top:6px">Son guncelleme: ' + new Date(piyasaSonGuncelleme).toLocaleTimeString("tr-TR") + '</div>';
+
+  document.getElementById("piyasa-icerik").innerHTML = html;
 }
 
 function haberleriGoster() {
