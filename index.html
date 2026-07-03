@@ -364,7 +364,7 @@ function raporGoster() {
 
 function piyasaYukle(zorla) {
   var simdi = Date.now();
-  if (!zorla && piyasaVerisi && (simdi - piyasaSonGuncelleme < 45000)) {
+  if (!zorla && piyasaVerisi && (simdi - piyasaSonGuncelleme < 15000)) {
     piyasaGoster();
     return;
   }
@@ -380,15 +380,24 @@ function piyasaYukle(zorla) {
     }
   }
 
+  // Fiyatlar: Binance'in anlik borsa verisinden (TradingView ile ayni kaynaga yakin)
   var x1 = new XMLHttpRequest();
-  x1.open("GET", "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true", true);
+  x1.open("GET", "https://api.binance.com/api/v3/ticker/24hr?symbols=%5B%22BTCUSDT%22%2C%22ETHUSDT%22%5D", true);
   x1.onload = function() {
-    if (x1.status === 200) { fiyatlar = JSON.parse(x1.responseText); tamamlandiKontrol(); }
-    else piyasaHata();
+    if (x1.status === 200) {
+      var arr = JSON.parse(x1.responseText);
+      fiyatlar = {};
+      for (var i = 0; i < arr.length; i++) {
+        if (arr[i].symbol === "BTCUSDT") fiyatlar.bitcoin = { usd: parseFloat(arr[i].lastPrice), usd_24h_change: parseFloat(arr[i].priceChangePercent) };
+        if (arr[i].symbol === "ETHUSDT") fiyatlar.ethereum = { usd: parseFloat(arr[i].lastPrice), usd_24h_change: parseFloat(arr[i].priceChangePercent) };
+      }
+      tamamlandiKontrol();
+    } else piyasaHata();
   };
   x1.onerror = piyasaHata;
   x1.send();
 
+  // Piyasa degeri ve dominans: CoinGecko /global (turetilmis istatistik, dogasi geregi birkac dk'da bir guncellenir)
   var x2 = new XMLHttpRequest();
   x2.open("GET", "https://api.coingecko.com/api/v3/global", true);
   x2.onload = function() {
