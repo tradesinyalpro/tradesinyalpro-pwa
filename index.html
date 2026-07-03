@@ -462,9 +462,6 @@ function piyasaGoster() {
   html += '<div class="stat-card"><div class="stat-label">USDT.D</div><div class="stat-val green">' + (usdtD != null ? "%" + usdtD.toFixed(1) : "-") + '</div>' + domBar(usdtD, "#4ade80") + '</div>';
   html += '</div>';
 
-  html += '<div class="section-title">Likidasyonlar</div>';
-  html += '<div class="market-note">Bu veri henuz eklenmedi. Guvenilir Long/Short likidasyon verisi ucretsiz kaynaklarda bulunmuyor, ucretli bir veri saglayicisi gerekiyor.</div>';
-
   html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="piyasaYukle(true)">Yenile</button></div>';
   html += '<div class="sig-time" style="text-align:center;margin-top:6px">Son guncelleme: ' + new Date(piyasaSonGuncelleme).toLocaleTimeString("tr-TR") + '</div>';
 
