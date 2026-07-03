@@ -16,7 +16,7 @@
   .live-dot { width: 6px; height: 6px; background: #4ade80; border-radius: 50%; animation: pulse 1.5s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
   .tabs { display: flex; background: #111827; border-bottom: 1px solid #1e293b; }
-  .tab { flex: 1; padding: 12px 8px; text-align: center; font-size: 12px; color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; }
+  .tab { flex: 1; padding: 12px 4px; text-align: center; font-size: 11px; color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; }
   .tab.active { color: #3b82f6; border-bottom-color: #3b82f6; }
   .content { padding: 12px; max-width: 600px; margin: 0 auto; }
   .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
@@ -41,6 +41,10 @@
   .badge.tp { background: #0c1a3d; color: #60a5fa; }
   .badge.stop { background: #2d0a0a; color: #f87171; }
   .badge.bot { background: #1e1b4b; color: #a5b4fc; }
+  .badge.kripto { background: #1e1b4b; color: #a5b4fc; }
+  .badge.pozitif { background: #052e16; color: #4ade80; }
+  .badge.negatif { background: #2d0a0a; color: #f87171; }
+  .badge.notr { background: #422006; color: #f59e0b; }
   .sig-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
   .sig-key { font-size: 12px; color: #64748b; }
   .sig-val { font-size: 12px; font-weight: 500; }
@@ -55,6 +59,17 @@
   .bot-btn.active { background: #1e3a8a; border-color: #3b82f6; color: #93c5fd; }
   .loading { text-align: center; padding: 30px; color: #475569; }
   .error { background: #2d0a0a; border: 1px solid #7f1d1d; border-radius: 12px; padding: 16px; text-align: center; color: #f87171; font-size: 13px; margin: 16px 0; }
+  .news-card { background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 14px; margin-bottom: 8px; }
+  .news-card.pozitif { border-left: 3px solid #4ade80; }
+  .news-card.negatif { border-left: 3px solid #f87171; }
+  .news-card.notr { border-left: 3px solid #f59e0b; }
+  .news-header { display: flex; justify-content: flex-start; margin-bottom: 8px; }
+  .news-badges { display: flex; gap: 4px; }
+  .news-title { font-size: 13px; font-weight: 500; color: #e2e8f0; margin-bottom: 6px; line-height: 1.4; }
+  .news-bullets { padding: 0; margin: 0; }
+  .news-bullet { font-size: 11px; color: #94a3b8; margin-bottom: 3px; padding-left: 12px; position: relative; list-style: none; }
+  .news-bullet::before { content: "•"; position: absolute; left: 0; color: #475569; }
+  .news-time { font-size: 11px; color: #475569; margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -71,6 +86,7 @@
   <div class="tab active" onclick="sekmeAc('sinyaller',this)">Sinyaller</div>
   <div class="tab" onclick="sekmeAc('performans',this)">Performans</div>
   <div class="tab" onclick="sekmeAc('gecmis',this)">Gecmis</div>
+  <div class="tab" onclick="sekmeAc('haberler',this)">Haberler</div>
 </div>
 
 <div class="content">
@@ -92,13 +108,26 @@
   <div id="gecmis" style="display:none">
     <div id="gecmis-icerik"><div class="loading">Yukleniyor...</div></div>
   </div>
+
+  <div id="haberler" style="display:none">
+    <div class="bot-filter">
+      <button class="bot-btn active" onclick="haberFiltre('hepsi',this)">Tumu</button>
+      <button class="bot-btn" onclick="haberFiltre('kripto',this)">Kripto</button>
+      <button class="bot-btn" onclick="haberFiltre('ekonomi',this)">Ekonomi</button>
+      <button class="bot-btn" onclick="haberFiltre('fed',this)">Fed</button>
+      <button class="bot-btn" onclick="haberFiltre('jeopolitik',this)">Jeopolitik</button>
+    </div>
+    <div id="haber-listesi"><div class="loading">Yukleniyor...</div></div>
+  </div>
 </div>
 
 <script>
 var API = "https://abundant-light-production-fb25.up.railway.app";
 var API_KEY = "tradesinyalpro2024";
 var tumVeriler = {};
+var tumHaberler = [];
 var aktifBot = "hepsi";
+var aktifHaberKategori = "hepsi";
 var aktifSekme = "sinyaller";
 
 var BOT_ADLARI = {
@@ -127,15 +156,27 @@ function veriYukle() {
   };
   xhr.onerror = function() {
     document.getElementById("sinyal-listesi").innerHTML =
-      '<div class="error">API\'ye baglanılamadi. Internet baglantınızı kontrol edin.</div>';
+      '<div class="error">API\'ye baglanılamadi.</div>';
   };
   xhr.send();
+
+  var xhr2 = new XMLHttpRequest();
+  xhr2.open("GET", API + "/haberler", true);
+  xhr2.setRequestHeader("X-API-Key", API_KEY);
+  xhr2.onload = function() {
+    if (xhr2.status === 200) {
+      tumHaberler = JSON.parse(xhr2.responseText);
+      if (aktifSekme === "haberler") haberleriGoster();
+    }
+  };
+  xhr2.send();
 }
 
 function guncelle() {
   if (aktifSekme === "sinyaller") sinyalleriGoster();
   if (aktifSekme === "performans") performansGoster();
   if (aktifSekme === "gecmis") gecmisGoster();
+  if (aktifSekme === "haberler") haberleriGoster();
 }
 
 function sinyalleriGoster() {
@@ -168,9 +209,7 @@ function sinyalleriGoster() {
       html += '<div class="sig-time">' + (s.zaman || "") + '</div></div>';
     }
   }
-  if (toplam === 0) {
-    html = '<div class="empty">Su an aktif sinyal yok</div>';
-  }
+  if (toplam === 0) html = '<div class="empty">Su an aktif sinyal yok</div>';
   document.getElementById("sinyal-listesi").innerHTML = html;
 }
 
@@ -233,10 +272,42 @@ function gecmisGoster() {
       html += '<div class="sig-time">' + (s.zaman || "") + '</div></div>';
     }
   }
-  if (toplam === 0) {
-    html = '<div class="empty">Henuz tamamlanmis islem yok</div>';
-  }
+  if (toplam === 0) html = '<div class="empty">Henuz tamamlanmis islem yok</div>';
   document.getElementById("gecmis-icerik").innerHTML = html;
+}
+
+function haberleriGoster() {
+  var html = "";
+  var liste = tumHaberler;
+  if (aktifHaberKategori !== "hepsi") {
+    liste = tumHaberler.filter(function(h) {
+      return h.kategori && h.kategori.toLowerCase() === aktifHaberKategori;
+    });
+  }
+  if (liste.length === 0) {
+    html = '<div class="empty">Henuz haber yok</div>';
+    document.getElementById("haber-listesi").innerHTML = html;
+    return;
+  }
+  for (var i = 0; i < liste.length; i++) {
+    var h = liste[i];
+    var deger = h.deger || "notr";
+    html += '<div class="news-card ' + deger + '">';
+    html += '<div class="news-header"><div class="news-badges">';
+    if (h.kategori) html += '<span class="badge kripto">' + h.kategori + '</span>';
+    if (h.deger) html += '<span class="badge ' + deger + '">' + (deger === "pozitif" ? "Pozitif" : deger === "negatif" ? "Negatif" : "Notr") + '</span>';
+    html += '</div></div>';
+    html += '<div class="news-title">' + (h.baslik || "") + '</div>';
+    if (h.maddeler && h.maddeler.length > 0) {
+      html += '<ul class="news-bullets">';
+      for (var j = 0; j < h.maddeler.length; j++) {
+        html += '<li class="news-bullet">' + h.maddeler[j] + '</li>';
+      }
+      html += '</ul>';
+    }
+    html += '<div class="news-time">' + (h.zaman || "") + '</div></div>';
+  }
+  document.getElementById("haber-listesi").innerHTML = html;
 }
 
 function sekmeAc(id, el) {
@@ -252,10 +323,18 @@ function sekmeAc(id, el) {
 
 function botFiltre(bot, el) {
   aktifBot = bot;
-  var btnlar = document.querySelectorAll(".bot-btn");
+  var btnlar = document.querySelectorAll("#sinyaller .bot-btn");
   for (var i = 0; i < btnlar.length; i++) btnlar[i].classList.remove("active");
   el.classList.add("active");
   sinyalleriGoster();
+}
+
+function haberFiltre(kategori, el) {
+  aktifHaberKategori = kategori;
+  var btnlar = document.querySelectorAll("#haberler .bot-btn");
+  for (var i = 0; i < btnlar.length; i++) btnlar[i].classList.remove("active");
+  el.classList.add("active");
+  haberleriGoster();
 }
 
 veriYukle();
