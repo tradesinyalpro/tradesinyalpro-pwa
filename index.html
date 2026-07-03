@@ -15,8 +15,8 @@
   .live-badge { background: #052e16; color: #4ade80; font-size: 11px; padding: 4px 10px; border-radius: 20px; font-weight: 500; display: flex; align-items: center; gap: 5px; }
   .live-dot { width: 6px; height: 6px; background: #4ade80; border-radius: 50%; animation: pulse 1.5s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-  .tabs { display: flex; background: #111827; border-bottom: 1px solid #1e293b; }
-  .tab { flex: 1; padding: 12px 4px; text-align: center; font-size: 11px; color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; }
+  .tabs { display: flex; background: #111827; border-bottom: 1px solid #1e293b; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tab { flex: 1; min-width: 74px; white-space: nowrap; padding: 12px 4px; text-align: center; font-size: 11px; color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; }
   .tab.active { color: #3b82f6; border-bottom-color: #3b82f6; }
   .content { padding: 12px; max-width: 600px; margin: 0 auto; }
   .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
@@ -86,6 +86,7 @@
   <div class="tab active" onclick="sekmeAc('sinyaller',this)">Sinyaller</div>
   <div class="tab" onclick="sekmeAc('performans',this)">Performans</div>
   <div class="tab" onclick="sekmeAc('gecmis',this)">Gecmis</div>
+  <div class="tab" onclick="sekmeAc('rapor',this)">Gunluk Rapor</div>
   <div class="tab" onclick="sekmeAc('haberler',this)">Haberler</div>
 </div>
 
@@ -109,6 +110,10 @@
     <div id="gecmis-icerik"><div class="loading">Yukleniyor...</div></div>
   </div>
 
+  <div id="rapor" style="display:none">
+    <div id="rapor-icerik"><div class="loading">Yukleniyor...</div></div>
+  </div>
+
   <div id="haberler" style="display:none">
     <div class="bot-filter">
       <button class="bot-btn active" onclick="haberFiltre('hepsi',this)">Tumu</button>
@@ -126,6 +131,7 @@ var API = "https://abundant-light-production-fb25.up.railway.app";
 var API_KEY = "tradesinyalpro2024";
 var tumVeriler = {};
 var tumHaberler = [];
+var tumRaporlar = [];
 var aktifBot = "hepsi";
 var aktifHaberKategori = "hepsi";
 var aktifSekme = "sinyaller";
@@ -170,46 +176,62 @@ function veriYukle() {
     }
   };
   xhr2.send();
+
+  var xhr3 = new XMLHttpRequest();
+  xhr3.open("GET", API + "/raporlar", true);
+  xhr3.setRequestHeader("X-API-Key", API_KEY);
+  xhr3.onload = function() {
+    if (xhr3.status === 200) {
+      tumRaporlar = JSON.parse(xhr3.responseText);
+      if (aktifSekme === "rapor") raporGoster();
+    }
+  };
+  xhr3.send();
 }
 
 function guncelle() {
   if (aktifSekme === "sinyaller") sinyalleriGoster();
   if (aktifSekme === "performans") performansGoster();
   if (aktifSekme === "gecmis") gecmisGoster();
+  if (aktifSekme === "rapor") raporGoster();
   if (aktifSekme === "haberler") haberleriGoster();
 }
 
 function sinyalleriGoster() {
   var html = "";
-  var toplam = 0;
+  var hepsi = [];
   var botlar = Object.keys(tumVeriler);
   for (var b = 0; b < botlar.length; b++) {
     var bot = botlar[b];
     var data = tumVeriler[bot];
     if (aktifBot !== "hepsi" && aktifBot !== bot) continue;
-    var sinyaller = data.sinyaller || [];
+    var sinyaller = (data.sinyaller || []).filter(function(s) { return s.durum === "aktif"; });
     for (var i = 0; i < sinyaller.length; i++) {
-      var s = sinyaller[i];
-      if (s.durum !== "aktif") continue;
-      toplam++;
-      var yon = s.yon || "";
-      var cls = yon === "LONG" ? "long" : "short";
-      var e1html = s.e1 ? '<div class="sig-row"><span class="sig-key">E1</span><span class="sig-val blue">' + s.e1 + '</span></div>' : "";
-      var e2html = s.e2 ? '<div class="sig-row"><span class="sig-key">E2</span><span class="sig-val blue">' + s.e2 + '</span></div>' : "";
-      var e3html = s.e3 ? '<div class="sig-row"><span class="sig-key">E3</span><span class="sig-val blue">' + s.e3 + '</span></div>' : "";
-      var kademehtml = s.asama ? '<div class="sig-row"><span class="sig-key">Kademe</span><span class="sig-val">' + s.asama + '</span></div>' : "";
-      html += '<div class="signal-card ' + cls + '">';
-      html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + '</div>';
-      html += '<div class="sig-badges"><span class="badge ' + cls + '">' + yon + '</span>';
-      html += '<span class="badge bot">' + botAdi(bot) + '</span></div></div>';
-      html += '<div class="sig-row"><span class="sig-key">Giris</span><span class="sig-val">' + (s.giris || s.maliyet || "-") + '</span></div>';
-      html += '<div class="sig-row"><span class="sig-key">Hedef</span><span class="sig-val green">' + (s.hedef || "-") + '</span></div>';
-      html += '<div class="sig-row"><span class="sig-key">Stop</span><span class="sig-val red">' + (s.stop || "-") + '</span></div>';
-      html += e1html + e2html + e3html + kademehtml;
-      html += '<div class="sig-time">' + (s.zaman || "") + '</div></div>';
+      hepsi.push({ s: sinyaller[i], bot: bot });
     }
   }
-  if (toplam === 0) html = '<div class="empty">Su an aktif sinyal yok</div>';
+  hepsi.sort(function(a, b) { return (b.s.zaman || "").localeCompare(a.s.zaman || ""); });
+
+  for (var k = 0; k < hepsi.length; k++) {
+    var s = hepsi[k].s;
+    var bot = hepsi[k].bot;
+    var yon = s.yon || "";
+    var cls = yon === "LONG" ? "long" : "short";
+    var e1html = s.e1 ? '<div class="sig-row"><span class="sig-key">E1</span><span class="sig-val blue">' + s.e1 + '</span></div>' : "";
+    var e2html = s.e2 ? '<div class="sig-row"><span class="sig-key">E2</span><span class="sig-val blue">' + s.e2 + '</span></div>' : "";
+    var e3html = s.e3 ? '<div class="sig-row"><span class="sig-key">E3</span><span class="sig-val blue">' + s.e3 + '</span></div>' : "";
+    var kademehtml = s.asama ? '<div class="sig-row"><span class="sig-key">Kademe</span><span class="sig-val">' + s.asama + '</span></div>' : "";
+    html += '<div class="signal-card ' + cls + '">';
+    html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + '</div>';
+    html += '<div class="sig-badges"><span class="badge ' + cls + '">' + yon + '</span>';
+    html += '<span class="badge bot">' + botAdi(bot) + '</span></div></div>';
+    html += '<div class="sig-row"><span class="sig-key">Giris</span><span class="sig-val">' + (s.giris || s.maliyet || "-") + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">Hedef</span><span class="sig-val green">' + (s.hedef || "-") + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">Stop</span><span class="sig-val red">' + (s.stop || "-") + '</span></div>';
+    html += e1html + e2html + e3html + kademehtml;
+    html += '<div class="sig-time">' + (s.zaman || "") + '</div></div>';
+  }
+  if (hepsi.length === 0) html = '<div class="empty">Su an aktif sinyal yok</div>';
   document.getElementById("sinyal-listesi").innerHTML = html;
 }
 
@@ -250,7 +272,7 @@ function performansGoster() {
 
 function gecmisGoster() {
   var html = "";
-  var toplam = 0;
+  var hepsi = [];
   var botlar = Object.keys(tumVeriler);
   for (var b = 0; b < botlar.length; b++) {
     var bot = botlar[b];
@@ -259,21 +281,71 @@ function gecmisGoster() {
     for (var i = 0; i < sinyaller.length; i++) {
       var s = sinyaller[i];
       if (s.durum !== "tp" && s.durum !== "stop") continue;
-      toplam++;
-      var sonuc = s.durum === "tp" ? "tp" : "stop";
-      var sonucYazi = s.durum === "tp" ? "TP" : "Stop";
-      var yon = s.yon || "";
-      html += '<div class="signal-card ' + sonuc + '">';
-      html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + '</div>';
-      html += '<div class="sig-badges"><span class="badge ' + sonuc + '">' + sonucYazi + '</span>';
-      html += '<span class="badge bot">' + botAdi(bot) + '</span></div></div>';
-      html += '<div class="sig-row"><span class="sig-key">Yon</span><span class="sig-val">' + yon + '</span></div>';
-      html += '<div class="sig-row"><span class="sig-key">Giris</span><span class="sig-val">' + (s.giris || s.maliyet || "-") + '</span></div>';
-      html += '<div class="sig-time">' + (s.zaman || "") + '</div></div>';
+      hepsi.push({ s: s, bot: bot });
     }
   }
-  if (toplam === 0) html = '<div class="empty">Henuz tamamlanmis islem yok</div>';
+  hepsi.sort(function(a, b) {
+    var za = a.s.sonuc_zamani || a.s.zaman || "";
+    var zb = b.s.sonuc_zamani || b.s.zaman || "";
+    return zb.localeCompare(za);
+  });
+
+  for (var k = 0; k < hepsi.length; k++) {
+    var s = hepsi[k].s;
+    var bot = hepsi[k].bot;
+    var sonuc = s.durum === "tp" ? "tp" : "stop";
+    var sonucYazi = s.durum === "tp" ? "TP" : "Stop";
+    var yon = s.yon || "";
+    html += '<div class="signal-card ' + sonuc + '">';
+    html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + '</div>';
+    html += '<div class="sig-badges"><span class="badge ' + sonuc + '">' + sonucYazi + '</span>';
+    html += '<span class="badge bot">' + botAdi(bot) + '</span></div></div>';
+    html += '<div class="sig-row"><span class="sig-key">Yon</span><span class="sig-val">' + yon + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">Giris</span><span class="sig-val">' + (s.giris || s.maliyet || "-") + '</span></div>';
+    html += '<div class="sig-time">' + (s.sonuc_zamani || s.zaman || "") + '</div></div>';
+  }
+  if (hepsi.length === 0) html = '<div class="empty">Henuz tamamlanmis islem yok</div>';
   document.getElementById("gecmis-icerik").innerHTML = html;
+}
+
+function raporGoster() {
+  if (!tumRaporlar || tumRaporlar.length === 0) {
+    document.getElementById("rapor-icerik").innerHTML = '<div class="empty">Henuz gunluk rapor yok (ilk rapor gece 03:00\'te olusur)</div>';
+    return;
+  }
+  var gruplar = {};
+  var tarihler = [];
+  for (var i = 0; i < tumRaporlar.length; i++) {
+    var r = tumRaporlar[i];
+    if (!gruplar[r.tarih]) { gruplar[r.tarih] = []; tarihler.push(r.tarih); }
+    gruplar[r.tarih].push(r);
+  }
+  tarihler.sort(function(a, b) { return b.localeCompare(a); });
+
+  var html = "";
+  for (var t = 0; t < tarihler.length; t++) {
+    var tarih = tarihler[t];
+    var kayitlar = gruplar[tarih].slice();
+    kayitlar.sort(function(a, b) { return (a.bot || "").localeCompare(b.bot || ""); });
+    var gunTp = 0, gunStop = 0;
+    for (var k = 0; k < kayitlar.length; k++) { gunTp += kayitlar[k].tp; gunStop += kayitlar[k].stop; }
+    var gunToplam = gunTp + gunStop;
+    var gunBasari = gunToplam > 0 ? Math.round(gunTp / gunToplam * 100) : 0;
+
+    html += '<div class="section-title">' + tarih + ' &nbsp;·&nbsp; Gun Toplami: ' + gunTp + ' TP / ' + gunStop + ' Stop (%' + gunBasari + ')</div>';
+    for (var k2 = 0; k2 < kayitlar.length; k2++) {
+      var r = kayitlar[k2];
+      var toplam = r.tp + r.stop;
+      var basari = toplam > 0 ? Math.round(r.tp / toplam * 100) : 0;
+      html += '<div class="signal-card" style="margin-bottom:8px">';
+      html += '<div class="sig-header"><div class="sig-symbol">' + botAdi(r.bot) + '</div>';
+      html += '<span class="badge bot">' + basari + '% basari</span></div>';
+      html += '<div class="sig-row"><span class="sig-key">TP</span><span class="sig-val green">' + r.tp + '</span></div>';
+      html += '<div class="sig-row"><span class="sig-key">Stop</span><span class="sig-val red">' + r.stop + '</span></div>';
+      html += '</div>';
+    }
+  }
+  document.getElementById("rapor-icerik").innerHTML = html;
 }
 
 function haberleriGoster() {
