@@ -36,7 +36,7 @@
   .signal-card { background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 14px; margin-bottom: 8px; }
   .signal-card.long { border-left: 3px solid #4ade80; }
   .signal-card.short { border-left: 3px solid #f87171; }
-  .signal-card.tp { border-left: 3px solid #60a5fa; opacity: 0.7; }
+  .signal-card.tp { border-left: 3px solid #4ade80; opacity: 0.7; }
   .signal-card.stop { border-left: 3px solid #f87171; opacity: 0.7; }
   .sig-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   .sig-symbol { font-size: 14px; font-weight: 600; }
@@ -44,7 +44,7 @@
   .badge { font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 20px; }
   .badge.long { background: #052e16; color: #4ade80; }
   .badge.short { background: #2d0a0a; color: #f87171; }
-  .badge.tp { background: #0c1a3d; color: #60a5fa; }
+  .badge.tp { background: #052e16; color: #4ade80; }
   .badge.stop { background: #2d0a0a; color: #f87171; }
   .badge.bot { background: #1e1b4b; color: #a5b4fc; }
   .badge.kripto { background: #1e1b4b; color: #a5b4fc; }
@@ -350,11 +350,12 @@ function gecmisGoster() {
     var sonuc = s.durum === "tp" ? "tp" : "stop";
     var sonucYazi = s.durum === "tp" ? "TP" : "Stop";
     var yon = s.yon || "";
+    var yonCls = yon === "LONG" ? "long" : "short";
     html += '<div class="signal-card ' + sonuc + '">';
     html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + '</div>';
     html += '<div class="sig-badges"><span class="badge ' + sonuc + '">' + sonucYazi + '</span>';
     html += '<span class="badge bot">' + botAdi(bot) + '</span></div></div>';
-    html += '<div class="sig-row"><span class="sig-key">Yon</span><span class="sig-val">' + yon + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">Yon</span><span class="badge ' + yonCls + '">' + yon + '</span></div>';
     html += '<div class="sig-row"><span class="sig-key">Giris</span><span class="sig-val">' + (s.giris || s.maliyet || "-") + '</span></div>';
     html += '<div class="sig-time">' + (s.sonuc_zamani || s.zaman || "") + '</div></div>';
   }
