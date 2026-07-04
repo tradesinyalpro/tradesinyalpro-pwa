@@ -32,6 +32,11 @@
   .price-change.up { color: #4ade80; }
   .price-change.down { color: #f87171; }
   .market-note { font-size: 11px; color: #64748b; padding: 10px 12px; background: #111827; border: 1px dashed #334155; border-radius: 10px; margin-bottom: 8px; }
+  .mini-chip-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .mini-chip { font-size: 11px; background: #1e293b; color: #cbd5e1; padding: 4px 9px; border-radius: 10px; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+  .mini-chip.tp { background: #052e16; color: #4ade80; }
+  .mini-chip.stop { background: #2d0a0a; color: #f87171; }
+  .mini-chip.aktif { background: #0c1a3d; color: #60a5fa; }
   .section-title { font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; margin: 16px 0 8px; }
   .signal-card { background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 14px; margin-bottom: 8px; }
   .signal-card.long { border-left: 3px solid #4ade80; }
@@ -311,7 +316,24 @@ function performansGoster() {
     html += '<span class="badge bot">' + basari + '% basari</span></div>';
     html += '<div class="sig-row"><span class="sig-key">TP</span><span class="sig-val green">' + tp + '</span></div>';
     html += '<div class="sig-row"><span class="sig-key">Stop</span><span class="sig-val red">' + stop + '</span></div>';
-    html += '<div class="sig-row"><span class="sig-key">Aktif</span><span class="sig-val blue">' + aktif + '</span></div></div>';
+    html += '<div class="sig-row"><span class="sig-key">Aktif</span><span class="sig-val blue">' + aktif + '</span></div>';
+
+    if (sinyaller.length > 0) {
+      var siraliSinyaller = sinyaller.slice().sort(function(a, b) {
+        var za = a.sonuc_zamani || a.zaman || "";
+        var zb = b.sonuc_zamani || b.zaman || "";
+        return zb.localeCompare(za);
+      });
+      html += '<div class="mini-chip-wrap">';
+      for (var j = 0; j < siraliSinyaller.length; j++) {
+        var sig = siraliSinyaller[j];
+        var durum = sig.durum || "aktif";
+        var ikon = durum === "tp" ? "✅" : durum === "stop" ? "🛑" : "🔵";
+        html += '<span class="mini-chip ' + durum + '">' + ikon + ' ' + sig.sembol + '</span>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
   }
   var genelToplam = toplamTp + toplamStop;
   var genelBasari = genelToplam > 0 ? Math.round(toplamTp / genelToplam * 100) : 0;
@@ -343,6 +365,24 @@ function gecmisGoster() {
     var zb = b.s.sonuc_zamani || b.s.zaman || "";
     return zb.localeCompare(za);
   });
+
+  var toplamTp = 0, toplamStop = 0;
+  for (var t = 0; t < hepsi.length; t++) {
+    if (hepsi[t].s.durum === "tp") toplamTp++; else toplamStop++;
+  }
+  var toplamIslem = toplamTp + toplamStop;
+  var toplamBasari = toplamIslem > 0 ? Math.round(toplamTp / toplamIslem * 100) : 0;
+
+  if (hepsi.length > 0) {
+    html += '<div class="stats-grid" style="margin-bottom:12px">';
+    html += '<div class="stat-card"><div class="stat-label">Toplam TP</div><div class="stat-val green">' + toplamTp + '</div></div>';
+    html += '<div class="stat-card"><div class="stat-label">Toplam Stop</div><div class="stat-val red">' + toplamStop + '</div></div>';
+    html += '</div>';
+    html += '<div class="stat-card" style="margin-bottom:16px;text-align:center">';
+    html += '<div class="stat-label">Toplam Islem: ' + toplamIslem + ' &nbsp;·&nbsp; Basari Orani</div>';
+    html += '<div class="stat-val">%' + toplamBasari + '</div>';
+    html += '</div>';
+  }
 
   for (var k = 0; k < hepsi.length; k++) {
     var s = hepsi[k].s;
