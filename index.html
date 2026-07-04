@@ -57,6 +57,12 @@
   .badge.long { background: #052e16; color: #4ade80; }
   .badge.short { background: #2d0a0a; color: #f87171; }
   .badge.tp { background: #052e16; color: #4ade80; }
+  .badge.seviye-normal { background: #1e293b; color: #94a3b8; }
+  .badge.seviye-buyuk { background: #431407; color: #fb923c; }
+  .badge.seviye-mega { background: #450a0a; color: #fbbf24; font-weight: 700; }
+  .balina-ozet-bar { display: flex; height: 8px; border-radius: 6px; overflow: hidden; margin-top: 8px; }
+  .balina-ozet-alim { background: #4ade80; height: 100%; }
+  .balina-ozet-satim { background: #f87171; height: 100%; }
   .badge.stop { background: #2d0a0a; color: #f87171; }
   .badge.bot { background: #1e1b4b; color: #a5b4fc; }
   .badge.kripto { background: #1e1b4b; color: #a5b4fc; }
@@ -106,6 +112,7 @@
   <div class="tab" onclick="sekmeAc('gecmis',this)">Gecmis</div>
   <div class="tab" onclick="sekmeAc('rapor',this)">Gunluk Rapor</div>
   <div class="tab" onclick="sekmeAc('piyasa',this)">Piyasa</div>
+  <div class="tab" onclick="sekmeAc('balina',this)">Balina Takip</div>
   <div class="tab" onclick="sekmeAc('haberler',this)">Haberler</div>
 </div>
 
@@ -178,6 +185,10 @@
     </div>
   </div>
 
+  <div id="balina" style="display:none">
+    <div id="balina-icerik"><div class="loading">Yukleniyor...</div></div>
+  </div>
+
   <div id="haberler" style="display:none">
     <div class="bot-filter">
       <button class="bot-btn active" onclick="haberFiltre('hepsi',this)">Tumu</button>
@@ -196,6 +207,7 @@ var API_KEY = "tradesinyalpro2024";
 var tumVeriler = {};
 var tumHaberler = [];
 var tumRaporlar = [];
+var tumBalina = { islemler: [], ozet: {} };
 var piyasaVerisi = null;
 var piyasaSonGuncelleme = 0;
 var aktifBot = "hepsi";
@@ -253,6 +265,17 @@ function veriYukle() {
     }
   };
   xhr3.send();
+
+  var xhr4 = new XMLHttpRequest();
+  xhr4.open("GET", API + "/balina", true);
+  xhr4.setRequestHeader("X-API-Key", API_KEY);
+  xhr4.onload = function() {
+    if (xhr4.status === 200) {
+      tumBalina = JSON.parse(xhr4.responseText);
+      if (aktifSekme === "balina") balinaGoster();
+    }
+  };
+  xhr4.send();
 }
 
 function guncelle() {
@@ -260,6 +283,7 @@ function guncelle() {
   if (aktifSekme === "performans") performansGoster();
   if (aktifSekme === "gecmis") gecmisGoster();
   if (aktifSekme === "rapor") raporGoster();
+  if (aktifSekme === "balina") balinaGoster();
   if (aktifSekme === "haberler") haberleriGoster();
 }
 
@@ -573,6 +597,58 @@ function piyasaGoster() {
   html += '<div class="sig-time" style="text-align:center;margin-top:6px">Son guncelleme: ' + new Date(piyasaSonGuncelleme).toLocaleTimeString("tr-TR") + '</div>';
 
   document.getElementById("piyasa-icerik").innerHTML = html;
+}
+
+function balinaGoster() {
+  var islemler = tumBalina.islemler || [];
+  var ozet = tumBalina.ozet || {};
+
+  var html = "";
+
+  // --- Genel Alim/Satim Baskisi ---
+  var ozetSemboller = Object.keys(ozet);
+  if (ozetSemboller.length > 0) {
+    ozetSemboller.sort(function(a, b) { return (ozet[b].toplam_hacim || 0) - (ozet[a].toplam_hacim || 0); });
+    ozetSemboller = ozetSemboller.slice(0, 12);
+
+    html += '<div class="section-title">Genel Alim / Satim Baskisi (Son 5 Dakika)</div>';
+    for (var i = 0; i < ozetSemboller.length; i++) {
+      var s = ozetSemboller[i];
+      var o = ozet[s];
+      var alim = o.alim_yuzde || 0;
+      var satim = o.satim_yuzde || 0;
+      html += '<div class="stat-card" style="margin-bottom:8px">';
+      html += '<div class="sig-header"><div class="sig-symbol">#' + s + '</div>';
+      html += '<span class="badge long">Alim %' + alim + '</span></div>';
+      html += '<div class="balina-ozet-bar">';
+      html += '<div class="balina-ozet-alim" style="width:' + alim + '%"></div>';
+      html += '<div class="balina-ozet-satim" style="width:' + satim + '%"></div>';
+      html += '</div>';
+      html += '<div class="sig-time">Satim %' + satim + '</div>';
+      html += '</div>';
+    }
+  }
+
+  // --- Son Balina Hareketleri ---
+  html += '<div class="section-title">Son Balina Hareketleri (100k$ Ustu)</div>';
+  if (islemler.length === 0) {
+    html += '<div class="empty">Henuz balina hareketi tespit edilmedi</div>';
+  }
+  for (var k = 0; k < islemler.length; k++) {
+    var t = islemler[k];
+    var yonCls = t.yon === "LONG" ? "long" : "short";
+    var seviyeYazi = t.seviye === "mega" ? "MEGA BALINA" : t.seviye === "buyuk" ? "Buyuk Balina" : "Balina";
+    var ikon = t.seviye === "mega" ? "\uD83D\uDC33\uD83D\uDC33\uD83D\uDC33" : t.seviye === "buyuk" ? "\uD83D\uDC33\uD83D\uDC33" : "\uD83D\uDC33";
+    var degerFormatli = "$" + Math.round(t.deger || 0).toLocaleString();
+    html += '<div class="signal-card ' + yonCls + '">';
+    html += '<div class="sig-header"><div class="sig-symbol">' + ikon + ' #' + t.sembol + '</div>';
+    html += '<div class="sig-badges"><span class="badge ' + yonCls + '">' + t.yon + '</span>';
+    html += '<span class="badge seviye-' + t.seviye + '">' + seviyeYazi + '</span></div></div>';
+    html += '<div class="sig-row"><span class="sig-key">Deger</span><span class="sig-val">' + degerFormatli + '</span></div>';
+    html += '<div class="sig-time">' + (t.zaman || "") + '</div></div>';
+  }
+
+  document.getElementById("balina-icerik").innerHTML = html;
 }
 
 function haberleriGoster() {
