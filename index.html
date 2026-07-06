@@ -74,6 +74,7 @@
   .sig-badges { display: flex; gap: 6px; align-items: center; }
   .badge { font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 20px; }
   .badge.long { background: #052e16; color: #4ade80; }
+  .badge.aktif { background: #0c1a3d; color: #60a5fa; }
   .badge.short { background: #2d0a0a; color: #f87171; }
   .badge.tp { background: #052e16; color: #4ade80; }
   .badge.seviye-normal { background: #1e293b; color: #94a3b8; }
@@ -295,6 +296,7 @@ var API = "https://abundant-light-production-fb25.up.railway.app";
 var API_KEY = "tradesinyalpro2024";
 var authToken = null;
 var hesapDurumu = null;
+var hesapKalanGun = null;
 var girisliKullanici = null;
 var tumVeriler = {};
 var tumHaberler = [];
@@ -1010,6 +1012,7 @@ function girisYap() {
     if (xhr.status === 200) {
       authToken = yanit.token;
       hesapDurumu = yanit.hesap_durumu;
+      hesapKalanGun = yanit.kalan_gun;
       girisliKullanici = yanit.kullanici_adi;
       localStorage.setItem("ts_token", authToken);
       girisBasarili();
@@ -1117,7 +1120,7 @@ function girisBasarili() {
 
 function erisimGuncelle() {
   var bannerAlani = document.getElementById("durum-banner-alani");
-  var tamErisim = (hesapDurumu === "onayli" || hesapDurumu === "admin");
+  var tamErisim = (hesapDurumu === "onayli" || hesapDurumu === "admin" || hesapDurumu === "deneme");
 
   var tablar = document.querySelectorAll("#tabs-alani .tab");
   for (var i = 0; i < tablar.length; i++) {
@@ -1126,7 +1129,12 @@ function erisimGuncelle() {
   }
   document.getElementById("yonetici-tab").style.display = (hesapDurumu === "admin") ? "" : "none";
 
-  if (hesapDurumu === "bekliyor") {
+  if (hesapDurumu === "deneme") {
+    var gunYazisi = (hesapKalanGun === 1) ? "1 gun" : (hesapKalanGun + " gun");
+    bannerAlani.innerHTML = '<div class="durum-banner bekliyor">Ucretsiz deneme surumundesiniz. Kalan sure: ' + gunYazisi + '.</div>';
+  } else if (hesapDurumu === "deneme_bitti") {
+    bannerAlani.innerHTML = '<div class="durum-banner suresi-dolmus">Deneme süreniz sona erdi. Uyeliginizi baslatmak icin bize ulasin.</div>';
+  } else if (hesapDurumu === "bekliyor") {
     bannerAlani.innerHTML = '<div class="durum-banner bekliyor">Hesabiniz onay bekliyor. Onaylandiktan sonra tum ozelliklere erisebileceksiniz.</div>';
   } else if (hesapDurumu === "suresi_dolmus") {
     bannerAlani.innerHTML = '<div class="durum-banner suresi-dolmus">Uyeliginizin suresi doldu. Yenilemek icin bize ulasin.</div>';
@@ -1162,6 +1170,8 @@ function yoneticiPaneliGoster() {
     for (var i = 0; i < liste.length; i++) {
       var u = liste[i];
       var durumRozet = u.durum === "bekliyor" ? '<span class="badge seviye-buyuk">Onay Bekliyor</span>'
+                      : u.durum === "deneme" ? '<span class="badge aktif">Deneme (Aktif)</span>'
+                      : u.durum === "deneme_bitti" ? '<span class="badge seviye-buyuk">Deneme Bitti</span>'
                       : u.durum === "onayli" ? '<span class="badge long">Onayli</span>'
                       : '<span class="badge short">Suresi Doldu</span>';
       html += '<div class="signal-card" style="margin-bottom:8px">';
@@ -1201,6 +1211,7 @@ function sayfaBaslat() {
       var yanit = JSON.parse(xhr.responseText);
       authToken = kayitliToken;
       hesapDurumu = yanit.hesap_durumu;
+      hesapKalanGun = yanit.kalan_gun;
       girisliKullanici = yanit.kullanici_adi;
       girisBasarili();
     } else {
