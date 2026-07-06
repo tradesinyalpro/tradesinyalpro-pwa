@@ -765,35 +765,48 @@ function balinaGoster() {
 }
 
 function altcoinIzgaraHtml(islemler) {
+  var sabitSira = tumBalina.sembol_sirasi || [];
+
+  // Her sembol icin islemleri grupla (backend'den yeni->eski geldigi icin,
+  // soldan saga "excel gibi" eklensin diye eskiden yeniye ceviriyoruz)
   var gruplar = {};
-  var sira = [];
   for (var i = 0; i < islemler.length; i++) {
     var t = islemler[i];
-    if (!gruplar[t.sembol]) { gruplar[t.sembol] = []; sira.push(t.sembol); }
-    gruplar[t.sembol].push(t);
+    if (!gruplar[t.sembol]) gruplar[t.sembol] = [];
+    gruplar[t.sembol].unshift(t);
   }
-  // En son islemi olan coin en ustte gorunsun
-  sira.sort(function(a, b) {
-    var zA = (gruplar[a][0] && gruplar[a][0].zaman) || "";
-    var zB = (gruplar[b][0] && gruplar[b][0].zaman) || "";
-    return zB.localeCompare(zA);
+
+  // Sira listesinde olmayan ama islem gelmis semboller varsa (henuz sira
+  // guncellenmediyse) onlari da sonuna ekleyelim, hic veri kaybolmasin
+  var goruntulenecekler = sabitSira.slice();
+  Object.keys(gruplar).forEach(function(s) {
+    if (goruntulenecekler.indexOf(s) === -1) goruntulenecekler.push(s);
   });
 
-  var html = '<div class="section-title">Coin Bazinda Alim / Satim Hareketleri</div>';
-  for (var s = 0; s < sira.length; s++) {
-    var sembol = sira[s];
-    var kayitlar = gruplar[sembol];
+  if (goruntulenecekler.length === 0) {
+    return '<div class="empty">Coin listesi henuz yuklenmedi, birazdan gelecek</div>';
+  }
+
+  var html = '<div class="section-title">Coin Bazinda Alim / Satim Hareketleri (24s Hacme Gore Sabit Sirali)</div>';
+  for (var s = 0; s < goruntulenecekler.length; s++) {
+    var sembol = goruntulenecekler[s];
+    var kayitlar = gruplar[sembol] || [];
     html += '<div class="stat-card" style="margin-bottom:8px">';
     html += '<div class="sig-header"><div class="sig-symbol">#' + sembol + '</div>';
     html += '<span class="badge bot">' + kayitlar.length + ' islem</span></div>';
-    html += '<div class="mini-chip-wrap">';
-    for (var k = 0; k < kayitlar.length; k++) {
-      var t = kayitlar[k];
-      var cls = t.yon === "LONG" ? "long" : "short";
-      var deger = "$" + Math.round(t.deger || 0).toLocaleString();
-      html += '<span class="mini-chip ' + cls + '" title="' + (t.zaman || "") + '">' + deger + '</span>';
+    if (kayitlar.length === 0) {
+      html += '<div class="sig-time">Henuz islem yok</div>';
+    } else {
+      html += '<div class="mini-chip-wrap">';
+      for (var k = 0; k < kayitlar.length; k++) {
+        var t = kayitlar[k];
+        var cls = t.yon === "LONG" ? "long" : "short";
+        var deger = "$" + Math.round(t.deger || 0).toLocaleString();
+        html += '<span class="mini-chip ' + cls + '" title="' + (t.zaman || "") + '">' + deger + '</span>';
+      }
+      html += '</div>';
     }
-    html += '</div></div>';
+    html += '</div>';
   }
   return html;
 }
