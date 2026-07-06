@@ -102,9 +102,52 @@
   .news-bullet { font-size: 11px; color: #94a3b8; margin-bottom: 3px; padding-left: 12px; position: relative; list-style: none; }
   .news-bullet::before { content: "•"; position: absolute; left: 0; color: #475569; }
   .news-time { font-size: 11px; color: #475569; margin-top: 8px; }
+<style>
+  .auth-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .auth-card { width: 100%; max-width: 360px; background: #111827; border: 1px solid #1e293b; border-radius: 16px; padding: 28px 24px; }
+  .auth-logo { text-align: center; font-size: 22px; font-weight: 700; margin-bottom: 24px; }
+  .auth-logo span { color: #3b82f6; }
+  .auth-input { width: 100%; padding: 12px 14px; margin-bottom: 12px; background: #0a0f1e; border: 1px solid #1e293b; border-radius: 10px; color: #e2e8f0; font-size: 14px; }
+  .auth-input::placeholder { color: #64748b; }
+  .auth-btn { width: 100%; padding: 13px; background: #3b82f6; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 4px; }
+  .auth-btn:active { opacity: 0.8; }
+  .auth-toggle { text-align: center; margin-top: 16px; font-size: 13px; color: #60a5fa; cursor: pointer; }
+  .auth-error { background: #2d0a0a; color: #f87171; padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; display: none; }
+  .auth-success { background: #052e16; color: #4ade80; padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; display: none; }
+  .durum-banner { padding: 12px 16px; font-size: 13px; text-align: center; }
+  .durum-banner.bekliyor { background: #1e293b; color: #93c5fd; }
+  .durum-banner.suresi-dolmus { background: #451a03; color: #fbbf24; }
+  .cikis-btn { background: none; border: none; color: #64748b; font-size: 12px; cursor: pointer; text-decoration: underline; }
 </style>
 </head>
 <body>
+
+<div id="auth-ekrani" class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">Trade<span>Sinyal</span>Pro</div>
+
+    <div id="giris-form">
+      <div class="auth-error" id="giris-hata"></div>
+      <input class="auth-input" id="giris-kadi" type="text" placeholder="Kullanici adi" autocomplete="username">
+      <input class="auth-input" id="giris-sifre" type="password" placeholder="Sifre" autocomplete="current-password">
+      <button class="auth-btn" onclick="girisYap()">Giris Yap</button>
+      <div class="auth-toggle" onclick="formDegistir('kayit')">Hesabin yok mu? Kayit Ol</div>
+    </div>
+
+    <div id="kayit-form" style="display:none">
+      <div class="auth-error" id="kayit-hata"></div>
+      <div class="auth-success" id="kayit-basari"></div>
+      <input class="auth-input" id="kayit-kadi" type="text" placeholder="Kullanici adi" autocomplete="username">
+      <input class="auth-input" id="kayit-sifre" type="password" placeholder="Sifre (en az 6 karakter)" autocomplete="new-password">
+      <input class="auth-input" id="kayit-telegram" type="text" placeholder="Telegram kullanici adi (@ornek)">
+      <input class="auth-input" id="kayit-email" type="email" placeholder="E-posta (istege bagli)">
+      <button class="auth-btn" onclick="kayitOl()">Kayit Ol</button>
+      <div class="auth-toggle" onclick="formDegistir('giris')">Zaten hesabin var mi? Giris Yap</div>
+    </div>
+  </div>
+</div>
+
+<div id="app-icerik" style="display:none">
 
 <div class="header">
   <div class="logo">Trade<span>Sinyal</span>Pro</div>
@@ -114,14 +157,17 @@
   </div>
 </div>
 
-<div class="tabs">
-  <div class="tab active" onclick="sekmeAc('sinyaller',this)">Sinyaller</div>
+<div id="durum-banner-alani"></div>
+
+<div class="tabs" id="tabs-alani">
+  <div class="tab active" onclick="sekmeAc('sinyaller',this)" data-tam-erisim="1">Sinyaller</div>
   <div class="tab" onclick="sekmeAc('performans',this)">Performans</div>
   <div class="tab" onclick="sekmeAc('gecmis',this)">Gecmis</div>
-  <div class="tab" onclick="sekmeAc('rapor',this)">Gunluk Rapor</div>
-  <div class="tab" onclick="sekmeAc('piyasa',this)">Piyasa</div>
-  <div class="tab" onclick="sekmeAc('balina',this)">Balina Takip</div>
-  <div class="tab" onclick="sekmeAc('haberler',this)">Haberler</div>
+  <div class="tab" onclick="sekmeAc('rapor',this)" data-tam-erisim="1">Gunluk Rapor</div>
+  <div class="tab" onclick="sekmeAc('piyasa',this)" data-tam-erisim="1">Piyasa</div>
+  <div class="tab" onclick="sekmeAc('balina',this)" data-tam-erisim="1">Balina Takip</div>
+  <div class="tab" onclick="sekmeAc('haberler',this)" data-tam-erisim="1">Haberler</div>
+  <div class="tab" onclick="sekmeAc('yonetici',this)" id="yonetici-tab" style="display:none">Yonetici</div>
 </div>
 
 <div class="content">
@@ -196,6 +242,7 @@
   <div id="balina" style="display:none">
     <div class="bot-filter">
       <button class="bot-btn active" onclick="balinaFiltre('kripto',this)">Kripto</button>
+      <button class="bot-btn" onclick="balinaFiltre('altcoin',this)">Altcoinler</button>
       <button class="bot-btn" onclick="balinaFiltre('hisse',this)">ABD Hisseleri</button>
     </div>
     <div id="balina-icerik"><div class="loading">Yukleniyor...</div></div>
@@ -211,11 +258,22 @@
     </div>
     <div id="haber-listesi"><div class="loading">Yukleniyor...</div></div>
   </div>
+
+  <div id="yonetici" style="display:none">
+    <div id="yonetici-icerik"><div class="loading">Yukleniyor...</div></div>
+  </div>
+</div>
+
+<div style="text-align:center;padding:16px"><button class="cikis-btn" onclick="cikisYap()">Cikis Yap</button></div>
+
 </div>
 
 <script>
 var API = "https://abundant-light-production-fb25.up.railway.app";
 var API_KEY = "tradesinyalpro2024";
+var authToken = null;
+var hesapDurumu = null;
+var girisliKullanici = null;
 var tumVeriler = {};
 var tumHaberler = [];
 var tumRaporlar = [];
@@ -298,6 +356,7 @@ function guncelle() {
   if (aktifSekme === "rapor") raporGoster();
   if (aktifSekme === "balina") balinaGoster();
   if (aktifSekme === "haberler") haberleriGoster();
+  if (aktifSekme === "yonetici") yoneticiPaneliGoster();
 }
 
 function sinyalleriGoster() {
@@ -625,11 +684,17 @@ function balinaGoster() {
   var tumOzet = tumBalina.ozet || {};
 
   // Kategorisi olmayan eski kayitlar guvenli varsayilan olarak "kripto" sayilir
-  var islemler = tumIslemler.filter(function(t) { return (t.kategori || "kripto") === balinaKategori; });
-  var ozet = {};
-  Object.keys(tumOzet).forEach(function(s) {
-    if ((tumOzet[s].kategori || "kripto") === balinaKategori) ozet[s] = tumOzet[s];
-  });
+  var islemler, ozet = {};
+  if (balinaKategori === "altcoin") {
+    islemler = tumIslemler.filter(function(t) { return t.grup === "altcoin"; });
+  } else {
+    islemler = tumIslemler.filter(function(t) {
+      return (t.kategori || "kripto") === balinaKategori && t.grup !== "altcoin";
+    });
+    Object.keys(tumOzet).forEach(function(s) {
+      if ((tumOzet[s].kategori || "kripto") === balinaKategori) ozet[s] = tumOzet[s];
+    });
+  }
 
   var html = "";
 
@@ -778,8 +843,197 @@ function haberFiltre(kategori, el) {
   haberleriGoster();
 }
 
-veriYukle();
-setInterval(veriYukle, 10000);
+function formDegistir(hangisi) {
+  document.getElementById("giris-form").style.display = hangisi === "giris" ? "block" : "none";
+  document.getElementById("kayit-form").style.display = hangisi === "kayit" ? "block" : "none";
+  document.getElementById("giris-hata").style.display = "none";
+  document.getElementById("kayit-hata").style.display = "none";
+  document.getElementById("kayit-basari").style.display = "none";
+}
+
+function girisYap() {
+  var kadi = document.getElementById("giris-kadi").value.trim();
+  var sifre = document.getElementById("giris-sifre").value;
+  var hataEl = document.getElementById("giris-hata");
+  hataEl.style.display = "none";
+  if (!kadi || !sifre) {
+    hataEl.textContent = "Kullanici adi ve sifre gerekli";
+    hataEl.style.display = "block";
+    return;
+  }
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/giris", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.onload = function() {
+    var yanit;
+    try { yanit = JSON.parse(xhr.responseText); } catch (e) { yanit = {}; }
+    if (xhr.status === 200) {
+      authToken = yanit.token;
+      hesapDurumu = yanit.hesap_durumu;
+      girisliKullanici = yanit.kullanici_adi;
+      localStorage.setItem("ts_token", authToken);
+      girisBasarili();
+    } else {
+      hataEl.textContent = yanit.hata || "Giris basarisiz";
+      hataEl.style.display = "block";
+    }
+  };
+  xhr.onerror = function() {
+    hataEl.textContent = "Baglanti hatasi, tekrar deneyin";
+    hataEl.style.display = "block";
+  };
+  xhr.send(JSON.stringify({ kullanici_adi: kadi, sifre: sifre }));
+}
+
+function kayitOl() {
+  var kadi = document.getElementById("kayit-kadi").value.trim();
+  var sifre = document.getElementById("kayit-sifre").value;
+  var telegram = document.getElementById("kayit-telegram").value.trim();
+  var email = document.getElementById("kayit-email").value.trim();
+  var hataEl = document.getElementById("kayit-hata");
+  var basariEl = document.getElementById("kayit-basari");
+  hataEl.style.display = "none";
+  basariEl.style.display = "none";
+
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/kayit", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.onload = function() {
+    var yanit;
+    try { yanit = JSON.parse(xhr.responseText); } catch (e) { yanit = {}; }
+    if (xhr.status === 200) {
+      basariEl.textContent = "Kaydiniz alindi! Onay bekleniyor, simdi giris yapabilirsiniz.";
+      basariEl.style.display = "block";
+      document.getElementById("kayit-kadi").value = "";
+      document.getElementById("kayit-sifre").value = "";
+      document.getElementById("kayit-telegram").value = "";
+      document.getElementById("kayit-email").value = "";
+    } else {
+      hataEl.textContent = yanit.hata || "Kayit basarisiz";
+      hataEl.style.display = "block";
+    }
+  };
+  xhr.onerror = function() {
+    hataEl.textContent = "Baglanti hatasi, tekrar deneyin";
+    hataEl.style.display = "block";
+  };
+  xhr.send(JSON.stringify({ kullanici_adi: kadi, sifre: sifre, telegram: telegram, email: email }));
+}
+
+function cikisYap() {
+  localStorage.removeItem("ts_token");
+  authToken = null;
+  hesapDurumu = null;
+  girisliKullanici = null;
+  document.getElementById("app-icerik").style.display = "none";
+  document.getElementById("auth-ekrani").style.display = "flex";
+  formDegistir("giris");
+}
+
+function girisBasarili() {
+  document.getElementById("auth-ekrani").style.display = "none";
+  document.getElementById("app-icerik").style.display = "block";
+  erisimGuncelle();
+  veriYukle();
+  setInterval(veriYukle, 10000);
+}
+
+function erisimGuncelle() {
+  var bannerAlani = document.getElementById("durum-banner-alani");
+  var tamErisim = (hesapDurumu === "onayli" || hesapDurumu === "admin");
+
+  var tablar = document.querySelectorAll("#tabs-alani .tab");
+  for (var i = 0; i < tablar.length; i++) {
+    var tamGerekli = tablar[i].getAttribute("data-tam-erisim") === "1";
+    if (tamGerekli) tablar[i].style.display = tamErisim ? "" : "none";
+  }
+  document.getElementById("yonetici-tab").style.display = (hesapDurumu === "admin") ? "" : "none";
+
+  if (hesapDurumu === "bekliyor") {
+    bannerAlani.innerHTML = '<div class="durum-banner bekliyor">Hesabiniz onay bekliyor. Onaylandiktan sonra tum ozelliklere erisebileceksiniz.</div>';
+  } else if (hesapDurumu === "suresi_dolmus") {
+    bannerAlani.innerHTML = '<div class="durum-banner suresi-dolmus">Uyeliginizin suresi doldu. Yenilemek icin bize ulasin.</div>';
+  } else {
+    bannerAlani.innerHTML = "";
+  }
+
+  if (!tamErisim && aktifSekme === "sinyaller") {
+    var tablar2 = document.querySelectorAll("#tabs-alani .tab");
+    for (var j = 0; j < tablar2.length; j++) {
+      if ((tablar2[j].getAttribute("onclick") || "").indexOf("'gecmis'") !== -1) {
+        sekmeAc("gecmis", tablar2[j]);
+        break;
+      }
+    }
+  }
+}
+
+function yoneticiPaneliGoster() {
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/admin/kullanicilar", true);
+  xhr.setRequestHeader("X-Auth-Token", authToken);
+  xhr.onload = function() {
+    if (xhr.status !== 200) {
+      document.getElementById("yonetici-icerik").innerHTML = '<div class="empty">Yetkisiz erisim</div>';
+      return;
+    }
+    var liste = JSON.parse(xhr.responseText);
+    var html = "";
+    if (liste.length === 0) {
+      html = '<div class="empty">Henuz kayitli kullanici yok</div>';
+    }
+    for (var i = 0; i < liste.length; i++) {
+      var u = liste[i];
+      var durumRozet = u.durum === "bekliyor" ? '<span class="badge seviye-buyuk">Onay Bekliyor</span>'
+                      : u.durum === "onayli" ? '<span class="badge long">Onayli</span>'
+                      : '<span class="badge short">Suresi Doldu</span>';
+      html += '<div class="signal-card" style="margin-bottom:8px">';
+      html += '<div class="sig-header"><div class="sig-symbol">' + u.kullanici_adi + '</div>' + durumRozet + '</div>';
+      html += '<div class="sig-row"><span class="sig-key">Telegram</span><span class="sig-val">' + (u.telegram || "-") + '</span></div>';
+      html += '<div class="sig-row"><span class="sig-key">Email</span><span class="sig-val">' + (u.email || "-") + '</span></div>';
+      html += '<div class="sig-time">Kayit: ' + (u.olusturma_tarihi || "-") + '</div>';
+      if (u.onay_tarihi) html += '<div class="sig-time">Onay: ' + u.onay_tarihi + '</div>';
+      if (u.durum !== "onayli") {
+        var butonYazisi = u.durum === "suresi_dolmus" ? "Yenile (30 Gun)" : "Onayla";
+        html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciOnayla(\'' + u.kullanici_adi + '\')">' + butonYazisi + '</button></div>';
+      }
+      html += '</div>';
+    }
+    document.getElementById("yonetici-icerik").innerHTML = html;
+  };
+  xhr.send();
+}
+
+function kullaniciOnayla(kadi) {
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/admin/onayla", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken);
+  xhr.onload = function() { yoneticiPaneliGoster(); };
+  xhr.send(JSON.stringify({ kullanici_adi: kadi }));
+}
+
+function sayfaBaslat() {
+  var kayitliToken = localStorage.getItem("ts_token");
+  if (!kayitliToken) return;
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/hesap/durum", true);
+  xhr.setRequestHeader("X-Auth-Token", kayitliToken);
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      var yanit = JSON.parse(xhr.responseText);
+      authToken = kayitliToken;
+      hesapDurumu = yanit.hesap_durumu;
+      girisliKullanici = yanit.kullanici_adi;
+      girisBasarili();
+    } else {
+      localStorage.removeItem("ts_token");
+    }
+  };
+  xhr.send();
+}
+
+sayfaBaslat();
 </script>
 </body>
 </html>
