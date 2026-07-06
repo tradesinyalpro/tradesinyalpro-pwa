@@ -41,6 +41,15 @@
   .price-change.down { color: #f87171; }
   .market-note { font-size: 11px; color: #64748b; padding: 10px 12px; background: #111827; border: 1px dashed #334155; border-radius: 10px; margin-bottom: 8px; }
   .mini-chip-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .balina-tablo-wrap { overflow-x: auto; border: 1px solid #1e293b; border-radius: 10px; margin-bottom: 16px; -webkit-overflow-scrolling: touch; }
+  .balina-tablo { border-collapse: collapse; width: max-content; min-width: 100%; }
+  .balina-tablo th, .balina-tablo td { border: 1px solid #1e293b; padding: 8px 10px; font-size: 12px; text-align: center; white-space: nowrap; }
+  .balina-tablo th { background: #0c1424; color: #64748b; font-weight: 600; font-size: 11px; }
+  .balina-tablo td.coin-adi, .balina-tablo th.coin-adi { position: sticky; left: 0; background: #111827; z-index: 2; text-align: left; font-weight: 600; }
+  .balina-tablo th.coin-adi { background: #0c1424; z-index: 3; }
+  .balina-tablo td.long { background: #052e16; color: #4ade80; font-weight: 600; }
+  .balina-tablo td.short { background: #2d0a0a; color: #f87171; font-weight: 600; }
+  .balina-tablo td.bos { color: #334155; }
   .mini-chip { font-size: 11px; background: #1e293b; color: #cbd5e1; padding: 4px 9px; border-radius: 10px; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
   .mini-chip.tp { background: #052e16; color: #4ade80; }
   .mini-chip.stop { background: #2d0a0a; color: #f87171; }
@@ -693,7 +702,14 @@ function balinaFiltre(kategori, el) {
 }
 
 function balinaGoster() {
-  var tumIslemler = tumBalina.islemler || [];
+  // Backend artik islemleri coin bazinda ({"BTCUSDT":[...], ...}) gonderiyor,
+  // her coin kendi icinde en fazla 20 kayit tutuyor. Mevcut filtreleme
+  // mantigi tek bir duz liste bekledigi icin once hepsini birlestiriyoruz.
+  var islemlerSozluk = tumBalina.islemler || {};
+  var tumIslemler = [];
+  Object.keys(islemlerSozluk).forEach(function(s) {
+    tumIslemler = tumIslemler.concat(islemlerSozluk[s]);
+  });
   var tumOzet = tumBalina.ozet || {};
 
   // Kategorisi olmayan eski kayitlar guvenli varsayilan olarak "kripto" sayilir
@@ -704,6 +720,7 @@ function balinaGoster() {
     islemler = tumIslemler.filter(function(t) {
       return (t.kategori || "kripto") === balinaKategori && t.grup !== "altcoin";
     });
+    islemler.sort(function(a, b) { return (b.zaman || "").localeCompare(a.zaman || ""); });
     Object.keys(tumOzet).forEach(function(s) {
       if ((tumOzet[s].kategori || "kripto") === balinaKategori) ozet[s] = tumOzet[s];
     });
@@ -740,7 +757,7 @@ function balinaGoster() {
     if (islemler.length === 0) {
       html += '<div class="empty">Henuz altcoin balina hareketi tespit edilmedi</div>';
     } else {
-      html += altcoinIzgaraHtml(islemler);
+      html += altcoinTabloHtml(islemler);
     }
   } else {
     if (islemler.length === 0) {
@@ -764,6 +781,61 @@ function balinaGoster() {
   document.getElementById("balina-icerik").innerHTML = html;
 }
 
+function altcoinTabloHtml(islemler) {
+  var sabitSira = tumBalina.sembol_sirasi || [];
+
+  // Her sembol icin islemleri eskiden yeniye sirala (soldan saga dolsun diye)
+  var gruplar = {};
+  for (var i = 0; i < islemler.length; i++) {
+    var t = islemler[i];
+    if (!gruplar[t.sembol]) gruplar[t.sembol] = [];
+    gruplar[t.sembol].unshift(t);
+  }
+
+  var goruntulenecekler = sabitSira.slice();
+  Object.keys(gruplar).forEach(function(s) {
+    if (goruntulenecekler.indexOf(s) === -1) goruntulenecekler.push(s);
+  });
+
+  if (goruntulenecekler.length === 0) {
+    return '<div class="empty">Coin listesi henuz yuklenmedi, birazdan gelecek</div>';
+  }
+
+  // En cok islemi olan coin kadar sutun acalim (en fazla 20, backend siniri)
+  var maxSutun = 1;
+  goruntulenecekler.forEach(function(s) {
+    var uzunluk = (gruplar[s] || []).length;
+    if (uzunluk > maxSutun) maxSutun = uzunluk;
+  });
+
+  var html = '<div class="section-title">Coin Bazinda Alim / Satim Hareketleri (24s Hacme Gore Sabit Sirali)</div>';
+  html += '<div class="balina-tablo-wrap"><table class="balina-tablo"><thead><tr><th class="coin-adi">Coin</th>';
+  for (var c = 1; c <= maxSutun; c++) html += '<th>' + c + '</th>';
+  html += '</tr></thead><tbody>';
+
+  for (var s = 0; s < goruntulenecekler.length; s++) {
+    var sembol = goruntulenecekler[s];
+    var kayitlar = gruplar[sembol] || [];
+    html += '<tr><td class="coin-adi">#' + sembol + '</td>';
+    for (var k = 0; k < maxSutun; k++) {
+      if (k < kayitlar.length) {
+        var t = kayitlar[k];
+        var cls = t.yon === "LONG" ? "long" : "short";
+        var deger = "$" + Math.round(t.deger || 0).toLocaleString();
+        html += '<td class="' + cls + '" title="' + (t.zaman || "") + '">' + deger + '</td>';
+      } else {
+        html += '<td class="bos">-</td>';
+      }
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+  return html;
+}
+
+// --- YEDEK (eski) tasarim: kutucuklu/hap seklinde gorunum.
+// Beklendigi gibi geri donmek istenirse yukaridaki cagriyi
+// altcoinIzgaraHtml(islemler) olarak degistirmek yeterli. ---
 function altcoinIzgaraHtml(islemler) {
   var sabitSira = tumBalina.sembol_sirasi || [];
 
