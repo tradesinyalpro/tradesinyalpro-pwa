@@ -281,6 +281,7 @@
   </div>
 
   <div id="yonetici" style="display:none">
+    <div id="yonetici-ziyaret-icerik"></div>
     <div id="yonetici-icerik"><div class="loading">Yukleniyor...</div></div>
   </div>
 </div>
@@ -1173,9 +1174,17 @@ function cikisYap() {
 function girisBasarili() {
   document.getElementById("auth-ekrani").style.display = "none";
   document.getElementById("app-icerik").style.display = "block";
+  ziyaretKaydet(girisliKullanici);
   erisimGuncelle();
   veriYukle();
   setInterval(veriYukle, 10000);
+}
+
+function ziyaretKaydet(kullaniciAdi) {
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/ziyaret/kaydet", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.send(JSON.stringify({ kullanici_adi: kullaniciAdi || "misafir" }));
 }
 
 function erisimGuncelle() {
@@ -1214,6 +1223,30 @@ function erisimGuncelle() {
 }
 
 function yoneticiPaneliGoster() {
+  var xhrZiyaret = new XMLHttpRequest();
+  xhrZiyaret.open("GET", API + "/admin/ziyaretler", true);
+  xhrZiyaret.setRequestHeader("X-Auth-Token", authToken);
+  xhrZiyaret.onload = function() {
+    if (xhrZiyaret.status !== 200) return;
+    var veri = JSON.parse(xhrZiyaret.responseText);
+    var html = '<div class="section-title">Site Ziyaret Istatistikleri</div>';
+    html += '<div class="stats-grid">';
+    html += '<div class="stat-card"><div class="stat-label">Toplam Ziyaret</div><div class="stat-val">' + veri.toplam_ziyaret + '</div></div>';
+    html += '<div class="stat-card"><div class="stat-label">Farkli Kullanici</div><div class="stat-val blue">' + veri.farkli_kullanici_sayisi + '</div></div>';
+    html += '</div>';
+    if (veri.kullanici_bazli && veri.kullanici_bazli.length > 0) {
+      html += '<div class="section-title">Kullanici Bazinda Ziyaret</div>';
+      for (var i = 0; i < veri.kullanici_bazli.length; i++) {
+        var k = veri.kullanici_bazli[i];
+        html += '<div class="signal-card" style="margin-bottom:6px">';
+        html += '<div class="sig-header"><div class="sig-symbol">' + k.kullanici_adi + '</div>';
+        html += '<span class="badge bot">' + k.ziyaret_sayisi + ' ziyaret</span></div></div>';
+      }
+    }
+    document.getElementById("yonetici-ziyaret-icerik").innerHTML = html;
+  };
+  xhrZiyaret.send();
+
   var xhr = new XMLHttpRequest();
   xhr.open("GET", API + "/admin/kullanicilar", true);
   xhr.setRequestHeader("X-Auth-Token", authToken);
@@ -1265,6 +1298,7 @@ function sayfaBaslat() {
   if (!kayitliToken) {
     document.getElementById("yukleniyor-ekrani").style.display = "none";
     document.getElementById("auth-ekrani").style.display = "flex";
+    ziyaretKaydet("misafir");
     return;
   }
   var xhr = new XMLHttpRequest();
@@ -1282,11 +1316,13 @@ function sayfaBaslat() {
     } else {
       localStorage.removeItem("ts_token");
       document.getElementById("auth-ekrani").style.display = "flex";
+      ziyaretKaydet("misafir");
     }
   };
   xhr.onerror = function() {
     document.getElementById("yukleniyor-ekrani").style.display = "none";
     document.getElementById("auth-ekrani").style.display = "flex";
+    ziyaretKaydet("misafir");
   };
   xhr.send();
 }
