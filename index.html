@@ -45,6 +45,8 @@
   .mini-chip.tp { background: #052e16; color: #4ade80; }
   .mini-chip.stop { background: #2d0a0a; color: #f87171; }
   .mini-chip.aktif { background: #0c1a3d; color: #60a5fa; }
+  .mini-chip.long { background: #052e16; color: #4ade80; }
+  .mini-chip.short { background: #2d0a0a; color: #f87171; }
   .mini-chip.tiklanabilir { cursor: pointer; }
   .mini-chip.tiklanabilir:active { opacity: 0.6; }
   .signal-card.highlight-pulse { animation: pulseGlow 1s ease-in-out 2; border-color: #60a5fa; }
@@ -264,7 +266,18 @@
   </div>
 </div>
 
-<div style="text-align:center;padding:16px"><button class="cikis-btn" onclick="cikisYap()">Cikis Yap</button></div>
+<div style="text-align:center;padding:16px">
+  <button class="cikis-btn" onclick="sifreFormAcKapat()">Sifre Degistir</button>
+  &nbsp;&nbsp;|&nbsp;&nbsp;
+  <button class="cikis-btn" onclick="cikisYap()">Cikis Yap</button>
+  <div id="sifre-form" style="display:none;max-width:300px;margin:16px auto 0">
+    <div class="auth-error" id="sifre-hata"></div>
+    <div class="auth-success" id="sifre-basari"></div>
+    <input class="auth-input" id="sifre-eski" type="password" placeholder="Mevcut sifre">
+    <input class="auth-input" id="sifre-yeni" type="password" placeholder="Yeni sifre (en az 6 karakter)">
+    <button class="auth-btn" onclick="sifreDegistir()">Degistir</button>
+  </div>
+</div>
 
 </div>
 
@@ -723,24 +736,66 @@ function balinaGoster() {
   }
 
   // --- Son Balina Hareketleri ---
-  if (islemler.length === 0) {
-    html += '<div class="empty">Henuz balina hareketi tespit edilmedi</div>';
-  }
-  for (var k = 0; k < islemler.length; k++) {
-    var t = islemler[k];
-    var yonCls = t.yon === "LONG" ? "long" : "short";
-    var seviyeYazi = t.seviye === "mega" ? "MEGA BALINA" : t.seviye === "buyuk" ? "Buyuk Balina" : "Balina";
-    var ikon = t.seviye === "mega" ? "\uD83D\uDC33\uD83D\uDC33\uD83D\uDC33" : t.seviye === "buyuk" ? "\uD83D\uDC33\uD83D\uDC33" : "\uD83D\uDC33";
-    var degerFormatli = "$" + Math.round(t.deger || 0).toLocaleString();
-    html += '<div class="signal-card ' + yonCls + '">';
-    html += '<div class="sig-header"><div class="sig-symbol">' + ikon + ' #' + t.sembol + '</div>';
-    html += '<div class="sig-badges"><span class="badge ' + yonCls + '">' + t.yon + '</span>';
-    html += '<span class="badge seviye-' + t.seviye + '">' + seviyeYazi + '</span></div></div>';
-    html += '<div class="sig-row"><span class="sig-key">Deger</span><span class="sig-val">' + degerFormatli + '</span></div>';
-    html += '<div class="sig-time">' + (t.zaman || "") + '</div></div>';
+  if (balinaKategori === "altcoin") {
+    if (islemler.length === 0) {
+      html += '<div class="empty">Henuz altcoin balina hareketi tespit edilmedi</div>';
+    } else {
+      html += altcoinIzgaraHtml(islemler);
+    }
+  } else {
+    if (islemler.length === 0) {
+      html += '<div class="empty">Henuz balina hareketi tespit edilmedi</div>';
+    }
+    for (var k = 0; k < islemler.length; k++) {
+      var t = islemler[k];
+      var yonCls = t.yon === "LONG" ? "long" : "short";
+      var seviyeYazi = t.seviye === "mega" ? "MEGA BALINA" : t.seviye === "buyuk" ? "Buyuk Balina" : "Balina";
+      var ikon = t.seviye === "mega" ? "\uD83D\uDC33\uD83D\uDC33\uD83D\uDC33" : t.seviye === "buyuk" ? "\uD83D\uDC33\uD83D\uDC33" : "\uD83D\uDC33";
+      var degerFormatli = "$" + Math.round(t.deger || 0).toLocaleString();
+      html += '<div class="signal-card ' + yonCls + '">';
+      html += '<div class="sig-header"><div class="sig-symbol">' + ikon + ' #' + t.sembol + '</div>';
+      html += '<div class="sig-badges"><span class="badge ' + yonCls + '">' + t.yon + '</span>';
+      html += '<span class="badge seviye-' + t.seviye + '">' + seviyeYazi + '</span></div></div>';
+      html += '<div class="sig-row"><span class="sig-key">Deger</span><span class="sig-val">' + degerFormatli + '</span></div>';
+      html += '<div class="sig-time">' + (t.zaman || "") + '</div></div>';
+    }
   }
 
   document.getElementById("balina-icerik").innerHTML = html;
+}
+
+function altcoinIzgaraHtml(islemler) {
+  var gruplar = {};
+  var sira = [];
+  for (var i = 0; i < islemler.length; i++) {
+    var t = islemler[i];
+    if (!gruplar[t.sembol]) { gruplar[t.sembol] = []; sira.push(t.sembol); }
+    gruplar[t.sembol].push(t);
+  }
+  // En son islemi olan coin en ustte gorunsun
+  sira.sort(function(a, b) {
+    var zA = (gruplar[a][0] && gruplar[a][0].zaman) || "";
+    var zB = (gruplar[b][0] && gruplar[b][0].zaman) || "";
+    return zB.localeCompare(zA);
+  });
+
+  var html = '<div class="section-title">Coin Bazinda Alim / Satim Hareketleri</div>';
+  for (var s = 0; s < sira.length; s++) {
+    var sembol = sira[s];
+    var kayitlar = gruplar[sembol];
+    html += '<div class="stat-card" style="margin-bottom:8px">';
+    html += '<div class="sig-header"><div class="sig-symbol">#' + sembol + '</div>';
+    html += '<span class="badge bot">' + kayitlar.length + ' islem</span></div>';
+    html += '<div class="mini-chip-wrap">';
+    for (var k = 0; k < kayitlar.length; k++) {
+      var t = kayitlar[k];
+      var cls = t.yon === "LONG" ? "long" : "short";
+      var deger = "$" + Math.round(t.deger || 0).toLocaleString();
+      html += '<span class="mini-chip ' + cls + '" title="' + (t.zaman || "") + '">' + deger + '</span>';
+    }
+    html += '</div></div>';
+  }
+  return html;
 }
 
 function haberleriGoster() {
@@ -918,6 +973,43 @@ function kayitOl() {
     hataEl.style.display = "block";
   };
   xhr.send(JSON.stringify({ kullanici_adi: kadi, sifre: sifre, telegram: telegram, email: email }));
+}
+
+function sifreFormAcKapat() {
+  var f = document.getElementById("sifre-form");
+  f.style.display = (f.style.display === "none") ? "block" : "none";
+}
+
+function sifreDegistir() {
+  var eski = document.getElementById("sifre-eski").value;
+  var yeni = document.getElementById("sifre-yeni").value;
+  var hataEl = document.getElementById("sifre-hata");
+  var basariEl = document.getElementById("sifre-basari");
+  hataEl.style.display = "none";
+  basariEl.style.display = "none";
+
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/sifre_degistir", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken);
+  xhr.onload = function() {
+    var yanit;
+    try { yanit = JSON.parse(xhr.responseText); } catch (e) { yanit = {}; }
+    if (xhr.status === 200) {
+      basariEl.textContent = "Sifreniz basariyla degistirildi.";
+      basariEl.style.display = "block";
+      document.getElementById("sifre-eski").value = "";
+      document.getElementById("sifre-yeni").value = "";
+    } else {
+      hataEl.textContent = yanit.hata || "Sifre degistirilemedi";
+      hataEl.style.display = "block";
+    }
+  };
+  xhr.onerror = function() {
+    hataEl.textContent = "Baglanti hatasi, tekrar deneyin";
+    hataEl.style.display = "block";
+  };
+  xhr.send(JSON.stringify({ eski_sifre: eski, yeni_sifre: yeni }));
 }
 
 function cikisYap() {
