@@ -186,6 +186,10 @@
   </div>
 
   <div id="balina" style="display:none">
+    <div class="bot-filter">
+      <button class="bot-btn active" onclick="balinaFiltre('kripto',this)">Kripto</button>
+      <button class="bot-btn" onclick="balinaFiltre('hisse',this)">ABD Hisseleri</button>
+    </div>
     <div id="balina-icerik"><div class="loading">Yukleniyor...</div></div>
   </div>
 
@@ -208,6 +212,7 @@ var tumVeriler = {};
 var tumHaberler = [];
 var tumRaporlar = [];
 var tumBalina = { islemler: [], ozet: {} };
+var balinaKategori = "kripto";
 var piyasaVerisi = null;
 var piyasaSonGuncelleme = 0;
 var aktifBot = "hepsi";
@@ -599,9 +604,24 @@ function piyasaGoster() {
   document.getElementById("piyasa-icerik").innerHTML = html;
 }
 
+function balinaFiltre(kategori, el) {
+  balinaKategori = kategori;
+  var btnlar = document.querySelectorAll("#balina .bot-btn");
+  for (var i = 0; i < btnlar.length; i++) btnlar[i].classList.remove("active");
+  el.classList.add("active");
+  balinaGoster();
+}
+
 function balinaGoster() {
-  var islemler = tumBalina.islemler || [];
-  var ozet = tumBalina.ozet || {};
+  var tumIslemler = tumBalina.islemler || [];
+  var tumOzet = tumBalina.ozet || {};
+
+  // Kategorisi olmayan eski kayitlar guvenli varsayilan olarak "kripto" sayilir
+  var islemler = tumIslemler.filter(function(t) { return (t.kategori || "kripto") === balinaKategori; });
+  var ozet = {};
+  Object.keys(tumOzet).forEach(function(s) {
+    if ((tumOzet[s].kategori || "kripto") === balinaKategori) ozet[s] = tumOzet[s];
+  });
 
   var html = "";
 
