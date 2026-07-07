@@ -255,23 +255,6 @@
               "originalTitle": "Kripto"
             },
             {
-              "title": "BIST 100",
-              "symbols": [
-                { "s": "BIST:XU100", "d": "BIST 100 Endeksi" },
-                { "s": "BIST:THYAO", "d": "Turk Hava Yollari" },
-                { "s": "BIST:GARAN", "d": "Garanti BBVA" },
-                { "s": "BIST:AKBNK", "d": "Akbank" },
-                { "s": "BIST:ISCTR", "d": "Is Bankasi" },
-                { "s": "BIST:ASELS", "d": "Aselsan" },
-                { "s": "BIST:BIMAS", "d": "BIM" },
-                { "s": "BIST:EREGL", "d": "Eregli Demir Celik" },
-                { "s": "BIST:KCHOL", "d": "Koc Holding" },
-                { "s": "BIST:SAHOL", "d": "Sabanci Holding" },
-                { "s": "BIST:TUPRS", "d": "Tupras" }
-              ],
-              "originalTitle": "BIST 100"
-            },
-            {
               "title": "Altin",
               "symbols": [
                 { "s": "FX_IDC:XAUTRYG", "d": "Gram Altin (TL)" },
@@ -309,7 +292,7 @@
   <div id="iletisim" style="display:none">
     <div class="stat-card" style="text-align:center;padding:32px 20px">
       <div style="font-size:15px;margin-bottom:16px;color:#94a3b8">Sorularınız, üyelik onayı veya destek için bize ulaşabilirsiniz.</div>
-      <a href="https://t.me/KULLANICI_ADINI_BURAYA_YAZ" target="_blank" style="display:inline-block;background:#3b82f6;color:#fff;padding:13px 24px;border-radius:10px;text-decoration:none;font-weight:600">Telegram'dan Yaz</a>
+      <a href="https://t.me/Tradesinyal_Vip" target="_blank" style="display:inline-block;background:#3b82f6;color:#fff;padding:13px 24px;border-radius:10px;text-decoration:none;font-weight:600">Telegram'dan Yaz</a>
     </div>
   </div>
 
@@ -465,6 +448,11 @@ function sinyalleriGoster() {
 }
 
 function performansGoster() {
+  if (performansDetayBot) {
+    document.getElementById("performans-icerik").innerHTML = performansDetayHtml(performansDetayBot);
+    return;
+  }
+
   var html = "";
   var toplamTp = 0, toplamStop = 0, toplamAktif = 0;
   var botlar = Object.keys(tumVeriler);
@@ -482,7 +470,7 @@ function performansGoster() {
     var basari = toplam > 0 ? Math.round(tp / toplam * 100) : 0;
     toplamTp += tp; toplamStop += stop; toplamAktif += aktif;
     html += '<div class="signal-card" style="margin-bottom:8px">';
-    html += '<div class="sig-header"><div class="sig-symbol">' + botAdi(bot) + '</div>';
+    html += '<div class="sig-header" style="cursor:pointer" onclick="performansDetayAc(\'' + bot + '\')"><div class="sig-symbol">' + botAdi(bot) + ' &rsaquo;</div>';
     html += '<span class="badge bot">' + basari + '% basari</span></div>';
     html += '<div class="sig-row"><span class="sig-key">TP</span><span class="sig-val green">' + tp + '</span></div>';
     html += '<div class="sig-row"><span class="sig-key">Stop</span><span class="sig-val red">' + stop + '</span></div>';
@@ -518,6 +506,47 @@ function performansGoster() {
   ozet += '<div class="stat-card"><div class="stat-label">Genel Basari</div><div class="stat-val green">' + genelBasari + '%</div></div></div>';
   ozet += '<div class="section-title">Oda Bazli Performans</div>';
   document.getElementById("performans-icerik").innerHTML = ozet + html;
+}
+
+function performansDetayHtml(bot) {
+  var data = tumVeriler[bot] || {};
+  var sinyaller = data.sinyaller || [];
+  var gruplar = {};
+  for (var i = 0; i < sinyaller.length; i++) {
+    var s = sinyaller[i];
+    if (!gruplar[s.sembol]) gruplar[s.sembol] = { tp: 0, stop: 0, aktif: 0 };
+    if (s.durum === "tp") gruplar[s.sembol].tp++;
+    else if (s.durum === "stop") gruplar[s.sembol].stop++;
+    else gruplar[s.sembol].aktif++;
+  }
+
+  var semboller = Object.keys(gruplar);
+  semboller.sort(function(a, b) {
+    var toplamA = gruplar[a].tp + gruplar[a].stop;
+    var toplamB = gruplar[b].tp + gruplar[b].stop;
+    return toplamB - toplamA;
+  });
+
+  var html = '<div style="margin-bottom:12px"><button class="refresh-btn" onclick="performansDetayKapat()">&larr; Geri Don</button></div>';
+  html += '<div class="section-title">' + botAdi(bot) + ' - Coin Bazinda Performans</div>';
+  if (semboller.length === 0) {
+    html += '<div class="empty">Henuz veri yok</div>';
+  }
+  for (var k = 0; k < semboller.length; k++) {
+    var sembol = semboller[k];
+    var g = gruplar[sembol];
+    var toplam = g.tp + g.stop;
+    var basari = toplam > 0 ? Math.round(g.tp / toplam * 100) : 0;
+    html += '<div class="signal-card" style="margin-bottom:8px">';
+    html += '<div class="sig-header"><div class="sig-symbol">#' + sembol + '</div>';
+    if (toplam > 0) html += '<span class="badge bot">' + basari + '% basari</span>';
+    html += '</div>';
+    html += '<div class="sig-row"><span class="sig-key">TP</span><span class="sig-val green">' + g.tp + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">Stop</span><span class="sig-val red">' + g.stop + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">Aktif</span><span class="sig-val blue">' + g.aktif + '</span></div>';
+    html += '</div>';
+  }
+  return html;
 }
 
 function gecmisGoster() {
@@ -748,6 +777,7 @@ function balinaFiltre(kategori, el) {
 }
 
 var altcoinDetaySembol = null;
+var performansDetayBot = null;
 
 function altcoinDetayAc(sembol) {
   altcoinDetaySembol = sembol;
@@ -761,8 +791,20 @@ function altcoinDetayKapat() {
 
 window.addEventListener("popstate", function(e) {
   altcoinDetaySembol = (e.state && e.state.altcoinDetay) ? e.state.altcoinDetay : null;
+  performansDetayBot = (e.state && e.state.performansDetay) ? e.state.performansDetay : null;
   if (aktifSekme === "balina") balinaGoster();
+  if (aktifSekme === "performans") performansGoster();
 });
+
+function performansDetayAc(bot) {
+  performansDetayBot = bot;
+  history.pushState({ performansDetay: bot }, "", "");
+  performansGoster();
+}
+
+function performansDetayKapat() {
+  history.back();
+}
 
 function balinaGoster() {
   // Backend artik islemleri coin bazinda ({"BTCUSDT":[...], ...}) gonderiyor,
