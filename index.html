@@ -171,7 +171,7 @@
 <div id="app-icerik" style="display:none">
 
 <div class="header">
-  <div class="logo">Trade<span>Sinyal</span>Pro</div>
+  <div class="logo" style="cursor:pointer" onclick="anaSayfayaGit()">Trade<span>Sinyal</span>Pro</div>
   <div style="display:flex;gap:8px;align-items:center">
     <button class="refresh-btn" onclick="veriYukle()">&#8635; Yenile</button>
     <div class="live-badge"><div class="live-dot"></div>Canli</div>
@@ -188,6 +188,7 @@
   <div class="tab" onclick="sekmeAc('piyasa',this)" data-tam-erisim="1">Piyasa</div>
   <div class="tab" onclick="sekmeAc('balina',this)" data-tam-erisim="1">Balina Takip</div>
   <div class="tab" onclick="sekmeAc('haberler',this)" data-tam-erisim="1">Haberler</div>
+  <div class="tab" onclick="sekmeAc('iletisim',this)">Iletisim</div>
   <div class="tab" onclick="sekmeAc('yonetici',this)" id="yonetici-tab" style="display:none">Yonetici</div>
 </div>
 
@@ -303,6 +304,13 @@
       <button class="bot-btn" onclick="haberFiltre('jeopolitik',this)">Jeopolitik</button>
     </div>
     <div id="haber-listesi"><div class="loading">Yukleniyor...</div></div>
+  </div>
+
+  <div id="iletisim" style="display:none">
+    <div class="stat-card" style="text-align:center;padding:32px 20px">
+      <div style="font-size:15px;margin-bottom:16px;color:#94a3b8">Sorularınız, üyelik onayı veya destek için bize ulaşabilirsiniz.</div>
+      <a href="https://t.me/KULLANICI_ADINI_BURAYA_YAZ" target="_blank" style="display:inline-block;background:#3b82f6;color:#fff;padding:13px 24px;border-radius:10px;text-decoration:none;font-weight:600">Telegram'dan Yaz</a>
+    </div>
   </div>
 
   <div id="yonetici" style="display:none">
@@ -846,19 +854,20 @@ function balinaGoster() {
 function altcoinTabloHtml(islemler) {
   var sabitSira = tumBalina.sembol_sirasi || [];
 
-  // Her sembol icin islemleri eskiden yeniye sirala (soldan saga dolsun diye)
+  // Her sembol icin islemleri EN YENIDEN eskiye sirali tutuyoruz
+  // (coin adinin hemen yaninda -solda- en yeni veri gorunsun diye)
   var gruplarTam = {};
   for (var i = 0; i < islemler.length; i++) {
     var t = islemler[i];
     if (!gruplarTam[t.sembol]) gruplarTam[t.sembol] = [];
-    gruplarTam[t.sembol].unshift(t);
+    gruplarTam[t.sembol].push(t);
   }
 
   // Ana tabloda sadece SON 20 kayit gosterilir (detayli gecmis icin coin adina tiklanir)
   var gruplar = {};
   Object.keys(gruplarTam).forEach(function(s) {
     var tam = gruplarTam[s];
-    gruplar[s] = tam.length > 20 ? tam.slice(tam.length - 20) : tam;
+    gruplar[s] = tam.length > 20 ? tam.slice(0, 20) : tam;
   });
 
   var goruntulenecekler = sabitSira.slice();
@@ -908,16 +917,28 @@ function altcoinDetayHtml(sembol, islemlerSozluk) {
   html += '<div class="section-title">#' + sembol + ' - Son ' + kayitlar.length + ' Islem</div>';
   if (kayitlar.length === 0) {
     html += '<div class="empty">Bu coin icin henuz islem yok</div>';
+    return html;
   }
-  for (var i = 0; i < kayitlar.length; i++) {
-    var t = kayitlar[i];
-    var cls = t.yon === "LONG" ? "long" : "short";
-    var deger = "$" + Math.round(t.deger || 0).toLocaleString();
-    var saat = t.zaman ? t.zaman.split(" ")[1] : "";
-    html += '<div class="signal-card ' + cls + '">';
-    html += '<div class="sig-header"><div class="sig-symbol">' + deger + '</div><span class="badge ' + cls + '">' + t.yon + '</span></div>';
-    html += '<div class="sig-time">' + saat + '</div></div>';
+
+  var SATIR = 10, SUTUN = 20;
+  html += '<div class="balina-tablo-wrap"><table class="balina-tablo"><tbody>';
+  for (var r = 0; r < SATIR; r++) {
+    html += '<tr>';
+    for (var c = 0; c < SUTUN; c++) {
+      var idx = r * SUTUN + c;
+      if (idx < kayitlar.length) {
+        var t = kayitlar[idx];
+        var cls = t.yon === "LONG" ? "long" : "short";
+        var deger = "$" + Math.round(t.deger || 0).toLocaleString();
+        var saat = t.zaman ? t.zaman.split(" ")[1] : "";
+        html += '<td class="' + cls + '" title="' + (t.zaman || "") + '">' + deger + '<div class="hucre-saat">' + saat + '</div></td>';
+      } else {
+        html += '<td class="bos">-</td>';
+      }
+    }
+    html += '</tr>';
   }
+  html += '</tbody></table></div>';
   return html;
 }
 
@@ -1212,6 +1233,27 @@ function ziyaretKaydet(kullaniciAdi) {
   xhr.send(JSON.stringify({ kullanici_adi: kullaniciAdi || "misafir" }));
 }
 
+function anaSayfayaGit() {
+  var tamErisim = (hesapDurumu === "onayli" || hesapDurumu === "admin" || hesapDurumu === "deneme");
+  var hedefSekme = tamErisim ? "sinyaller" : "gecmis";
+  var tablar = document.querySelectorAll("#tabs-alani .tab");
+  for (var i = 0; i < tablar.length; i++) {
+    if ((tablar[i].getAttribute("onclick") || "").indexOf("'" + hedefSekme + "'") !== -1) {
+      sekmeAc(hedefSekme, tablar[i]);
+      break;
+    }
+  }
+  if (tamErisim) {
+    aktifBot = "hepsi";
+    var botBtnlar = document.querySelectorAll("#sinyaller .bot-btn");
+    for (var j = 0; j < botBtnlar.length; j++) {
+      botBtnlar[j].classList.remove("active");
+      if ((botBtnlar[j].getAttribute("onclick") || "").indexOf("'hepsi'") !== -1) botBtnlar[j].classList.add("active");
+    }
+    sinyalleriGoster();
+  }
+}
+
 function erisimGuncelle() {
   var bannerAlani = document.getElementById("durum-banner-alani");
   var tamErisim = (hesapDurumu === "onayli" || hesapDurumu === "admin" || hesapDurumu === "deneme");
@@ -1302,6 +1344,7 @@ function yoneticiPaneliGoster() {
         var butonYazisi = u.durum === "suresi_dolmus" ? "Yenile (30 Gun)" : "Onayla";
         html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciOnayla(\'' + u.kullanici_adi + '\')">' + butonYazisi + '</button></div>';
       }
+      html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciSifreSifirla(\'' + u.kullanici_adi + '\')">Sifre Sifirla (Kaydi Sil)</button></div>';
       html += '</div>';
     }
     document.getElementById("yonetici-icerik").innerHTML = html;
@@ -1315,6 +1358,37 @@ function kullaniciOnayla(kadi) {
   xhr.setRequestHeader("Content-Type", "application/json");
   xhr.setRequestHeader("X-Auth-Token", authToken);
   xhr.onload = function() { yoneticiPaneliGoster(); };
+  xhr.send(JSON.stringify({ kullanici_adi: kadi }));
+}
+
+function kullaniciSifreSifirla(kadi) {
+  var onay = confirm(
+    kadi + " icin sifre sifirlanacak.\n\n" +
+    "Bu islem kullanicinin KAYDINI SILER. Kullanici ayni Telegram kullanici adiyla " +
+    "yeniden kayit olup siz tekrar onayladiginizda, varsa kalan uyelik gunleri " +
+    "otomatik olarak korunur (sifirdan 30 gun baslamaz).\n\n" +
+    "Devam etmek istiyor musunuz?"
+  );
+  if (!onay) return;
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/admin/sifre_sifirla", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken);
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      var yanit = JSON.parse(xhr.responseText);
+      var mesaj = "Kayit silindi.";
+      if (yanit.kalan_gun_saklandi > 0) {
+        mesaj += " " + yanit.kalan_gun_saklandi + " gunluk uyelik suresi, yeniden kayit oldugunda otomatik uygulanmak uzere saklandi.";
+      }
+      alert(mesaj);
+      yoneticiPaneliGoster();
+    } else {
+      var yanit2;
+      try { yanit2 = JSON.parse(xhr.responseText); } catch (e) { yanit2 = {}; }
+      alert("Hata: " + (yanit2.hata || "Islem basarisiz"));
+    }
+  };
   xhr.send(JSON.stringify({ kullanici_adi: kadi }));
 }
 
