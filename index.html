@@ -153,6 +153,10 @@
       <input class="auth-input" id="giris-sifre" type="password" placeholder="Sifre" autocomplete="current-password">
       <button class="auth-btn" onclick="girisYap()">Giris Yap</button>
       <div class="auth-toggle" onclick="formDegistir('kayit')">Hesabin yok mu? Kayit Ol</div>
+      <div style="text-align:center;margin-top:14px;font-size:12px;color:#64748b;line-height:1.5">
+        Uyeliginizin onaylanmasi icin yoneticiye basvurun.<br>
+        <a href="https://t.me/Tradesinyal_Vip" target="_blank" style="color:#60a5fa">Telegram: @Tradesinyal_Vip</a>
+      </div>
     </div>
 
     <div id="kayit-form" style="display:none">
@@ -182,8 +186,8 @@
 
 <div class="tabs" id="tabs-alani">
   <div class="tab active" onclick="sekmeAc('sinyaller',this)" data-tam-erisim="1">Sinyaller</div>
-  <div class="tab" onclick="sekmeAc('performans',this)">Performans</div>
-  <div class="tab" onclick="sekmeAc('gecmis',this)">Gecmis</div>
+  <div class="tab" onclick="sekmeAc('performans',this)" data-tam-erisim="1">Performans</div>
+  <div class="tab" onclick="sekmeAc('gecmis',this)" data-tam-erisim="1">Gecmis</div>
   <div class="tab" onclick="sekmeAc('rapor',this)" data-tam-erisim="1">Gunluk Rapor</div>
   <div class="tab" onclick="sekmeAc('piyasa',this)" data-tam-erisim="1">Piyasa</div>
   <div class="tab" onclick="sekmeAc('balina',this)" data-tam-erisim="1">Balina Takip</div>
@@ -319,7 +323,6 @@
 
 <script>
 var API = "https://abundant-light-production-fb25.up.railway.app";
-var API_KEY = "tradesinyalpro2024";
 var authToken = null;
 var hesapDurumu = null;
 var hesapKalanGun = null;
@@ -349,7 +352,7 @@ function botAdi(bot) {
 function veriYukle() {
   var xhr = new XMLHttpRequest();
   xhr.open("GET", API + "/sinyaller", true);
-  xhr.setRequestHeader("X-API-Key", API_KEY);
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
   xhr.onload = function() {
     if (xhr.status === 200) {
       tumVeriler = JSON.parse(xhr.responseText);
@@ -367,7 +370,7 @@ function veriYukle() {
 
   var xhr2 = new XMLHttpRequest();
   xhr2.open("GET", API + "/haberler", true);
-  xhr2.setRequestHeader("X-API-Key", API_KEY);
+  xhr2.setRequestHeader("X-Auth-Token", authToken || "");
   xhr2.onload = function() {
     if (xhr2.status === 200) {
       tumHaberler = JSON.parse(xhr2.responseText);
@@ -378,7 +381,7 @@ function veriYukle() {
 
   var xhr3 = new XMLHttpRequest();
   xhr3.open("GET", API + "/raporlar", true);
-  xhr3.setRequestHeader("X-API-Key", API_KEY);
+  xhr3.setRequestHeader("X-Auth-Token", authToken || "");
   xhr3.onload = function() {
     if (xhr3.status === 200) {
       tumRaporlar = JSON.parse(xhr3.responseText);
@@ -389,7 +392,7 @@ function veriYukle() {
 
   var xhr4 = new XMLHttpRequest();
   xhr4.open("GET", API + "/balina", true);
-  xhr4.setRequestHeader("X-API-Key", API_KEY);
+  xhr4.setRequestHeader("X-Auth-Token", authToken || "");
   xhr4.onload = function() {
     if (xhr4.status === 200) {
       tumBalina = JSON.parse(xhr4.responseText);
@@ -1320,11 +1323,11 @@ function erisimGuncelle() {
     bannerAlani.innerHTML = "";
   }
 
-  if (!tamErisim && aktifSekme === "sinyaller") {
+  if (!tamErisim && aktifSekme !== "iletisim" && aktifSekme !== "yonetici") {
     var tablar2 = document.querySelectorAll("#tabs-alani .tab");
     for (var j = 0; j < tablar2.length; j++) {
-      if ((tablar2[j].getAttribute("onclick") || "").indexOf("'gecmis'") !== -1) {
-        sekmeAc("gecmis", tablar2[j]);
+      if ((tablar2[j].getAttribute("onclick") || "").indexOf("'iletisim'") !== -1) {
+        sekmeAc("iletisim", tablar2[j]);
         break;
       }
     }
@@ -1382,8 +1385,11 @@ function yoneticiPaneliGoster() {
       html += '<div class="sig-row"><span class="sig-key">Email</span><span class="sig-val">' + (u.email || "-") + '</span></div>';
       html += '<div class="sig-time">Kayit: ' + (u.olusturma_tarihi || "-") + '</div>';
       if (u.onay_tarihi) html += '<div class="sig-time">Onay: ' + u.onay_tarihi + '</div>';
+      if (u.durum === "bekliyor") {
+        html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciDenemeBaslat(\'' + u.kullanici_adi + '\')">Deneme Baslat (3 Gun)</button></div>';
+      }
       if (u.durum !== "onayli") {
-        var butonYazisi = u.durum === "suresi_dolmus" ? "Yenile (30 Gun)" : "Onayla";
+        var butonYazisi = u.durum === "suresi_dolmus" ? "Yenile (30 Gun)" : "Direkt Onayla (30 Gun)";
         html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciOnayla(\'' + u.kullanici_adi + '\')">' + butonYazisi + '</button></div>';
       }
       html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciSifreSifirla(\'' + u.kullanici_adi + '\')">Sifre Sifirla (Kaydi Sil)</button></div>';
@@ -1397,6 +1403,15 @@ function yoneticiPaneliGoster() {
 function kullaniciOnayla(kadi) {
   var xhr = new XMLHttpRequest();
   xhr.open("POST", API + "/admin/onayla", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken);
+  xhr.onload = function() { yoneticiPaneliGoster(); };
+  xhr.send(JSON.stringify({ kullanici_adi: kadi }));
+}
+
+function kullaniciDenemeBaslat(kadi) {
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/admin/deneme_baslat", true);
   xhr.setRequestHeader("Content-Type", "application/json");
   xhr.setRequestHeader("X-Auth-Token", authToken);
   xhr.onload = function() { yoneticiPaneliGoster(); };
