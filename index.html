@@ -208,6 +208,7 @@
       <button class="bot-btn" onclick="botFiltre('SINYAL_ODA_2',this)">Sinyal Oda 2</button>
       <button class="bot-btn" onclick="botFiltre('SINYAL_ODA_3',this)">Sinyal Oda 3</button>
       <button class="bot-btn" onclick="botFiltre('SINYAL_ODA_4',this)">Sinyal Oda 4</button>
+      <button class="bot-btn" id="favori-filtre-btn" onclick="favoriFiltreToggle()">&#9733; Favoriler</button>
     </div>
     <div id="sinyal-listesi"><div class="loading">Yukleniyor...</div></div>
   </div>
@@ -361,6 +362,38 @@ var balinaKategori = "kripto";
 var piyasaVerisi = null;
 var piyasaSonGuncelleme = 0;
 var aktifBot = "hepsi";
+var favoriCoinler = {};
+var sadeceFavoriler = false;
+
+function favoriYukle() {
+  try {
+    var kayitli = localStorage.getItem("ts_favoriler");
+    favoriCoinler = kayitli ? JSON.parse(kayitli) : {};
+  } catch (e) {
+    favoriCoinler = {};
+  }
+}
+
+function favoriKaydet() {
+  localStorage.setItem("ts_favoriler", JSON.stringify(favoriCoinler));
+}
+
+function favoriToggle(sembol) {
+  if (favoriCoinler[sembol]) {
+    delete favoriCoinler[sembol];
+  } else {
+    favoriCoinler[sembol] = true;
+  }
+  favoriKaydet();
+  sinyalleriGoster();
+}
+
+function favoriFiltreToggle() {
+  sadeceFavoriler = !sadeceFavoriler;
+  var btn = document.getElementById("favori-filtre-btn");
+  if (sadeceFavoriler) btn.classList.add("active"); else btn.classList.remove("active");
+  sinyalleriGoster();
+}
 var aktifHaberKategori = "hepsi";
 var aktifSekme = "sinyaller";
 
@@ -520,6 +553,9 @@ function sinyalleriGoster() {
     }
   }
   hepsi.sort(function(a, b) { return (b.s.zaman || "").localeCompare(a.s.zaman || ""); });
+  if (sadeceFavoriler) {
+    hepsi = hepsi.filter(function(item) { return favoriCoinler[item.s.sembol]; });
+  }
 
   for (var k = 0; k < hepsi.length; k++) {
     var s = hepsi[k].s;
@@ -536,8 +572,10 @@ function sinyalleriGoster() {
     var canliFiyatHtml = canliFiyat ? '<div style="text-align:center;margin:8px 0;padding:8px;background:#0c1424;border-radius:8px">' +
       '<div style="font-size:10px;color:#64748b;letter-spacing:0.05em;margin-bottom:2px">ANLIK FIYAT</div>' +
       '<div style="font-size:19px;font-weight:700;color:' + fiyatRengi + '">' + canliFiyat + '</div></div>' : "";
+    var favoriMi = favoriCoinler[s.sembol];
+    var yildizHtml = '<span onclick="favoriToggle(\'' + s.sembol + '\')" style="cursor:pointer;font-size:16px;margin-left:6px;color:' + (favoriMi ? "#fbbf24" : "#475569") + '">' + (favoriMi ? "&#9733;" : "&#9734;") + '</span>';
     html += '<div class="signal-card ' + cls + '">';
-    html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + '</div>';
+    html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + yildizHtml + '</div>';
     html += '<div class="sig-badges"><span class="badge ' + cls + '">' + yon + '</span>';
     html += '<span class="badge bot">' + botAdi(bot) + '</span></div></div>';
     html += canliFiyatHtml;
@@ -1255,7 +1293,7 @@ function sekmeAc(id, el) {
 
 function botFiltre(bot, el) {
   aktifBot = bot;
-  var btnlar = document.querySelectorAll("#sinyaller .bot-btn");
+  var btnlar = document.querySelectorAll("#sinyaller .bot-btn:not(#favori-filtre-btn)");
   for (var i = 0; i < btnlar.length; i++) btnlar[i].classList.remove("active");
   el.classList.add("active");
   sinyalleriGoster();
@@ -1629,6 +1667,7 @@ function sayfaBaslat() {
   xhr.send();
 }
 
+favoriYukle();
 sayfaBaslat();
 </script>
 </body>
