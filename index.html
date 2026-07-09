@@ -155,7 +155,7 @@
       <div class="auth-toggle" onclick="formDegistir('kayit')">Hesabin yok mu? Kayit Ol</div>
       <div style="text-align:center;margin-top:14px;font-size:12px;color:#64748b;line-height:1.5">
         Uyeliginizin onaylanmasi icin yoneticiye basvurun.<br>
-        <a href="https://t.me/Tradesinyal_Vip" target="_blank" style="color:#60a5fa">Telegram: @Tradesinyal_Vip</a>
+        <a href="https://t.me/TradeSinyal_Pro" target="_blank" style="color:#60a5fa">Telegram: @TradeSinyal_Pro</a>
       </div>
     </div>
 
@@ -177,7 +177,8 @@
 <div class="header">
   <div class="logo" style="cursor:pointer" onclick="anaSayfayaGit()">Trade<span>Sinyal</span>Pro</div>
   <div style="display:flex;gap:8px;align-items:center">
-    <button class="refresh-btn" onclick="veriYukle()">&#8635; Yenile</button>
+    <div id="kalan-sure-gostergesi" style="font-size:11px;color:#94a3b8;white-space:nowrap"></div>
+    <button class="refresh-btn" onclick="veriYukle()" title="Yenile">&#8635;</button>
     <div class="live-badge"><div class="live-dot"></div>Canli</div>
   </div>
 </div>
@@ -296,7 +297,7 @@
   <div id="iletisim" style="display:none">
     <div class="stat-card" style="text-align:center;padding:32px 20px">
       <div style="font-size:15px;margin-bottom:16px;color:#94a3b8">Sorularınız, üyelik onayı veya destek için bize ulaşabilirsiniz.</div>
-      <a href="https://t.me/Tradesinyal_Vip" target="_blank" style="display:inline-block;background:#3b82f6;color:#fff;padding:13px 24px;border-radius:10px;text-decoration:none;font-weight:600">Telegram'dan Yaz</a>
+      <a href="https://t.me/TradeSinyal_Pro" target="_blank" style="display:inline-block;background:#3b82f6;color:#fff;padding:13px 24px;border-radius:10px;text-decoration:none;font-weight:600">Telegram'dan Yaz</a>
     </div>
   </div>
 
@@ -1303,6 +1304,15 @@ function erisimGuncelle() {
   var bannerAlani = document.getElementById("durum-banner-alani");
   var tamErisim = (hesapDurumu === "onayli" || hesapDurumu === "admin" || hesapDurumu === "deneme");
 
+  var kalanGostergesi = document.getElementById("kalan-sure-gostergesi");
+  if (hesapDurumu === "deneme" && hesapKalanGun !== null && hesapKalanGun !== undefined) {
+    kalanGostergesi.textContent = "Kalan deneme: " + hesapKalanGun + " gün";
+  } else if (hesapDurumu === "onayli" && hesapKalanGun !== null && hesapKalanGun !== undefined) {
+    kalanGostergesi.textContent = "Kalan: " + hesapKalanGun + " gün";
+  } else {
+    kalanGostergesi.textContent = "";
+  }
+
   var tablar = document.querySelectorAll("#tabs-alani .tab");
   for (var i = 0; i < tablar.length; i++) {
     var tamGerekli = tablar[i].getAttribute("data-tam-erisim") === "1";
@@ -1383,6 +1393,11 @@ function yoneticiPaneliGoster() {
       html += '<div class="sig-header"><div class="sig-symbol">' + u.kullanici_adi + '</div>' + durumRozet + '</div>';
       html += '<div class="sig-row"><span class="sig-key">Telegram</span><span class="sig-val">' + (u.telegram || "-") + '</span></div>';
       html += '<div class="sig-row"><span class="sig-key">Email</span><span class="sig-val">' + (u.email || "-") + '</span></div>';
+      if (u.durum === "deneme" && u.kalan_gun !== null && u.kalan_gun !== undefined) {
+        html += '<div class="sig-row"><span class="sig-key">Kalan Deneme</span><span class="sig-val">' + u.kalan_gun + ' gün</span></div>';
+      } else if (u.durum === "onayli" && u.kalan_gun !== null && u.kalan_gun !== undefined) {
+        html += '<div class="sig-row"><span class="sig-key">Kalan Süre</span><span class="sig-val">' + u.kalan_gun + ' gün</span></div>';
+      }
       html += '<div class="sig-time">Kayit: ' + (u.olusturma_tarihi || "-") + '</div>';
       if (u.onay_tarihi) html += '<div class="sig-time">Onay: ' + u.onay_tarihi + '</div>';
       if (u.durum === "bekliyor") {
