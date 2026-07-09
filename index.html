@@ -97,6 +97,8 @@
   .sig-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
   .sig-key { font-size: 12px; color: #64748b; }
   .sig-val { font-size: 12px; font-weight: 500; }
+  .kopyalanabilir { cursor: pointer; border-bottom: 1px dashed #475569; padding-bottom: 1px; transition: opacity 0.15s; }
+  .kopyalanabilir:active { opacity: 0.55; }
   .sig-val.green { color: #4ade80; }
   .sig-val.red { color: #f87171; }
   .sig-val.blue { color: #60a5fa; }
@@ -414,6 +416,30 @@ function guncelle() {
   if (aktifSekme === "yonetici") yoneticiPaneliGoster();
 }
 
+function fiyatKopyala(deger, el) {
+  if (!deger || deger === "-") return;
+  var metin = String(deger);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(metin);
+  } else {
+    var ta = document.createElement("textarea");
+    ta.value = metin;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+  }
+  var eskiMetin = el.textContent;
+  el.textContent = "Kopyalandi";
+  el.style.opacity = "0.55";
+  setTimeout(function() {
+    el.textContent = eskiMetin;
+    el.style.opacity = "1";
+  }, 800);
+}
+
 function sinyalleriGoster() {
   var toplamTp = 0, toplamStop = 0;
   var tumBotlar = Object.keys(tumVeriler);
@@ -452,17 +478,17 @@ function sinyalleriGoster() {
     var bot = hepsi[k].bot;
     var yon = s.yon || "";
     var cls = yon === "LONG" ? "long" : "short";
-    var e1html = s.e1 ? '<div class="sig-row"><span class="sig-key">E1</span><span class="sig-val blue">' + s.e1 + '</span></div>' : "";
-    var e2html = s.e2 ? '<div class="sig-row"><span class="sig-key">E2</span><span class="sig-val blue">' + s.e2 + '</span></div>' : "";
-    var e3html = s.e3 ? '<div class="sig-row"><span class="sig-key">E3</span><span class="sig-val blue">' + s.e3 + '</span></div>' : "";
+    var e1html = s.e1 ? '<div class="sig-row"><span class="sig-key">E1</span><span class="sig-val blue kopyalanabilir" onclick="fiyatKopyala(\'' + s.e1 + '\', this)">' + s.e1 + '</span></div>' : "";
+    var e2html = s.e2 ? '<div class="sig-row"><span class="sig-key">E2</span><span class="sig-val blue kopyalanabilir" onclick="fiyatKopyala(\'' + s.e2 + '\', this)">' + s.e2 + '</span></div>' : "";
+    var e3html = s.e3 ? '<div class="sig-row"><span class="sig-key">E3</span><span class="sig-val blue kopyalanabilir" onclick="fiyatKopyala(\'' + s.e3 + '\', this)">' + s.e3 + '</span></div>' : "";
     var kademehtml = s.asama ? '<div class="sig-row"><span class="sig-key">Kademe</span><span class="sig-val">' + s.asama + '</span></div>' : "";
     html += '<div class="signal-card ' + cls + '">';
     html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + '</div>';
     html += '<div class="sig-badges"><span class="badge ' + cls + '">' + yon + '</span>';
     html += '<span class="badge bot">' + botAdi(bot) + '</span></div></div>';
-    html += '<div class="sig-row"><span class="sig-key">Giris</span><span class="sig-val">' + (s.giris || s.maliyet || "-") + '</span></div>';
-    html += '<div class="sig-row"><span class="sig-key">Hedef</span><span class="sig-val green">' + (s.hedef || "-") + '</span></div>';
-    html += '<div class="sig-row"><span class="sig-key">Stop</span><span class="sig-val red">' + (s.stop || "-") + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">Giris</span><span class="sig-val kopyalanabilir" onclick="fiyatKopyala(\'' + (s.giris || s.maliyet || "-") + '\', this)">' + (s.giris || s.maliyet || "-") + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">Hedef</span><span class="sig-val green kopyalanabilir" onclick="fiyatKopyala(\'' + (s.hedef || "-") + '\', this)">' + (s.hedef || "-") + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">Stop</span><span class="sig-val red kopyalanabilir" onclick="fiyatKopyala(\'' + (s.stop || "-") + '\', this)">' + (s.stop || "-") + '</span></div>';
     html += e1html + e2html + e3html + kademehtml;
     html += '<div class="sig-time">' + (s.zaman || "") + '</div></div>';
   }
