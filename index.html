@@ -199,6 +199,7 @@
 
 <div class="content">
   <div id="sinyaller">
+    <div id="genel-basari-ozet" style="margin-bottom:10px"></div>
     <div class="bot-filter">
       <button class="bot-btn active" onclick="botFiltre('hepsi',this)">Tumu</button>
       <button class="bot-btn" onclick="botFiltre('SINYAL_ODA_1',this)">Sinyal Oda 1</button>
@@ -414,6 +415,24 @@ function guncelle() {
 }
 
 function sinyalleriGoster() {
+  var toplamTp = 0, toplamStop = 0;
+  var tumBotlar = Object.keys(tumVeriler);
+  for (var bb = 0; bb < tumBotlar.length; bb++) {
+    var bdata = tumVeriler[tumBotlar[bb]];
+    toplamTp += bdata.tp || 0;
+    toplamStop += bdata.stop || 0;
+  }
+  var toplamSonuc = toplamTp + toplamStop;
+  var genelBasariOzet = document.getElementById("genel-basari-ozet");
+  if (toplamSonuc > 0) {
+    var basariYuzde = Math.round(toplamTp / toplamSonuc * 100);
+    genelBasariOzet.innerHTML = '<div class="stat-card" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px">' +
+      '<span style="font-size:12px;color:#94a3b8">Genel Basari Orani</span>' +
+      '<span class="stat-val green" style="font-size:18px">%' + basariYuzde + '</span></div>';
+  } else {
+    genelBasariOzet.innerHTML = "";
+  }
+
   var html = "";
   var hepsi = [];
   var botlar = Object.keys(tumVeriler);
