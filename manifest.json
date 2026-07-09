@@ -2,7 +2,7 @@
   "name": "TradeSinyalPro",
   "short_name": "TradeSinyal",
   "description": "Kripto sinyal takip uygulamasi",
-  "start_url": "/tradesinyalpro-pwa/",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0f1e",
   "theme_color": "#0a0f1e",
