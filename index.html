@@ -334,6 +334,7 @@ var girisliKullanici = null;
 var tumVeriler = {};
 var tumHaberler = [];
 var tumRaporlar = [];
+var canliFiyatlar = {};
 var tumBalina = { islemler: [], ozet: {} };
 var balinaKategori = "kripto";
 var piyasaVerisi = null;
@@ -404,6 +405,19 @@ function veriYukle() {
     }
   };
   xhr4.send();
+
+  var xhr5 = new XMLHttpRequest();
+  xhr5.open("GET", "https://api.binance.com/api/v3/ticker/price", true);
+  xhr5.onload = function() {
+    if (xhr5.status === 200) {
+      var liste = JSON.parse(xhr5.responseText);
+      var sozluk = {};
+      for (var i = 0; i < liste.length; i++) sozluk[liste[i].symbol] = liste[i].price;
+      canliFiyatlar = sozluk;
+      if (aktifSekme === "sinyaller") sinyalleriGoster();
+    }
+  };
+  xhr5.send();
 }
 
 function guncelle() {
@@ -482,10 +496,13 @@ function sinyalleriGoster() {
     var e2html = s.e2 ? '<div class="sig-row"><span class="sig-key">E2</span><span class="sig-val blue kopyalanabilir" onclick="fiyatKopyala(\'' + s.e2 + '\', this)">' + s.e2 + '</span></div>' : "";
     var e3html = s.e3 ? '<div class="sig-row"><span class="sig-key">E3</span><span class="sig-val blue kopyalanabilir" onclick="fiyatKopyala(\'' + s.e3 + '\', this)">' + s.e3 + '</span></div>' : "";
     var kademehtml = s.asama ? '<div class="sig-row"><span class="sig-key">Kademe</span><span class="sig-val">' + s.asama + '</span></div>' : "";
+    var canliFiyat = canliFiyatlar[s.sembol];
+    var canliFiyatHtml = canliFiyat ? '<div class="sig-row"><span class="sig-key">Anlik Fiyat</span><span class="sig-val" style="color:#60a5fa;font-weight:600">' + canliFiyat + '</span></div>' : "";
     html += '<div class="signal-card ' + cls + '">';
     html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + '</div>';
     html += '<div class="sig-badges"><span class="badge ' + cls + '">' + yon + '</span>';
     html += '<span class="badge bot">' + botAdi(bot) + '</span></div></div>';
+    html += canliFiyatHtml;
     html += '<div class="sig-row"><span class="sig-key">Giris</span><span class="sig-val kopyalanabilir" onclick="fiyatKopyala(\'' + (s.giris || s.maliyet || "-") + '\', this)">' + (s.giris || s.maliyet || "-") + '</span></div>';
     html += '<div class="sig-row"><span class="sig-key">Hedef</span><span class="sig-val green kopyalanabilir" onclick="fiyatKopyala(\'' + (s.hedef || "-") + '\', this)">' + (s.hedef || "-") + '</span></div>';
     html += '<div class="sig-row"><span class="sig-key">Stop</span><span class="sig-val red kopyalanabilir" onclick="fiyatKopyala(\'' + (s.stop || "-") + '\', this)">' + (s.stop || "-") + '</span></div>';
@@ -1342,7 +1359,7 @@ function cikisYap() {
 function girisBasarili() {
   document.getElementById("auth-ekrani").style.display = "none";
   document.getElementById("app-icerik").style.display = "block";
-  ziyaretKaydet(girisliKullanici);
+  if (hesapDurumu !== "admin") ziyaretKaydet(girisliKullanici);
   erisimGuncelle();
   veriYukle();
   setInterval(veriYukle, 10000);
