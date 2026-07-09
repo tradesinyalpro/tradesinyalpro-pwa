@@ -912,9 +912,16 @@ function baskinlikHesapla(kayitlar) {
 function baskinlikBarHtml(kayitlar, boyut) {
   var b = baskinlikHesapla(kayitlar);
   if (!b) return "";
-  var genislik = boyut === "buyuk" ? "70px" : "36px";
+  if (boyut === "buyuk") {
+    return '<div style="text-align:center">' +
+      '<div style="font-size:14px;font-weight:700;margin-bottom:4px">' +
+      '<span style="color:#4ade80">%' + b.alim + '</span> / <span style="color:#f87171">%' + b.satim + '</span></div>' +
+      '<div class="balina-ozet-bar" style="width:50%;height:5px;margin:0 auto">' +
+      '<div class="balina-ozet-alim" style="width:' + b.alim + '%"></div>' +
+      '<div class="balina-ozet-satim" style="width:' + b.satim + '%"></div></div></div>';
+  }
   return '<div style="display:flex;align-items:center;gap:5px;margin-top:3px">' +
-    '<div class="balina-ozet-bar" style="width:' + genislik + ';height:4px;margin-top:0">' +
+    '<div class="balina-ozet-bar" style="width:36px;height:4px;margin-top:0">' +
     '<div class="balina-ozet-alim" style="width:' + b.alim + '%"></div>' +
     '<div class="balina-ozet-satim" style="width:' + b.satim + '%"></div></div>' +
     '<span style="font-size:9px;color:#64748b">%' + b.alim + '/%' + b.satim + '</span></div>';
@@ -983,8 +990,8 @@ function altcoinTabloHtml(islemler) {
 function altcoinDetayHtml(sembol, islemlerSozluk) {
   var kayitlar = (islemlerSozluk[sembol] || []).filter(function(t) { return t.grup === "altcoin"; });
   var html = '<div style="margin-bottom:12px"><button class="refresh-btn" onclick="altcoinDetayKapat()">&larr; Tabloya Don</button></div>';
-  html += '<div class="section-title" style="display:flex;justify-content:space-between;align-items:center">' +
-    '<span>#' + sembol + ' - Son ' + kayitlar.length + ' Islem</span>' + baskinlikBarHtml(kayitlar, "buyuk") + '</div>';
+  html += '<div class="section-title">#' + sembol + ' - Son ' + kayitlar.length + ' Islem</div>';
+  html += '<div style="margin-bottom:10px">' + baskinlikBarHtml(kayitlar, "buyuk") + '</div>';
   if (kayitlar.length === 0) {
     html += '<div class="empty">Bu coin icin henuz islem yok</div>';
     return html;
