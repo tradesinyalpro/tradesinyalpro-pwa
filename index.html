@@ -897,6 +897,29 @@ function balinaGoster() {
   document.getElementById("balina-icerik").innerHTML = html;
 }
 
+function baskinlikHesapla(kayitlar) {
+  var alimHacim = 0, satimHacim = 0;
+  for (var i = 0; i < kayitlar.length; i++) {
+    var d = kayitlar[i].deger || 0;
+    if (kayitlar[i].yon === "LONG") alimHacim += d; else satimHacim += d;
+  }
+  var toplam = alimHacim + satimHacim;
+  if (toplam === 0) return null;
+  var alim = Math.round((alimHacim / toplam) * 100);
+  return { alim: alim, satim: 100 - alim };
+}
+
+function baskinlikBarHtml(kayitlar, boyut) {
+  var b = baskinlikHesapla(kayitlar);
+  if (!b) return "";
+  var genislik = boyut === "buyuk" ? "70px" : "36px";
+  return '<div style="display:flex;align-items:center;gap:5px;margin-top:3px">' +
+    '<div class="balina-ozet-bar" style="width:' + genislik + ';height:4px;margin-top:0">' +
+    '<div class="balina-ozet-alim" style="width:' + b.alim + '%"></div>' +
+    '<div class="balina-ozet-satim" style="width:' + b.satim + '%"></div></div>' +
+    '<span style="font-size:9px;color:#64748b">%' + b.alim + '/%' + b.satim + '</span></div>';
+}
+
 function altcoinTabloHtml(islemler) {
   var sabitSira = tumBalina.sembol_sirasi || [];
 
@@ -939,7 +962,7 @@ function altcoinTabloHtml(islemler) {
   for (var s = 0; s < goruntulenecekler.length; s++) {
     var sembol = goruntulenecekler[s];
     var kayitlar = gruplar[sembol] || [];
-    html += '<tr><td class="coin-adi" style="cursor:pointer" onclick="altcoinDetayAc(\'' + sembol + '\')">#' + sembol + '</td>';
+    html += '<tr><td class="coin-adi" style="cursor:pointer" onclick="altcoinDetayAc(\'' + sembol + '\')">#' + sembol + baskinlikBarHtml(kayitlar, "kucuk") + '</td>';
     for (var k = 0; k < maxSutun; k++) {
       if (k < kayitlar.length) {
         var t = kayitlar[k];
@@ -960,7 +983,8 @@ function altcoinTabloHtml(islemler) {
 function altcoinDetayHtml(sembol, islemlerSozluk) {
   var kayitlar = (islemlerSozluk[sembol] || []).filter(function(t) { return t.grup === "altcoin"; });
   var html = '<div style="margin-bottom:12px"><button class="refresh-btn" onclick="altcoinDetayKapat()">&larr; Tabloya Don</button></div>';
-  html += '<div class="section-title">#' + sembol + ' - Son ' + kayitlar.length + ' Islem</div>';
+  html += '<div class="section-title" style="display:flex;justify-content:space-between;align-items:center">' +
+    '<span>#' + sembol + ' - Son ' + kayitlar.length + ' Islem</span>' + baskinlikBarHtml(kayitlar, "buyuk") + '</div>';
   if (kayitlar.length === 0) {
     html += '<div class="empty">Bu coin icin henuz islem yok</div>';
     return html;
