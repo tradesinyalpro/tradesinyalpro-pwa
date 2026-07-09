@@ -497,7 +497,9 @@ function sinyalleriGoster() {
     var e3html = s.e3 ? '<div class="sig-row"><span class="sig-key">E3</span><span class="sig-val blue kopyalanabilir" onclick="fiyatKopyala(\'' + s.e3 + '\', this)">' + s.e3 + '</span></div>' : "";
     var kademehtml = s.asama ? '<div class="sig-row"><span class="sig-key">Kademe</span><span class="sig-val">' + s.asama + '</span></div>' : "";
     var canliFiyat = canliFiyatlar[s.sembol];
-    var canliFiyatHtml = canliFiyat ? '<div class="sig-row"><span class="sig-key">Anlik Fiyat</span><span class="sig-val" style="color:#60a5fa;font-weight:600">' + canliFiyat + '</span></div>' : "";
+    var canliFiyatHtml = canliFiyat ? '<div style="text-align:center;margin:8px 0;padding:8px;background:#0c1424;border-radius:8px">' +
+      '<div style="font-size:10px;color:#64748b;letter-spacing:0.05em;margin-bottom:2px">ANLIK FIYAT</div>' +
+      '<div style="font-size:19px;font-weight:700;color:#60a5fa">' + canliFiyat + '</div></div>' : "";
     html += '<div class="signal-card ' + cls + '">';
     html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + '</div>';
     html += '<div class="sig-badges"><span class="badge ' + cls + '">' + yon + '</span>';
