@@ -334,7 +334,28 @@ var girisliKullanici = null;
 var tumVeriler = {};
 var tumHaberler = [];
 var tumRaporlar = [];
+var spotFiyatlar = {};
+var futuresFiyatlar = {};
 var canliFiyatlar = {};
+var fiyatYonleri = {};
+
+function fiyatlariBirlestirVeGoster() {
+  var yeni = {};
+  Object.keys(futuresFiyatlar).forEach(function(k) { yeni[k] = futuresFiyatlar[k]; });
+  Object.keys(spotFiyatlar).forEach(function(k) { yeni[k] = spotFiyatlar[k]; });
+  var yeniYonler = {};
+  Object.keys(yeni).forEach(function(sym) {
+    var eski = canliFiyatlar[sym];
+    var yeniDeger = yeni[sym];
+    if (eski === undefined) yeniYonler[sym] = fiyatYonleri[sym] || "ayni";
+    else if (parseFloat(yeniDeger) > parseFloat(eski)) yeniYonler[sym] = "yukari";
+    else if (parseFloat(yeniDeger) < parseFloat(eski)) yeniYonler[sym] = "asagi";
+    else yeniYonler[sym] = fiyatYonleri[sym] || "ayni";
+  });
+  fiyatYonleri = yeniYonler;
+  canliFiyatlar = yeni;
+  if (aktifSekme === "sinyaller") sinyalleriGoster();
+}
 var tumBalina = { islemler: [], ozet: {} };
 var balinaKategori = "kripto";
 var piyasaVerisi = null;
@@ -413,11 +434,24 @@ function veriYukle() {
       var liste = JSON.parse(xhr5.responseText);
       var sozluk = {};
       for (var i = 0; i < liste.length; i++) sozluk[liste[i].symbol] = liste[i].price;
-      canliFiyatlar = sozluk;
-      if (aktifSekme === "sinyaller") sinyalleriGoster();
+      spotFiyatlar = sozluk;
+      fiyatlariBirlestirVeGoster();
     }
   };
   xhr5.send();
+
+  var xhr6 = new XMLHttpRequest();
+  xhr6.open("GET", "https://fapi.binance.com/fapi/v1/ticker/price", true);
+  xhr6.onload = function() {
+    if (xhr6.status === 200) {
+      var liste6 = JSON.parse(xhr6.responseText);
+      var sozluk6 = {};
+      for (var i = 0; i < liste6.length; i++) sozluk6[liste6[i].symbol] = liste6[i].price;
+      futuresFiyatlar = sozluk6;
+      fiyatlariBirlestirVeGoster();
+    }
+  };
+  xhr6.send();
 }
 
 function guncelle() {
@@ -497,9 +531,11 @@ function sinyalleriGoster() {
     var e3html = s.e3 ? '<div class="sig-row"><span class="sig-key">E3</span><span class="sig-val blue kopyalanabilir" onclick="fiyatKopyala(\'' + s.e3 + '\', this)">' + s.e3 + '</span></div>' : "";
     var kademehtml = s.asama ? '<div class="sig-row"><span class="sig-key">Kademe</span><span class="sig-val">' + s.asama + '</span></div>' : "";
     var canliFiyat = canliFiyatlar[s.sembol];
+    var fiyatYonu = fiyatYonleri[s.sembol];
+    var fiyatRengi = fiyatYonu === "yukari" ? "#4ade80" : fiyatYonu === "asagi" ? "#f87171" : "#60a5fa";
     var canliFiyatHtml = canliFiyat ? '<div style="text-align:center;margin:8px 0;padding:8px;background:#0c1424;border-radius:8px">' +
       '<div style="font-size:10px;color:#64748b;letter-spacing:0.05em;margin-bottom:2px">ANLIK FIYAT</div>' +
-      '<div style="font-size:19px;font-weight:700;color:#60a5fa">' + canliFiyat + '</div></div>' : "";
+      '<div style="font-size:19px;font-weight:700;color:' + fiyatRengi + '">' + canliFiyat + '</div></div>' : "";
     html += '<div class="signal-card ' + cls + '">';
     html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + '</div>';
     html += '<div class="sig-badges"><span class="badge ' + cls + '">' + yon + '</span>';
