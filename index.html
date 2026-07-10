@@ -191,6 +191,7 @@
 
 <div id="durum-banner-alani"></div>
 <div id="bildirim-banner-alani"></div>
+<div id="pwa-kurulum-banner-alani"></div>
 
 <div class="tabs" id="tabs-alani">
   <div class="tab active" onclick="sekmeAc('sinyaller',this)" data-tam-erisim="1">Sinyaller</div>
@@ -509,6 +510,7 @@ function veriYukle() {
     if (xhr3.status === 200) {
       tumRaporlar = JSON.parse(xhr3.responseText);
       if (aktifSekme === "rapor") raporGoster();
+      if (aktifSekme === "performans") performansGoster();
     }
   };
   xhr3.send();
@@ -629,7 +631,13 @@ function sinyalleriGoster() {
     var e1html = s.e1 ? '<div class="sig-row"><span class="sig-key">E1</span><span class="sig-val blue kopyalanabilir" onclick="fiyatKopyala(\'' + s.e1 + '\', this)">' + s.e1 + '</span></div>' : "";
     var e2html = s.e2 ? '<div class="sig-row"><span class="sig-key">E2</span><span class="sig-val blue kopyalanabilir" onclick="fiyatKopyala(\'' + s.e2 + '\', this)">' + s.e2 + '</span></div>' : "";
     var e3html = s.e3 ? '<div class="sig-row"><span class="sig-key">E3</span><span class="sig-val blue kopyalanabilir" onclick="fiyatKopyala(\'' + s.e3 + '\', this)">' + s.e3 + '</span></div>' : "";
-    var kademehtml = s.asama ? '<div class="sig-row"><span class="sig-key">Kademe</span><span class="sig-val">' + s.asama + '</span></div>' : "";
+    var asamaSayisi = s.asama || 0;
+    var kademehtml = '<div style="display:flex;gap:4px;align-items:center;margin:6px 0">' +
+      '<div style="display:flex;gap:3px;flex:1">' +
+      '<div style="flex:1;height:5px;border-radius:3px;background:' + (asamaSayisi >= 1 ? "#3b82f6" : "#1e293b") + '"></div>' +
+      '<div style="flex:1;height:5px;border-radius:3px;background:' + (asamaSayisi >= 2 ? "#3b82f6" : "#1e293b") + '"></div>' +
+      '<div style="flex:1;height:5px;border-radius:3px;background:' + (asamaSayisi >= 3 ? "#3b82f6" : "#1e293b") + '"></div>' +
+      '</div><span style="font-size:10px;color:#64748b">Kademe ' + asamaSayisi + '/3</span></div>';
     var canliFiyat = canliFiyatlar[s.sembol];
     var fiyatYonu = fiyatYonleri[s.sembol];
     var fiyatRengi = fiyatYonu === "yukari" ? "#4ade80" : fiyatYonu === "asagi" ? "#f87171" : "#60a5fa";
@@ -651,6 +659,47 @@ function sinyalleriGoster() {
   }
   if (hepsi.length === 0) html = '<div class="empty">Su an aktif sinyal yok</div>';
   document.getElementById("sinyal-listesi").innerHTML = html;
+}
+
+function trendGrafigiHtml() {
+  if (!tumRaporlar || tumRaporlar.length === 0) return "";
+  var gunler = {};
+  for (var i = 0; i < tumRaporlar.length; i++) {
+    var r = tumRaporlar[i];
+    var t = r.tarih;
+    if (!t) continue;
+    if (!gunler[t]) gunler[t] = { tp: 0, stop: 0 };
+    gunler[t].tp += r.tp || 0;
+    gunler[t].stop += r.stop || 0;
+  }
+  var tarihler = Object.keys(gunler).sort();
+  tarihler = tarihler.slice(-14);
+  if (tarihler.length === 0) return "";
+
+  var maxDeger = 1;
+  for (var k = 0; k < tarihler.length; k++) {
+    maxDeger = Math.max(maxDeger, gunler[tarihler[k]].tp, gunler[tarihler[k]].stop);
+  }
+
+  var genislikPerGun = 26, barGenislik = 9, yukseklikMax = 55, tabanY = 66;
+  var svgGenislik = tarihler.length * genislikPerGun + 8;
+  var svg = '<svg viewBox="0 0 ' + svgGenislik + ' 84" style="width:100%;height:100px" xmlns="http://www.w3.org/2000/svg">';
+  for (var m = 0; m < tarihler.length; m++) {
+    var g = gunler[tarihler[m]];
+    var x = m * genislikPerGun + 6;
+    var tpH = Math.round((g.tp / maxDeger) * yukseklikMax);
+    var stopH = Math.round((g.stop / maxDeger) * yukseklikMax);
+    svg += '<rect x="' + x + '" y="' + (tabanY - tpH) + '" width="' + barGenislik + '" height="' + tpH + '" fill="#4ade80" rx="2"></rect>';
+    svg += '<rect x="' + (x + barGenislik + 2) + '" y="' + (tabanY - stopH) + '" width="' + barGenislik + '" height="' + stopH + '" fill="#f87171" rx="2"></rect>';
+    var gunEtiket = tarihler[m].slice(5).replace("-", "/");
+    svg += '<text x="' + (x + barGenislik) + '" y="80" font-size="7" fill="#64748b" text-anchor="middle">' + gunEtiket + '</text>';
+  }
+  svg += "</svg>";
+
+  return '<div class="stat-card" style="margin-bottom:12px">' +
+    '<div style="font-size:12px;color:#94a3b8;margin-bottom:6px">Son ' + tarihler.length + ' Gun ' +
+    '<span style="color:#4ade80;margin-left:8px">&#9632; TP</span> <span style="color:#f87171">&#9632; Stop</span></div>' +
+    svg + "</div>";
 }
 
 function performansGoster() {
@@ -710,6 +759,7 @@ function performansGoster() {
   ozet += '<div class="stat-card"><div class="stat-label">Toplam Stop</div><div class="stat-val red">' + toplamStop + '</div></div>';
   ozet += '<div class="stat-card"><div class="stat-label">Aktif Sinyal</div><div class="stat-val blue">' + toplamAktif + '</div></div>';
   ozet += '<div class="stat-card"><div class="stat-label">Genel Basari</div><div class="stat-val green">' + genelBasari + '%</div></div></div>';
+  ozet += trendGrafigiHtml();
   ozet += '<div class="section-title">Oda Bazli Performans</div>';
   document.getElementById("performans-icerik").innerHTML = ozet + html;
 }
@@ -1641,6 +1691,56 @@ function bildirimleriAc() {
   });
 }
 
+var pwaKurulumPrompt = null;
+
+window.addEventListener("beforeinstallprompt", function(e) {
+  e.preventDefault();
+  pwaKurulumPrompt = e;
+  pwaKurulumBanneriniGoster();
+});
+
+function pwaStandaloneMi() {
+  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+}
+
+function pwaIosMu() {
+  var ua = window.navigator.userAgent;
+  return /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+}
+
+function pwaKurulumBanneriniGoster() {
+  var alan = document.getElementById("pwa-kurulum-banner-alani");
+  if (!alan) return;
+  if (pwaStandaloneMi() || localStorage.getItem("ts_pwa_kurulum_kapatildi") === "1") {
+    alan.innerHTML = "";
+    return;
+  }
+  if (pwaKurulumPrompt) {
+    alan.innerHTML = '<div class="bildirim-banner">TradeSinyalPro\'yu ana ekraniniza ekleyip uygulama gibi kullanabilirsiniz.' +
+      '<button onclick="pwaKur()">Ana Ekrana Ekle</button>' +
+      '<span onclick="pwaKurulumBanneriniKapat()" style="cursor:pointer;color:#64748b;font-size:11px;margin-left:6px">Kapat</span></div>';
+  } else if (pwaIosMu()) {
+    alan.innerHTML = '<div class="bildirim-banner">Ana ekrana eklemek icin: Paylas &#8593; simgesine, sonra "Ana Ekrana Ekle" secenegine dokunun.' +
+      '<span onclick="pwaKurulumBanneriniKapat()" style="cursor:pointer;color:#64748b;font-size:11px;margin-left:6px">Kapat</span></div>';
+  } else {
+    alan.innerHTML = "";
+  }
+}
+
+function pwaKur() {
+  if (!pwaKurulumPrompt) return;
+  pwaKurulumPrompt.prompt();
+  pwaKurulumPrompt.userChoice.then(function() {
+    pwaKurulumPrompt = null;
+    document.getElementById("pwa-kurulum-banner-alani").innerHTML = "";
+  });
+}
+
+function pwaKurulumBanneriniKapat() {
+  localStorage.setItem("ts_pwa_kurulum_kapatildi", "1");
+  document.getElementById("pwa-kurulum-banner-alani").innerHTML = "";
+}
+
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(function() {});
 }
@@ -1672,10 +1772,17 @@ function erisimGuncelle() {
   } else {
     bildirimBanneriGizle();
   }
+  pwaKurulumBanneriniGoster();
 
-  if (hesapDurumu === "deneme") {
+  if (hesapDurumu === "deneme" && hesapKalanGun !== null && hesapKalanGun <= 1) {
+    bannerAlani.innerHTML = '<div class="durum-banner suresi-dolmus">⚠️ Deneme süreniz yarın sona eriyor!' +
+      '<button onclick="window.open(\'https://t.me/TradeSinyal_Pro\',\'_blank\')" style="margin-left:8px;background:#3b82f6;color:#fff;border:none;padding:5px 12px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">Yenile</button></div>';
+  } else if (hesapDurumu === "deneme") {
     var gunYazisi = (hesapKalanGun === 1) ? "1 gun" : (hesapKalanGun + " gun");
     bannerAlani.innerHTML = '<div class="durum-banner bekliyor">Ucretsiz deneme surumundesiniz. Kalan sure: ' + gunYazisi + '.</div>';
+  } else if (hesapDurumu === "onayli" && hesapKalanGun !== null && hesapKalanGun <= 1) {
+    bannerAlani.innerHTML = '<div class="durum-banner suresi-dolmus">⚠️ Üyeliğiniz yarın sona eriyor!' +
+      '<button onclick="window.open(\'https://t.me/TradeSinyal_Pro\',\'_blank\')" style="margin-left:8px;background:#3b82f6;color:#fff;border:none;padding:5px 12px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">Yenile</button></div>';
   } else if (hesapDurumu === "deneme_bitti") {
     bannerAlani.innerHTML = '<div class="durum-banner suresi-dolmus">Deneme süreniz sona erdi. Uyeliginizi baslatmak icin bize ulasin.</div>';
   } else if (hesapDurumu === "bekliyor") {
