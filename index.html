@@ -136,6 +136,8 @@
   .durum-banner { padding: 12px 16px; font-size: 13px; text-align: center; }
   .durum-banner.bekliyor { background: #1e293b; color: #93c5fd; }
   .durum-banner.suresi-dolmus { background: #451a03; color: #fbbf24; }
+  .bildirim-banner { padding: 10px 14px; font-size: 12px; text-align: center; background: #0c1a3d; color: #93c5fd; display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+  .bildirim-banner button { background: #3b82f6; color: #fff; border: none; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
   .cikis-btn { background: none; border: none; color: #64748b; font-size: 12px; cursor: pointer; text-decoration: underline; }
 </style>
 </head>
@@ -186,6 +188,7 @@
 </div>
 
 <div id="durum-banner-alani"></div>
+<div id="bildirim-banner-alani"></div>
 
 <div class="tabs" id="tabs-alani">
   <div class="tab active" onclick="sekmeAc('sinyaller',this)" data-tam-erisim="1">Sinyaller</div>
@@ -1469,6 +1472,76 @@ function anaSayfayaGit() {
   }
 }
 
+function urlBase64ToUint8Array(base64String) {
+  var padding = "=".repeat((4 - base64String.length % 4) % 4);
+  var base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  var rawData = atob(base64);
+  var outputArray = new Uint8Array(rawData.length);
+  for (var i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
+function bildirimBanneriGizle() {
+  document.getElementById("bildirim-banner-alani").innerHTML = "";
+}
+
+function bildirimBanneriniGoster() {
+  var alan = document.getElementById("bildirim-banner-alani");
+  if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+    alan.innerHTML = "";
+    return;
+  }
+  if (Notification.permission === "granted" && localStorage.getItem("ts_bildirim_acik") === "1") {
+    alan.innerHTML = "";
+    return;
+  }
+  if (Notification.permission === "denied") {
+    alan.innerHTML = "";
+    return;
+  }
+  alan.innerHTML = '<div class="bildirim-banner">Yeni sinyal geldiginde haberdar olmak icin bildirimleri acabilirsiniz.' +
+    '<button onclick="bildirimleriAc()">Bildirimleri Ac</button></div>';
+}
+
+function bildirimleriAc() {
+  Notification.requestPermission().then(function(izin) {
+    if (izin !== "granted") {
+      bildirimBanneriGizle();
+      return;
+    }
+    navigator.serviceWorker.ready.then(function(reg) {
+      var xhrKey = new XMLHttpRequest();
+      xhrKey.open("GET", API + "/push/public-key", true);
+      xhrKey.onload = function() {
+        if (xhrKey.status !== 200) return;
+        var anahtar = JSON.parse(xhrKey.responseText).publicKey;
+        if (!anahtar) return;
+        reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(anahtar)
+        }).then(function(sub) {
+          var xhrSub = new XMLHttpRequest();
+          xhrSub.open("POST", API + "/push/abone-ol", true);
+          xhrSub.setRequestHeader("Content-Type", "application/json");
+          xhrSub.setRequestHeader("X-Auth-Token", authToken);
+          xhrSub.onload = function() {
+            if (xhrSub.status === 200) {
+              localStorage.setItem("ts_bildirim_acik", "1");
+              bildirimBanneriGizle();
+            }
+          };
+          xhrSub.send(JSON.stringify({ subscription: sub }));
+        }).catch(function() {});
+      };
+      xhrKey.send();
+    });
+  });
+}
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(function() {});
+}
+
 function erisimGuncelle() {
   var bannerAlani = document.getElementById("durum-banner-alani");
   var tamErisim = (hesapDurumu === "onayli" || hesapDurumu === "admin" || hesapDurumu === "deneme");
@@ -1488,6 +1561,12 @@ function erisimGuncelle() {
     if (tamGerekli) tablar[i].style.display = tamErisim ? "" : "none";
   }
   document.getElementById("yonetici-tab").style.display = (hesapDurumu === "admin") ? "" : "none";
+
+  if (tamErisim) {
+    bildirimBanneriniGoster();
+  } else {
+    bildirimBanneriGizle();
+  }
 
   if (hesapDurumu === "deneme") {
     var gunYazisi = (hesapKalanGun === 1) ? "1 gun" : (hesapKalanGun + " gun");
