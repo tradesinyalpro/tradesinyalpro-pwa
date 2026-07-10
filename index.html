@@ -218,6 +218,7 @@
       <button class="bot-btn" onclick="botFiltre('SINYAL_ODA_4',this)">Sinyal Oda 4</button>
       <span class="oda-sessiz-btn" data-oda="SINYAL_ODA_4" onclick="odaSessizToggle('SINYAL_ODA_4')">&#128276;</span>
       <button class="bot-btn" id="favori-filtre-btn" onclick="favoriFiltreToggle()">&#9733; Favoriler</button>
+      <span class="oda-sessiz-btn" id="favori-bildirim-btn" onclick="favoriBildirimToggle()">&#128276;</span>
     </div>
     <div id="sinyal-listesi"><div class="loading">Yukleniyor...</div></div>
   </div>
@@ -318,6 +319,11 @@
     <div id="yonetici-ziyaret-icerik"></div>
     <div id="yonetici-icerik"><div class="loading">Yukleniyor...</div></div>
   </div>
+
+  <div style="text-align:center;padding:18px 12px;margin-top:10px;border-top:1px solid #1e293b;font-size:10px;color:#475569;line-height:1.6">
+    TradeSinyalPro'da paylaşılan sinyaller ve içerikler yatırım tavsiyesi değildir, sadece bilgilendirme amaçlıdır.
+    Kripto para işlemleri yüksek risk içerir, yatırım kararlarınızın sorumluluğu tamamen size aittir.
+  </div>
 </div>
 
 <div style="text-align:center;padding:16px">
@@ -388,13 +394,62 @@ function favoriKaydet() {
 }
 
 function favoriToggle(sembol) {
+  var yeniDurum;
   if (favoriCoinler[sembol]) {
     delete favoriCoinler[sembol];
+    yeniDurum = false;
   } else {
     favoriCoinler[sembol] = true;
+    yeniDurum = true;
   }
   favoriKaydet();
   sinyalleriGoster();
+  // Push bildirimlerinde kullanilmasi icin backend'e de bildir (arka planda, sessizce)
+  if (authToken) {
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", API + "/favoriler", true);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.setRequestHeader("X-Auth-Token", authToken);
+    xhr.send(JSON.stringify({ sembol: sembol, favori: yeniDurum }));
+  }
+}
+
+var favoriBildirimAcik = false;
+
+function favoriBildirimDurumunuGuncelle() {
+  var btn = document.getElementById("favori-bildirim-btn");
+  if (!btn) return;
+  if (favoriBildirimAcik) {
+    btn.innerHTML = "&#128276;";
+    btn.classList.add("sessiz-aktif");
+  } else {
+    btn.innerHTML = "&#128277;";
+    btn.classList.remove("sessiz-aktif");
+  }
+}
+
+function favoriBildirimYukle() {
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/favori-bildirim", true);
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      var yanit = JSON.parse(xhr.responseText);
+      favoriBildirimAcik = !!yanit.favori_bildirim;
+      favoriBildirimDurumunuGuncelle();
+    }
+  };
+  xhr.send();
+}
+
+function favoriBildirimToggle() {
+  favoriBildirimAcik = !favoriBildirimAcik;
+  favoriBildirimDurumunuGuncelle();
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/favori-bildirim", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.send(JSON.stringify({ acik: favoriBildirimAcik }));
 }
 
 function favoriFiltreToggle() {
@@ -1613,6 +1668,7 @@ function erisimGuncelle() {
   if (tamErisim) {
     bildirimBanneriniGoster();
     sessizOdalariYukle();
+    favoriBildirimYukle();
   } else {
     bildirimBanneriGizle();
   }
