@@ -23,6 +23,7 @@ self.addEventListener("push", function(event) {
     body: veri.govde || "",
     icon: "/icon-192.png",
     badge: "/icon-192.png",
+    requireInteraction: true,
     data: { url: veri.url || "/" }
   };
   event.waitUntil(self.registration.showNotification(baslik, secenekler));
