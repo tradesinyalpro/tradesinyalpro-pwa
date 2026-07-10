@@ -1549,7 +1549,11 @@ function cikisYap() {
 function girisBasarili() {
   document.getElementById("auth-ekrani").style.display = "none";
   document.getElementById("app-icerik").style.display = "block";
-  if (hesapDurumu !== "admin") ziyaretKaydet(girisliKullanici);
+  if (hesapDurumu === "admin") {
+    localStorage.setItem("ts_admin_cihazi", "1");
+  } else {
+    ziyaretKaydet(girisliKullanici);
+  }
   erisimGuncelle();
   veriYukle();
   setInterval(veriYukle, 10000);
@@ -1929,7 +1933,7 @@ function sayfaBaslat() {
   if (!kayitliToken) {
     document.getElementById("yukleniyor-ekrani").style.display = "none";
     document.getElementById("auth-ekrani").style.display = "flex";
-    ziyaretKaydet("misafir");
+    if (localStorage.getItem("ts_admin_cihazi") !== "1") ziyaretKaydet("misafir");
     return;
   }
   var xhr = new XMLHttpRequest();
@@ -1947,13 +1951,13 @@ function sayfaBaslat() {
     } else {
       localStorage.removeItem("ts_token");
       document.getElementById("auth-ekrani").style.display = "flex";
-      ziyaretKaydet("misafir");
+      if (localStorage.getItem("ts_admin_cihazi") !== "1") ziyaretKaydet("misafir");
     }
   };
   xhr.onerror = function() {
     document.getElementById("yukleniyor-ekrani").style.display = "none";
     document.getElementById("auth-ekrani").style.display = "flex";
-    ziyaretKaydet("misafir");
+    if (localStorage.getItem("ts_admin_cihazi") !== "1") ziyaretKaydet("misafir");
   };
   xhr.send();
 }
