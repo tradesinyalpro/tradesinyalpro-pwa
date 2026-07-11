@@ -358,8 +358,13 @@ var fiyatYonleri = {};
 
 function fiyatlariBirlestirVeGoster() {
   var yeni = {};
-  Object.keys(futuresFiyatlar).forEach(function(k) { yeni[k] = futuresFiyatlar[k]; });
+  // Tum botlar sadece Binance FUTURES uzerinde islem yaptigi icin futures
+  // fiyati her zaman esas alinir. Spot, sadece futures'ta hic olmayan
+  // (nadir) semboller icin son care yedek olarak kullanilir - cunku bazi
+  // sembol isimleri spot ve futures piyasalarinda farkli varliklara denk
+  // gelebiliyor (yanlis fiyat gosterme riski).
   Object.keys(spotFiyatlar).forEach(function(k) { yeni[k] = spotFiyatlar[k]; });
+  Object.keys(futuresFiyatlar).forEach(function(k) { yeni[k] = futuresFiyatlar[k]; });
   var yeniYonler = {};
   Object.keys(yeni).forEach(function(sym) {
     var eski = canliFiyatlar[sym];
