@@ -194,7 +194,7 @@
 <div id="pwa-kurulum-banner-alani"></div>
 
 <div class="tabs" id="tabs-alani">
-  <div class="tab active" onclick="sekmeAc('sinyaller',this)" data-tam-erisim="1">Sinyaller</div>
+  <div class="tab active" onclick="sekmeAc('sinyaller',this)" data-tam-erisim="1">Veriler</div>
   <div class="tab" onclick="sekmeAc('performans',this)" data-tam-erisim="1">Performans</div>
   <div class="tab" onclick="sekmeAc('gecmis',this)" data-tam-erisim="1">Gecmis</div>
   <div class="tab" onclick="sekmeAc('rapor',this)" data-tam-erisim="1">Gunluk Rapor</div>
@@ -337,7 +337,7 @@
   </div>
 
   <div style="text-align:center;padding:18px 12px;margin-top:10px;border-top:1px solid #1e293b;font-size:10px;color:#475569;line-height:1.6">
-    TradeSinyalPro'da paylaşılan sinyaller ve içerikler yatırım tavsiyesi değildir, sadece bilgilendirme amaçlıdır.
+    TradeSinyalPro'da paylaşılan veriler ve içerikler yatırım tavsiyesi değildir, sadece bilgilendirme amaçlıdır.
     Kripto para işlemleri yüksek risk içerir, yatırım kararlarınızın sorumluluğu tamamen size aittir.
   </div>
 </div>
@@ -752,7 +752,7 @@ function sinyalleriGoster() {
     html += e1html + e2html + e3html + kademehtml;
     html += '<div class="sig-time">' + (s.zaman || "") + '</div></div>';
   }
-  if (hepsi.length === 0) html = '<div class="empty">Su an aktif sinyal yok</div>';
+  if (hepsi.length === 0) html = '<div class="empty">Su an aktif veri yok</div>';
   document.getElementById("sinyal-listesi").innerHTML = html;
 }
 
@@ -852,7 +852,7 @@ function performansGoster() {
   var ozet = '<div class="stats-grid">';
   ozet += '<div class="stat-card"><div class="stat-label">Toplam TP</div><div class="stat-val green">' + toplamTp + '</div></div>';
   ozet += '<div class="stat-card"><div class="stat-label">Toplam Stop</div><div class="stat-val red">' + toplamStop + '</div></div>';
-  ozet += '<div class="stat-card"><div class="stat-label">Aktif Sinyal</div><div class="stat-val blue">' + toplamAktif + '</div></div>';
+  ozet += '<div class="stat-card"><div class="stat-label">Aktif Veri</div><div class="stat-val blue">' + toplamAktif + '</div></div>';
   ozet += '<div class="stat-card"><div class="stat-label">Genel Basari</div><div class="stat-val green">' + genelBasari + '%</div></div></div>';
   ozet += trendGrafigiHtml();
   ozet += '<div class="section-title">Oda Bazli Performans</div>';
@@ -1757,7 +1757,7 @@ function bildirimBanneriniGoster() {
     alan.innerHTML = "";
     return;
   }
-  alan.innerHTML = '<div class="bildirim-banner">Yeni sinyal geldiginde haberdar olmak icin bildirimleri acabilirsiniz.' +
+  alan.innerHTML = '<div class="bildirim-banner">Yeni veri geldiginde haberdar olmak icin bildirimleri acabilirsiniz.' +
     '<button onclick="bildirimleriAc()">Bildirimleri Ac</button></div>';
 }
 
