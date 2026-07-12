@@ -701,13 +701,24 @@ function sohbetGonder() {
   var input = document.getElementById("sohbet-input");
   var metin = input.value.trim();
   if (!metin) return;
+  var linkDeseni = /(https?:\/\/|www\.|t\.me\/|\.(com|net|org|io|me|xyz|pro|co|info|tv|app|dev|gg|to|ru|cn|link|click|shop|top|site|online)\b)/i;
+  if (linkDeseni.test(metin)) {
+    alert("Mesajlarda link/URL paylasimi yapilamaz.");
+    return;
+  }
   input.value = "";
   var xhr = new XMLHttpRequest();
   xhr.open("POST", API + "/sohbet/gonder", true);
   xhr.setRequestHeader("Content-Type", "application/json");
   xhr.setRequestHeader("X-Auth-Token", authToken || "");
   xhr.onload = function() {
-    if (xhr.status === 200) veriYukle();
+    if (xhr.status === 200) {
+      veriYukle();
+    } else {
+      var yanit;
+      try { yanit = JSON.parse(xhr.responseText); } catch (e) { yanit = {}; }
+      alert(yanit.hata || "Mesaj gonderilemedi");
+    }
   };
   xhr.send(JSON.stringify({ metin: metin }));
 }
