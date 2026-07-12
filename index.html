@@ -235,6 +235,10 @@
   </div>
 
   <div id="gecmis" style="display:none">
+    <div style="margin-bottom:10px">
+      <input id="gecmis-arama" type="text" placeholder="Coin ara (ornegin BTC, ORDI)..." oninput="gecmisGoster()"
+        style="width:100%;background:#111827;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px;box-sizing:border-box">
+    </div>
     <div id="gecmis-icerik"><div class="loading">Yukleniyor...</div></div>
   </div>
 
@@ -1070,6 +1074,8 @@ function performansDetayHtml(bot) {
 }
 
 function gecmisGoster() {
+  var aramaEl = document.getElementById("gecmis-arama");
+  var arama = aramaEl ? aramaEl.value.trim().toUpperCase() : "";
   var html = "";
   var hepsi = [];
   var botlar = Object.keys(tumVeriler);
@@ -1082,6 +1088,11 @@ function gecmisGoster() {
       if (s.durum !== "tp" && s.durum !== "stop") continue;
       hepsi.push({ s: s, bot: bot });
     }
+  }
+  if (arama) {
+    hepsi = hepsi.filter(function(item) {
+      return item.s.sembol && item.s.sembol.toUpperCase().indexOf(arama) !== -1;
+    });
   }
   hepsi.sort(function(a, b) {
     var za = a.s.sonuc_zamani || a.s.zaman || "";
@@ -1122,7 +1133,9 @@ function gecmisGoster() {
     html += '<div class="sig-row"><span class="sig-key">Giris</span><span class="sig-val">' + (s.giris || s.maliyet || "-") + '</span></div>';
     html += '<div class="sig-time">' + (s.sonuc_zamani || s.zaman || "") + '</div></div>';
   }
-  if (hepsi.length === 0) html = '<div class="empty">Henuz tamamlanmis islem yok</div>';
+  if (hepsi.length === 0) {
+    html = arama ? ('<div class="empty">"' + arama + '" icin gecmis kayit bulunamadi</div>') : '<div class="empty">Henuz tamamlanmis islem yok</div>';
+  }
   document.getElementById("gecmis-icerik").innerHTML = html;
 }
 
