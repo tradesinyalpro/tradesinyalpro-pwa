@@ -1632,6 +1632,12 @@ function sifreDegistir() {
 }
 
 function cikisYap() {
+  if (authToken) {
+    var xhrCikis = new XMLHttpRequest();
+    xhrCikis.open("POST", API + "/cikis", true);
+    xhrCikis.setRequestHeader("X-Auth-Token", authToken);
+    xhrCikis.send();
+  }
   localStorage.removeItem("ts_token");
   authToken = null;
   hesapDurumu = null;
