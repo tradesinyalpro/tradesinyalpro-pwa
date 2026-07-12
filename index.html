@@ -201,6 +201,7 @@
   <div class="tab" onclick="sekmeAc('piyasa',this)" data-tam-erisim="1">Piyasa</div>
   <div class="tab" onclick="sekmeAc('balina',this)" data-tam-erisim="1">Balina Takip</div>
   <div class="tab" onclick="sekmeAc('haberler',this)" data-tam-erisim="1">Haberler</div>
+  <div class="tab" onclick="sekmeAc('sohbet',this)" data-tam-erisim="1">Sohbet</div>
   <div class="tab" onclick="sekmeAc('iletisim',this)">Iletisim</div>
   <div class="tab" onclick="sekmeAc('yonetici',this)" id="yonetici-tab" style="display:none">Yonetici</div>
 </div>
@@ -322,6 +323,16 @@
       <button class="bot-btn" onclick="haberFiltre('jeopolitik',this)">Jeopolitik</button>
     </div>
     <div id="haber-listesi"><div class="loading">Yukleniyor...</div></div>
+  </div>
+
+  <div id="sohbet" style="display:none">
+    <div id="sohbet-mesajlari" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
+    <div style="display:flex;gap:8px;position:sticky;bottom:0;background:#0a0f1e;padding:8px 0">
+      <input id="sohbet-input" type="text" placeholder="Mesajinizi yazin..." maxlength="500"
+        style="flex:1;background:#111827;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px"
+        onkeypress="if(event.key==='Enter')sohbetGonder()">
+      <button class="refresh-btn" onclick="sohbetGonder()">Gonder</button>
+    </div>
   </div>
 
   <div id="iletisim" style="display:none">
@@ -483,6 +494,7 @@ var aktifHaberKategori = "hepsi";
 var aktifSekme = "sinyaller";
 var sonGununOzeti = { metin: "", zaman: null };
 var sonAbdBorsa = {};
+var sonSohbetMesajlari = [];
 
 var BOT_ADLARI = {
   "SINYAL_ODA_1": "Oda 1",
@@ -597,6 +609,17 @@ function veriYukle() {
     }
   };
   xhr8.send();
+
+  var xhr9 = new XMLHttpRequest();
+  xhr9.open("GET", API + "/sohbet/mesajlar", true);
+  xhr9.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr9.onload = function() {
+    if (xhr9.status === 200) {
+      sonSohbetMesajlari = JSON.parse(xhr9.responseText);
+      if (aktifSekme === "sohbet") sohbetGoster();
+    }
+  };
+  xhr9.send();
 }
 
 function gununOzetiGoster(metin, zaman) {
@@ -644,6 +667,64 @@ function abdBorsaGoster() {
   alan.innerHTML = '<div class="stat-card"><div style="font-size:12px;color:#94a3b8;margin-bottom:8px">ABD Borsalari - Sabit Acilis / Kapanis Yuzdeleri</div>' + satirlar + '</div>';
 }
 
+function htmlKacis(metin) {
+  var div = document.createElement("div");
+  div.textContent = metin || "";
+  return div.innerHTML;
+}
+
+function sohbetGoster() {
+  var alan = document.getElementById("sohbet-mesajlari");
+  if (!alan) return;
+  if (aktifSekme !== "sohbet") return;
+  if (!sonSohbetMesajlari || sonSohbetMesajlari.length === 0) {
+    alan.innerHTML = '<div class="empty">Henuz mesaj yok, ilk mesaji sen yaz!</div>';
+    return;
+  }
+  var html = "";
+  var adminMi = hesapDurumu === "admin";
+  for (var i = 0; i < sonSohbetMesajlari.length; i++) {
+    var m = sonSohbetMesajlari[i];
+    var benMi = m.kullanici_adi === girisliKullanici;
+    var silButon = adminMi ? ('<span onclick="sohbetSil(' + m.id + ')" style="cursor:pointer;color:#f87171;font-size:11px;margin-left:8px">Sil</span>') : "";
+    html += '<div style="background:' + (benMi ? "#0c1a3d" : "#111827") + ';border-radius:10px;padding:8px 12px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">' +
+      '<span style="font-size:11px;font-weight:600;color:#93c5fd">' + htmlKacis(m.kullanici_adi) + '</span>' +
+      '<span style="font-size:9px;color:#64748b">' + (m.zaman ? m.zaman.slice(11, 16) : "") + silButon + '</span>' +
+      '</div><div style="font-size:13px;color:#e2e8f0;word-break:break-word">' + htmlKacis(m.metin) + '</div></div>';
+  }
+  alan.innerHTML = html;
+  alan.scrollTop = alan.scrollHeight;
+}
+
+function sohbetGonder() {
+  var input = document.getElementById("sohbet-input");
+  var metin = input.value.trim();
+  if (!metin) return;
+  input.value = "";
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/sohbet/gonder", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status === 200) veriYukle();
+  };
+  xhr.send(JSON.stringify({ metin: metin }));
+}
+
+function sohbetSil(id) {
+  if (hesapDurumu !== "admin") return;
+  if (!confirm("Bu mesaji silmek istediginize emin misiniz?")) return;
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/sohbet/sil", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status === 200) veriYukle();
+  };
+  xhr.send(JSON.stringify({ id: id }));
+}
+
 function guncelle() {
   if (aktifSekme === "sinyaller") {
     sinyalleriGoster();
@@ -656,6 +737,7 @@ function guncelle() {
   if (aktifSekme === "haberler") haberleriGoster();
   if (aktifSekme === "yonetici") yoneticiPaneliGoster();
   if (aktifSekme === "piyasa") abdBorsaGoster();
+  if (aktifSekme === "sohbet") sohbetGoster();
 }
 
 function fiyatKopyala(deger, el) {
