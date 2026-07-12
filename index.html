@@ -285,12 +285,23 @@
                 { "s": "OANDA:XAUUSD", "d": "Ons Altin (Dolar)" }
               ],
               "originalTitle": "Altin"
+            },
+            {
+              "title": "ABD Borsalari",
+              "symbols": [
+                { "s": "TVC:DJI", "d": "Dow Jones" },
+                { "s": "TVC:SPX", "d": "S&P 500" },
+                { "s": "TVC:IXIC", "d": "Nasdaq" }
+              ],
+              "originalTitle": "ABD Borsalari"
             }
           ]
         }
         </script>
       </div>
     </div>
+
+    <div id="abd-borsa-acilis-kapanis" style="margin-top:10px"></div>
   </div>
 
   <div id="balina" style="display:none">
@@ -471,6 +482,7 @@ function favoriFiltreToggle() {
 var aktifHaberKategori = "hepsi";
 var aktifSekme = "sinyaller";
 var sonGununOzeti = { metin: "", zaman: null };
+var sonAbdBorsa = {};
 
 var BOT_ADLARI = {
   "SINYAL_ODA_1": "Oda 1",
@@ -574,6 +586,17 @@ function veriYukle() {
     }
   };
   xhr7.send();
+
+  var xhr8 = new XMLHttpRequest();
+  xhr8.open("GET", API + "/abd-borsa", true);
+  xhr8.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr8.onload = function() {
+    if (xhr8.status === 200) {
+      sonAbdBorsa = JSON.parse(xhr8.responseText);
+      if (aktifSekme === "piyasa") abdBorsaGoster();
+    }
+  };
+  xhr8.send();
 }
 
 function gununOzetiGoster(metin, zaman) {
@@ -597,6 +620,30 @@ function gununOzetiGoster(metin, zaman) {
     '</div><div style="font-size:13px;line-height:1.6;color:#e2e8f0">' + metin + '</div></div>';
 }
 
+function abdBorsaGoster() {
+  var alan = document.getElementById("abd-borsa-acilis-kapanis");
+  if (!alan) return;
+  var semboller = ["^DJI", "^GSPC", "^IXIC"];
+  var satirlar = "";
+  var veriVar = false;
+  for (var i = 0; i < semboller.length; i++) {
+    var d = sonAbdBorsa[semboller[i]];
+    if (!d) continue;
+    veriVar = true;
+    var acilisYazi = (d.acilis_yuzde !== null && d.acilis_yuzde !== undefined) ?
+      ('<span style="color:' + (d.acilis_yuzde >= 0 ? "#4ade80" : "#f87171") + '">%' + (d.acilis_yuzde >= 0 ? "+" : "") + d.acilis_yuzde + '</span>') :
+      '<span style="color:#64748b">—</span>';
+    var kapanisYazi = (d.kapanis_yuzde !== null && d.kapanis_yuzde !== undefined) ?
+      ('<span style="color:' + (d.kapanis_yuzde >= 0 ? "#4ade80" : "#f87171") + '">%' + (d.kapanis_yuzde >= 0 ? "+" : "") + d.kapanis_yuzde + '</span>') :
+      '<span style="color:#64748b">—</span>';
+    satirlar += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1e293b">' +
+      '<span style="font-size:13px;color:#e2e8f0">' + (d.isim || semboller[i]) + '</span>' +
+      '<span style="font-size:12px;display:flex;gap:14px"><span>Acilis: ' + acilisYazi + '</span><span>Kapanis: ' + kapanisYazi + '</span></span></div>';
+  }
+  if (!veriVar) { alan.innerHTML = ""; return; }
+  alan.innerHTML = '<div class="stat-card"><div style="font-size:12px;color:#94a3b8;margin-bottom:8px">ABD Borsalari - Sabit Acilis / Kapanis Yuzdeleri</div>' + satirlar + '</div>';
+}
+
 function guncelle() {
   if (aktifSekme === "sinyaller") {
     sinyalleriGoster();
@@ -608,6 +655,7 @@ function guncelle() {
   if (aktifSekme === "balina") balinaGoster();
   if (aktifSekme === "haberler") haberleriGoster();
   if (aktifSekme === "yonetici") yoneticiPaneliGoster();
+  if (aktifSekme === "piyasa") abdBorsaGoster();
 }
 
 function fiyatKopyala(deger, el) {
