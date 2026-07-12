@@ -202,6 +202,7 @@
   <div class="tab" onclick="sekmeAc('balina',this)" data-tam-erisim="1">Balina Takip</div>
   <div class="tab" onclick="sekmeAc('haberler',this)" data-tam-erisim="1">Haberler</div>
   <div class="tab" onclick="sekmeAc('sohbet',this)" data-tam-erisim="1">Sohbet</div>
+  <div class="tab" onclick="sekmeAc('portfoy',this)" data-tam-erisim="1">Portfoyum</div>
   <div class="tab" onclick="sekmeAc('iletisim',this)">Iletisim</div>
   <div class="tab" onclick="sekmeAc('yonetici',this)" id="yonetici-tab" style="display:none">Yonetici</div>
 </div>
@@ -333,6 +334,10 @@
         onkeypress="if(event.key==='Enter')sohbetGonder()">
       <button class="refresh-btn" onclick="sohbetGonder()">Gonder</button>
     </div>
+  </div>
+
+  <div id="portfoy" style="display:none">
+    <div id="portfoy-icerik"><div class="loading">Yukleniyor...</div></div>
   </div>
 
   <div id="iletisim" style="display:none">
@@ -495,6 +500,8 @@ var aktifSekme = "sinyaller";
 var sonGununOzeti = { metin: "", zaman: null };
 var sonAbdBorsa = {};
 var sonSohbetMesajlari = [];
+var sonPortfoy = { kayitlar: [], ozet: {} };
+var takipDurumu = {};
 
 var BOT_ADLARI = {
   "SINYAL_ODA_1": "Oda 1",
@@ -620,6 +627,23 @@ function veriYukle() {
     }
   };
   xhr9.send();
+
+  var xhr10 = new XMLHttpRequest();
+  xhr10.open("GET", API + "/portfoyum", true);
+  xhr10.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr10.onload = function() {
+    if (xhr10.status === 200) {
+      sonPortfoy = JSON.parse(xhr10.responseText);
+      takipDurumu = {};
+      for (var i = 0; i < sonPortfoy.kayitlar.length; i++) {
+        var k = sonPortfoy.kayitlar[i];
+        takipDurumu[k.bot + "|" + k.sembol + "|" + k.zaman] = true;
+      }
+      if (aktifSekme === "sinyaller") sinyalleriGoster();
+      if (aktifSekme === "portfoy") portfoyGoster();
+    }
+  };
+  xhr10.send();
 }
 
 function gununOzetiGoster(metin, zaman) {
@@ -736,6 +760,54 @@ function sohbetSil(id) {
   xhr.send(JSON.stringify({ id: id }));
 }
 
+function takipToggle(bot, sembol, zaman) {
+  var anahtar = bot + "|" + sembol + "|" + zaman;
+  var yeniDurum = !takipDurumu[anahtar];
+  takipDurumu[anahtar] = yeniDurum;
+  if (aktifSekme === "sinyaller") sinyalleriGoster();
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/takip-et", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() { veriYukle(); };
+  xhr.send(JSON.stringify({ bot: bot, sembol: sembol, zaman: zaman, takip: yeniDurum }));
+}
+
+function portfoyGoster() {
+  var alan = document.getElementById("portfoy-icerik");
+  if (!alan) return;
+  var ozet = sonPortfoy.ozet || {};
+  var kayitlar = sonPortfoy.kayitlar || [];
+
+  var getiriRenk = (ozet.toplam_getiri_yuzde || 0) >= 0 ? "#4ade80" : "#f87171";
+  var html = '<div class="stats-grid">';
+  html += '<div class="stat-card"><div class="stat-label">Toplam Takip</div><div class="stat-val blue">' + (ozet.toplam || 0) + '</div></div>';
+  html += '<div class="stat-card"><div class="stat-label">TP / Stop</div><div class="stat-val">' + (ozet.tp || 0) + ' / ' + (ozet.stop || 0) + '</div></div>';
+  html += '<div class="stat-card"><div class="stat-label">Takipte (Aktif)</div><div class="stat-val blue">' + (ozet.aktif || 0) + '</div></div>';
+  html += '<div class="stat-card"><div class="stat-label">Sanal Toplam Getiri</div><div class="stat-val" style="color:' + getiriRenk + '">%' + (ozet.toplam_getiri_yuzde || 0) + '</div></div>';
+  html += '</div>';
+  html += '<div style="font-size:11px;color:#64748b;margin:6px 2px 14px">Getiri hesaplamasi, gercek fiyat hareketine ' + (ozet.kaldirac || 8) + 'x sabit kaldirac varsayimi uygulanarak yapilmistir - gercek islem/kazanc degildir, sadece bilgilendirme amaclidir.</div>';
+
+  if (kayitlar.length === 0) {
+    html += '<div class="empty">Henuz takip ettiginiz bir veri yok. Veriler sekmesinde bir karttaki 📍 ikonuna dokunarak takibe alabilirsiniz.</div>';
+  } else {
+    for (var i = kayitlar.length - 1; i >= 0; i--) {
+      var k = kayitlar[i];
+      var durumRozeti = k.durum === "tp" ? '<span class="badge long">TP</span>' :
+        k.durum === "stop" ? '<span class="badge short">STOP</span>' :
+        '<span class="badge bot">Takipte</span>';
+      var getiriYazi = (k.getiri_yuzde !== null && k.getiri_yuzde !== undefined) ?
+        ('<span style="color:' + (k.getiri_yuzde >= 0 ? "#4ade80" : "#f87171") + ';font-weight:600">%' + (k.getiri_yuzde >= 0 ? "+" : "") + k.getiri_yuzde + '</span>') :
+        '<span style="color:#64748b">—</span>';
+      html += '<div class="signal-card" style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px">' +
+        '<div><div style="font-size:13px;font-weight:600">#' + k.sembol + ' <span style="font-size:10px;color:#64748b">(' + k.yon + ')</span></div>' +
+        '<div style="font-size:10px;color:#64748b;margin-top:2px">' + k.zaman + '</div></div>' +
+        '<div style="text-align:right">' + durumRozeti + '<div style="margin-top:4px">' + getiriYazi + '</div></div></div>';
+    }
+  }
+  alan.innerHTML = html;
+}
+
 function guncelle() {
   if (aktifSekme === "sinyaller") {
     sinyalleriGoster();
@@ -749,6 +821,7 @@ function guncelle() {
   if (aktifSekme === "yonetici") yoneticiPaneliGoster();
   if (aktifSekme === "piyasa") abdBorsaGoster();
   if (aktifSekme === "sohbet") sohbetGoster();
+  if (aktifSekme === "portfoy") portfoyGoster();
 }
 
 function fiyatKopyala(deger, el) {
@@ -834,8 +907,11 @@ function sinyalleriGoster() {
       '<div style="font-size:19px;font-weight:700;color:' + fiyatRengi + '">' + canliFiyat + '</div></div>' : "";
     var favoriMi = favoriCoinler[s.sembol];
     var yildizHtml = '<span onclick="favoriToggle(\'' + s.sembol + '\')" style="cursor:pointer;font-size:16px;margin-left:6px;color:' + (favoriMi ? "#fbbf24" : "#475569") + '">' + (favoriMi ? "&#9733;" : "&#9734;") + '</span>';
+    var takipAnahtari = bot + "|" + s.sembol + "|" + s.zaman;
+    var takipliMi = !!takipDurumu[takipAnahtari];
+    var takipHtml = '<span onclick="takipToggle(\'' + bot + '\',\'' + s.sembol + '\',\'' + s.zaman + '\')" style="cursor:pointer;font-size:14px;margin-left:6px" title="Sanal Portfoyde Takip Et">' + (takipliMi ? "📌" : "📍") + '</span>';
     html += '<div class="signal-card ' + cls + '">';
-    html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + yildizHtml + '</div>';
+    html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + yildizHtml + takipHtml + '</div>';
     html += '<div class="sig-badges"><span class="badge ' + cls + '">' + yon + '</span>';
     html += '<span class="badge bot">' + botAdi(bot) + '</span></div></div>';
     html += canliFiyatHtml;
