@@ -1,1559 +1,2326 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
-from werkzeug.security import generate_password_hash, check_password_hash
-from pywebpush import webpush, WebPushException
-import json, os, threading, time, secrets, requests, re
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0a0f1e">
+<title>TradeSinyalPro</title>
+<link rel="manifest" href="manifest.json">
 
-TR_TZ = ZoneInfo("Europe/Istanbul")
+<!-- iOS PWA destegi: dogru ikon ve tam ekran acilis icin -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TradeSinyal">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  input, textarea { -webkit-user-select: text; user-select: text; }
+  body { background: #0a0f1e; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+  .header { background: #111827; border-bottom: 1px solid #1e293b; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  .logo { font-size: 16px; font-weight: 600; color: #fff; }
+  .logo span { color: #3b82f6; }
+  .live-badge { background: #052e16; color: #4ade80; font-size: 11px; padding: 4px 10px; border-radius: 20px; font-weight: 500; display: flex; align-items: center; gap: 5px; }
+  .live-dot { width: 6px; height: 6px; background: #4ade80; border-radius: 50%; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .tabs { display: flex; background: #111827; border-bottom: 1px solid #1e293b; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tab { flex: 1; min-width: 74px; white-space: nowrap; padding: 12px 4px; text-align: center; font-size: 11px; color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; }
+  .tab.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+  .content { padding: 12px; max-width: 600px; margin: 0 auto; }
+  @media (min-width: 900px) {
+    .content { max-width: 1400px; }
+  }
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+  .stat-card { background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 12px; }
+  .stat-label { font-size: 11px; color: #64748b; margin-bottom: 4px; }
+  .stat-val { font-size: 22px; font-weight: 600; }
+  .stat-val.green { color: #4ade80; }
+  .stat-val.red { color: #f87171; }
+  .stat-val.blue { color: #60a5fa; }
+  .dom-bar { background: #1e293b; border-radius: 6px; height: 6px; overflow: hidden; margin-top: 8px; }
+  .dom-fill { height: 100%; border-radius: 6px; }
+  .price-change { font-size: 13px; font-weight: 500; margin-top: 4px; }
+  .price-change.up { color: #4ade80; }
+  .price-change.down { color: #f87171; }
+  .market-note { font-size: 11px; color: #64748b; padding: 10px 12px; background: #111827; border: 1px dashed #334155; border-radius: 10px; margin-bottom: 8px; }
+  .mini-chip-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .balina-tablo-wrap { overflow-x: auto; border: 1px solid #1e293b; border-radius: 10px; margin-bottom: 16px; -webkit-overflow-scrolling: touch; }
+  .balina-tablo { border-collapse: collapse; width: max-content; min-width: 100%; }
+  .balina-tablo th, .balina-tablo td { border: 1px solid #1e293b; padding: 8px 10px; font-size: 12px; text-align: center; white-space: nowrap; }
+  .balina-tablo th { background: #0c1424; color: #64748b; font-weight: 600; font-size: 11px; }
+  .balina-tablo td.coin-adi, .balina-tablo th.coin-adi { position: sticky; left: 0; background: #111827; z-index: 2; text-align: left; font-weight: 600; }
+  .balina-tablo th.coin-adi { background: #0c1424; z-index: 3; }
+  .balina-tablo td.long { background: #052e16; color: #4ade80; font-weight: 600; }
+  .balina-tablo td.short { background: #2d0a0a; color: #f87171; font-weight: 600; }
+  .balina-tablo td.bos { color: #334155; }
+  .hucre-saat { font-size: 9px; color: #64748b; margin-top: 2px; font-weight: 400; }
+  .mini-chip { font-size: 11px; background: #1e293b; color: #cbd5e1; padding: 4px 9px; border-radius: 10px; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+  .mini-chip.tp { background: #052e16; color: #4ade80; }
+  .mini-chip.stop { background: #2d0a0a; color: #f87171; }
+  .mini-chip.aktif { background: #0c1a3d; color: #60a5fa; }
+  .mini-chip.long { background: #052e16; color: #4ade80; }
+  .mini-chip.short { background: #2d0a0a; color: #f87171; }
+  .mini-chip.tiklanabilir { cursor: pointer; }
+  .mini-chip.tiklanabilir:active { opacity: 0.6; }
+  .signal-card.highlight-pulse { animation: pulseGlow 1s ease-in-out 2; border-color: #60a5fa; }
+  @keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0); }
+    50% { box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.5); }
+  }
+  .section-title { font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; margin: 16px 0 8px; }
+  .signal-card { background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 14px; margin-bottom: 8px; }
+  .signal-card.long { border-left: 3px solid #4ade80; }
+  .signal-card.short { border-left: 3px solid #f87171; }
+  .signal-card.tp { border-left: 3px solid #4ade80; opacity: 0.7; }
+  .signal-card.stop { border-left: 3px solid #f87171; opacity: 0.7; }
+  .sig-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .sig-symbol { font-size: 14px; font-weight: 600; }
+  .sig-badges { display: flex; gap: 6px; align-items: center; }
+  .badge { font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 20px; }
+  .badge.long { background: #052e16; color: #4ade80; }
+  .badge.aktif { background: #0c1a3d; color: #60a5fa; }
+  .badge.short { background: #2d0a0a; color: #f87171; }
+  .badge.tp { background: #052e16; color: #4ade80; }
+  .badge.seviye-normal { background: #1e293b; color: #94a3b8; }
+  .badge.seviye-buyuk { background: #431407; color: #fb923c; }
+  .badge.seviye-mega { background: #450a0a; color: #fbbf24; font-weight: 700; }
+  .balina-ozet-bar { display: flex; height: 8px; border-radius: 6px; overflow: hidden; margin-top: 8px; }
+  .balina-ozet-alim { background: #4ade80; height: 100%; }
+  .balina-ozet-satim { background: #f87171; height: 100%; }
+  .badge.stop { background: #2d0a0a; color: #f87171; }
+  .badge.bot { background: #1e1b4b; color: #a5b4fc; }
+  .badge.kripto { background: #1e1b4b; color: #a5b4fc; }
+  .badge.olumlu { background: #052e16; color: #4ade80; }
+  .badge.olumsuz { background: #2d0a0a; color: #f87171; }
+  .badge.notr { background: #422006; color: #f59e0b; }
+  .sig-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
+  .sig-key { font-size: 12px; color: #64748b; }
+  .sig-val { font-size: 12px; font-weight: 500; }
+  .kopyalanabilir { cursor: pointer; border-bottom: 1px dashed #475569; padding-bottom: 1px; transition: opacity 0.15s; }
+  .kopyalanabilir:active { opacity: 0.55; }
+  .sig-val.green { color: #4ade80; }
+  .sig-val.red { color: #f87171; }
+  .sig-val.blue { color: #60a5fa; }
+  .sig-time { font-size: 11px; color: #475569; margin-top: 8px; }
+  .empty { text-align: center; padding: 40px 20px; color: #475569; font-size: 14px; }
+  .refresh-btn { background: #1e293b; border: none; color: #94a3b8; padding: 8px 14px; border-radius: 8px; font-size: 12px; cursor: pointer; }
+  .bot-filter { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 12px; }
+  .oda-sessiz-btn { cursor: pointer; font-size: 15px; display: flex; align-items: center; opacity: 0.55; margin-right: 2px; }
+  .oda-sessiz-btn.sessiz-aktif { opacity: 1; filter: grayscale(1) brightness(0.7); }
+  .bot-btn { background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 6px 12px; border-radius: 20px; font-size: 11px; cursor: pointer; white-space: nowrap; }
+  .bot-btn.active { background: #1e3a8a; border-color: #3b82f6; color: #93c5fd; }
+  .loading { text-align: center; padding: 30px; color: #475569; }
+  .error { background: #2d0a0a; border: 1px solid #7f1d1d; border-radius: 12px; padding: 16px; text-align: center; color: #f87171; font-size: 13px; margin: 16px 0; }
+  .news-card { background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 14px; margin-bottom: 8px; }
+  .news-card.olumlu { border-left: 3px solid #4ade80; }
+  .news-card.olumsuz { border-left: 3px solid #f87171; }
+  .news-card.notr { border-left: 3px solid #f59e0b; }
+  .news-header { display: flex; justify-content: flex-start; margin-bottom: 8px; }
+  .news-badges { display: flex; gap: 4px; }
+  .news-title { font-size: 13px; font-weight: 500; color: #e2e8f0; margin-bottom: 6px; line-height: 1.4; }
+  .news-bullets { padding: 0; margin: 0; }
+  .news-bullet { font-size: 11px; color: #94a3b8; margin-bottom: 3px; padding-left: 12px; position: relative; list-style: none; }
+  .news-bullet::before { content: "•"; position: absolute; left: 0; color: #475569; }
+  .news-time { font-size: 11px; color: #475569; margin-top: 8px; }
+<style>
+  .auth-screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; overflow-y: auto; }
+  .auth-card { width: 100%; max-width: 360px; background: #111827; border: 1px solid #1e293b; border-radius: 16px; padding: 28px 24px; }
+  .auth-logo { text-align: center; font-size: 22px; font-weight: 700; margin-bottom: 24px; }
+  .auth-logo span { color: #3b82f6; }
+  .auth-input { width: 100%; padding: 12px 14px; margin-bottom: 12px; background: #0a0f1e; border: 1px solid #1e293b; border-radius: 10px; color: #e2e8f0; font-size: 14px; }
+  .auth-input::placeholder { color: #64748b; }
+  .auth-btn { width: 100%; padding: 13px; background: #3b82f6; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 4px; }
+  .auth-btn:active { opacity: 0.8; }
+  .auth-toggle { text-align: center; margin-top: 16px; font-size: 13px; color: #60a5fa; cursor: pointer; }
+  .auth-error { background: #2d0a0a; color: #f87171; padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; display: none; }
+  .auth-success { background: #052e16; color: #4ade80; padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; display: none; }
+  .durum-banner { padding: 12px 16px; font-size: 13px; text-align: center; }
+  .durum-banner.bekliyor { background: #1e293b; color: #93c5fd; }
+  .durum-banner.suresi-dolmus { background: #451a03; color: #fbbf24; }
+  .bildirim-banner { padding: 10px 14px; font-size: 12px; text-align: center; background: #0c1a3d; color: #93c5fd; display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+  .bildirim-banner button { background: #3b82f6; color: #fff; border: none; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .cikis-btn { background: none; border: none; color: #64748b; font-size: 12px; cursor: pointer; text-decoration: underline; }
+</style>
+</head>
+<body>
 
-def tr_zaman():
-    return datetime.now(TR_TZ).strftime("%Y-%m-%d %H:%M:%S")
+<div id="yukleniyor-ekrani" class="auth-screen">
+  <div style="text-align:center;color:#64748b">Yukleniyor...</div>
+</div>
 
-app = Flask(__name__)
-CORS(app)
+<div id="auth-ekrani" class="auth-screen" style="display:none">
+  <div class="auth-card">
+    <div class="auth-logo">Trade<span>Sinyal</span>Pro</div>
 
-@app.after_request
-def onbellek_kapat(response):
-    """API cevaplarinin hicbir yerde (tarayici, CDN, ara sunucu) onbellege
-    alinmamasini saglar - boylece PWA ve botlar her zaman en guncel veriyi gorur."""
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
-    return response
+    <div id="giris-form">
+      <div class="auth-error" id="giris-hata"></div>
+      <input class="auth-input" id="giris-kadi" type="text" placeholder="Kullanici adi" autocomplete="username">
+      <input class="auth-input" id="giris-sifre" type="password" placeholder="Sifre" autocomplete="current-password">
+      <button class="auth-btn" onclick="girisYap()">Giris Yap</button>
+      <div class="auth-toggle" onclick="formDegistir('kayit')">Hesabin yok mu? Kayit Ol</div>
+      <div style="text-align:center;margin-top:14px;font-size:12px;color:#64748b;line-height:1.5">
+        Uyeliginizin onaylanmasi icin yoneticiye basvurun.<br>
+        <a href="https://t.me/TradeSinyal_Pro" target="_blank" style="color:#60a5fa">Telegram: @TradeSinyal_Pro</a>
+      </div>
+    </div>
 
-API_KEY = os.environ.get("API_KEY", "tradesinyalpro2024")
-MAX_CIHAZ = 2  # Kullanici basina izin verilen esazamanli oturum (cihaz) sayisi
-PORTFOY_KALDIRAC = 8  # Sanal portfoy getiri hesabinda kullanilan sabit kaldirac varsayimi
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+    <div id="kayit-form" style="display:none">
+      <div class="auth-error" id="kayit-hata"></div>
+      <div class="auth-success" id="kayit-basari"></div>
+      <input class="auth-input" id="kayit-kadi" type="text" placeholder="Kullanici adi" autocomplete="username">
+      <input class="auth-input" id="kayit-sifre" type="password" placeholder="Sifre (en az 6 karakter)" autocomplete="new-password">
+      <input class="auth-input" id="kayit-telegram" type="text" placeholder="Telegram kullanici adi (@ornek)">
+      <input class="auth-input" id="kayit-email" type="email" placeholder="E-posta (istege bagli)">
+      <button class="auth-btn" onclick="kayitOl()">Kayit Ol</button>
+      <div class="auth-toggle" onclick="formDegistir('giris')">Zaten hesabin var mi? Giris Yap</div>
+    </div>
+  </div>
+</div>
 
-# --- PUSH BILDIRIM AYARLARI (VAPID) ---
-# Bu iki deger Railway'de Environment Variables olarak eklenmeli.
-VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
-VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
-VAPID_CLAIMS = {"sub": "mailto:destek@tradesinyal.pro"}
+<div id="app-icerik" style="display:none">
 
-# --- KALICI DEPOLAMA ---
-# Railway'de bir Volume baglanirsa RAILWAY_VOLUME_MOUNT_PATH otomatik gelir.
-# Baglanmadiysa (ornegin yerel test), calisilan dizine kaydeder.
-VERI_DIZINI = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH", ".")
-VERI_DOSYASI = os.path.join(VERI_DIZINI, "veri.json")
-_kayit_kilit = threading.Lock()
+<div class="header">
+  <div class="logo" style="cursor:pointer" onclick="anaSayfayaGit()">Trade<span>Sinyal</span>Pro</div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <div id="kalan-sure-gostergesi" style="font-size:11px;color:#94a3b8;white-space:nowrap"></div>
+    <button class="refresh-btn" onclick="veriYukle()" title="Yenile">&#8635;</button>
+    <div class="live-badge"><div class="live-dot"></div>Canli</div>
+  </div>
+</div>
 
-botlar = {
-    "SINYAL_ODA_1": {"sinyaller": [], "tp": 0, "stop": 0},
-    "SINYAL_ODA_2": {"sinyaller": [], "tp": 0, "stop": 0},
-    "SINYAL_ODA_3": {"sinyaller": [], "tp": 0, "stop": 0},
-    "SINYAL_ODA_4": {"sinyaller": [], "tp": 0, "stop": 0},
+<div id="durum-banner-alani"></div>
+<div id="bildirim-banner-alani"></div>
+<div id="pwa-kurulum-banner-alani"></div>
+
+<div class="tabs" id="tabs-alani">
+  <div class="tab active" onclick="sekmeAc('sinyaller',this)" data-tam-erisim="1">Veriler</div>
+  <div class="tab" onclick="sekmeAc('performans',this)" data-tam-erisim="1">Performans</div>
+  <div class="tab" onclick="sekmeAc('gecmis',this)" data-tam-erisim="1">Gecmis</div>
+  <div class="tab" onclick="sekmeAc('rapor',this)" data-tam-erisim="1">Gunluk Rapor</div>
+  <div class="tab" onclick="sekmeAc('piyasa',this)" data-tam-erisim="1">Piyasa</div>
+  <div class="tab" onclick="sekmeAc('balina',this)" data-tam-erisim="1">Balina Takip</div>
+  <div class="tab" onclick="sekmeAc('haberler',this)" data-tam-erisim="1">Haberler</div>
+  <div class="tab" onclick="sekmeAc('sohbet',this)" data-tam-erisim="1">Sohbet</div>
+  <div class="tab" onclick="sekmeAc('portfoy',this)" data-tam-erisim="1">Portfoyum</div>
+  <div class="tab" onclick="sekmeAc('iletisim',this)">Iletisim</div>
+  <div class="tab" onclick="sekmeAc('yonetici',this)" id="yonetici-tab" style="display:none">Yonetici</div>
+</div>
+
+<div class="content">
+  <div id="sinyaller">
+    <div style="text-align:center;font-size:11px;color:#94a3b8;background:#0c1a3d;padding:8px 12px;border-radius:8px;margin-bottom:10px">
+      ⚠️ Burada paylaşılan veriler yatırım tavsiyesi değildir, bilgilendirme amaçlıdır.
+    </div>
+    <div id="gunun-ozeti-alani" style="margin-bottom:10px"></div>
+    <div id="genel-basari-ozet" style="margin-bottom:10px"></div>
+    <div class="bot-filter">
+      <button class="bot-btn active" onclick="botFiltre('hepsi',this)">Tumu</button>
+      <button class="bot-btn" onclick="botFiltre('SINYAL_ODA_1',this)">Oda 1</button>
+      <span class="oda-sessiz-btn" data-oda="SINYAL_ODA_1" onclick="odaSessizToggle('SINYAL_ODA_1')">&#128276;</span>
+      <button class="bot-btn" onclick="botFiltre('SINYAL_ODA_2',this)">Oda 2</button>
+      <span class="oda-sessiz-btn" data-oda="SINYAL_ODA_2" onclick="odaSessizToggle('SINYAL_ODA_2')">&#128276;</span>
+      <button class="bot-btn" onclick="botFiltre('SINYAL_ODA_3',this)">Oda 3</button>
+      <span class="oda-sessiz-btn" data-oda="SINYAL_ODA_3" onclick="odaSessizToggle('SINYAL_ODA_3')">&#128276;</span>
+      <button class="bot-btn" onclick="botFiltre('SINYAL_ODA_4',this)">Oda 4</button>
+      <span class="oda-sessiz-btn" data-oda="SINYAL_ODA_4" onclick="odaSessizToggle('SINYAL_ODA_4')">&#128276;</span>
+      <button class="bot-btn" id="favori-filtre-btn" onclick="favoriFiltreToggle()">&#9733; Favoriler</button>
+      <span class="oda-sessiz-btn" id="favori-bildirim-btn" onclick="favoriBildirimToggle()">&#128276;</span>
+    </div>
+    <div id="sinyal-listesi"><div class="loading">Yukleniyor...</div></div>
+  </div>
+
+  <div id="performans" style="display:none">
+    <div id="performans-icerik"><div class="loading">Yukleniyor...</div></div>
+  </div>
+
+  <div id="gecmis" style="display:none">
+    <div style="margin-bottom:10px">
+      <input id="gecmis-arama" type="text" placeholder="Coin ara (ornegin BTC, ORDI)..." oninput="gecmisGoster()"
+        style="width:100%;background:#111827;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px;box-sizing:border-box">
+    </div>
+    <div id="gecmis-icerik"><div class="loading">Yukleniyor...</div></div>
+  </div>
+
+  <div id="rapor" style="display:none">
+    <div id="rapor-icerik"><div class="loading">Yukleniyor...</div></div>
+  </div>
+
+  <div id="piyasa" style="display:none;padding:8px 12px">
+    <div class="signal-card" style="padding:12px 8px 4px">
+      <div class="tradingview-widget-container" style="height:820px">
+        <div class="tradingview-widget-container__widget"></div>
+        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-market-overview.js" async>
+        {
+          "colorTheme": "dark",
+          "dateRange": "1D",
+          "showChart": false,
+          "locale": "tr",
+          "isTransparent": true,
+          "showSymbolLogo": true,
+          "showFloatingTooltip": false,
+          "width": "100%",
+          "height": "820",
+          "plotLineColorGrowing": "rgba(74, 222, 128, 1)",
+          "plotLineColorFalling": "rgba(248, 113, 113, 1)",
+          "gridLineColor": "rgba(30, 41, 59, 0)",
+          "scaleFontColor": "rgba(148, 163, 184, 1)",
+          "belowLineFillColorGrowing": "rgba(74, 222, 128, 0.12)",
+          "belowLineFillColorFalling": "rgba(248, 113, 113, 0.12)",
+          "belowLineFillColorGrowingBottom": "rgba(74, 222, 128, 0)",
+          "belowLineFillColorFallingBottom": "rgba(248, 113, 113, 0)",
+          "symbolActiveColor": "rgba(59, 130, 246, 0.12)",
+          "tabs": [
+            {
+              "title": "Kripto",
+              "symbols": [
+                { "s": "BINANCE:BTCUSDT", "d": "Bitcoin" },
+                { "s": "BINANCE:ETHUSDT", "d": "Ethereum" },
+                { "s": "CRYPTOCAP:TOTAL", "d": "Piyasa Degeri" },
+                { "s": "CRYPTOCAP:BTC.D", "d": "BTC Dominans" },
+                { "s": "CRYPTOCAP:ETH.D", "d": "ETH Dominans" },
+                { "s": "CRYPTOCAP:USDT.D", "d": "USDT Dominans" },
+                { "s": "CRYPTOCAP:OTHERS.D", "d": "Diger Dominans" }
+              ],
+              "originalTitle": "Kripto"
+            },
+            {
+              "title": "Altin",
+              "symbols": [
+                { "s": "FX_IDC:XAUTRYG", "d": "Gram Altin (TL)" },
+                { "s": "OANDA:XAUUSD", "d": "Ons Altin (Dolar)" }
+              ],
+              "originalTitle": "Altin"
+            },
+            {
+              "title": "ABD Borsalari",
+              "symbols": [
+                { "s": "TVC:DJI", "d": "Dow Jones" },
+                { "s": "TVC:SPX", "d": "S&P 500" },
+                { "s": "TVC:IXIC", "d": "Nasdaq" }
+              ],
+              "originalTitle": "ABD Borsalari"
+            }
+          ]
+        }
+        </script>
+      </div>
+    </div>
+
+    <div id="abd-borsa-acilis-kapanis" style="margin-top:10px"></div>
+  </div>
+
+  <div id="balina" style="display:none">
+    <div class="bot-filter">
+      <button class="bot-btn active" onclick="balinaFiltre('kripto',this)">Kripto</button>
+      <button class="bot-btn" onclick="balinaFiltre('altcoin',this)">Altcoinler</button>
+      <button class="bot-btn" onclick="balinaFiltre('hisse',this)">ABD Hisseleri</button>
+    </div>
+    <div id="balina-icerik"><div class="loading">Yukleniyor...</div></div>
+  </div>
+
+  <div id="haberler" style="display:none">
+    <div class="bot-filter">
+      <button class="bot-btn active" onclick="haberFiltre('hepsi',this)">Tumu</button>
+      <button class="bot-btn" onclick="haberFiltre('kripto',this)">Kripto</button>
+      <button class="bot-btn" onclick="haberFiltre('ekonomi',this)">Ekonomi</button>
+      <button class="bot-btn" onclick="haberFiltre('fed',this)">Fed</button>
+      <button class="bot-btn" onclick="haberFiltre('jeopolitik',this)">Jeopolitik</button>
+    </div>
+    <div id="haber-listesi"><div class="loading">Yukleniyor...</div></div>
+  </div>
+
+  <div id="sohbet" style="display:none">
+    <div id="sohbet-mesajlari" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
+    <div style="display:flex;gap:8px;position:sticky;bottom:0;background:#0a0f1e;padding:8px 0">
+      <input id="sohbet-input" type="text" placeholder="Mesajinizi yazin..." maxlength="500"
+        style="flex:1;background:#111827;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px"
+        onkeypress="if(event.key==='Enter')sohbetGonder()">
+      <button class="refresh-btn" onclick="sohbetGonder()">Gonder</button>
+    </div>
+  </div>
+
+  <div id="portfoy" style="display:none">
+    <div id="portfoy-icerik"><div class="loading">Yukleniyor...</div></div>
+  </div>
+
+  <div id="iletisim" style="display:none">
+    <div class="stat-card" style="text-align:center;padding:32px 20px">
+      <div style="font-size:15px;margin-bottom:16px;color:#94a3b8">Sorularınız, üyelik onayı veya destek için bize ulaşabilirsiniz.</div>
+      <a href="https://t.me/TradeSinyal_Pro" target="_blank" style="display:inline-block;background:#3b82f6;color:#fff;padding:13px 24px;border-radius:10px;text-decoration:none;font-weight:600">Telegram'dan Yaz</a>
+    </div>
+  </div>
+
+  <div id="yonetici" style="display:none">
+    <div id="yonetici-ziyaret-icerik"></div>
+    <div id="yonetici-icerik"><div class="loading">Yukleniyor...</div></div>
+  </div>
+
+  <div style="text-align:center;padding:18px 12px;margin-top:10px;border-top:1px solid #1e293b;font-size:10px;color:#475569;line-height:1.6">
+    TradeSinyalPro'da paylaşılan veriler ve içerikler yatırım tavsiyesi değildir, sadece bilgilendirme amaçlıdır.
+    Kripto para işlemleri yüksek risk içerir, yatırım kararlarınızın sorumluluğu tamamen size aittir.
+  </div>
+</div>
+
+<div style="text-align:center;padding:16px">
+  <button class="cikis-btn" onclick="sifreFormAcKapat()">Sifre Degistir</button>
+  &nbsp;&nbsp;|&nbsp;&nbsp;
+  <button class="cikis-btn" onclick="cikisYap()">Cikis Yap</button>
+  <div id="sifre-form" style="display:none;max-width:300px;margin:16px auto 0">
+    <div class="auth-error" id="sifre-hata"></div>
+    <div class="auth-success" id="sifre-basari"></div>
+    <input class="auth-input" id="sifre-eski" type="password" placeholder="Mevcut sifre">
+    <input class="auth-input" id="sifre-yeni" type="password" placeholder="Yeni sifre (en az 6 karakter)">
+    <button class="auth-btn" onclick="sifreDegistir()">Degistir</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+var API = "https://abundant-light-production-fb25.up.railway.app";
+var authToken = null;
+var hesapDurumu = null;
+var hesapKalanGun = null;
+var girisliKullanici = null;
+var tumVeriler = {};
+var tumHaberler = [];
+var tumRaporlar = [];
+var spotFiyatlar = {};
+var futuresFiyatlar = {};
+var canliFiyatlar = {};
+var fiyatYonleri = {};
+
+function fiyatlariBirlestirVeGoster() {
+  var yeni = {};
+  // Tum botlar sadece Binance FUTURES uzerinde islem yaptigi icin futures
+  // fiyati her zaman esas alinir. Spot, sadece futures'ta hic olmayan
+  // (nadir) semboller icin son care yedek olarak kullanilir - cunku bazi
+  // sembol isimleri spot ve futures piyasalarinda farkli varliklara denk
+  // gelebiliyor (yanlis fiyat gosterme riski).
+  Object.keys(spotFiyatlar).forEach(function(k) { yeni[k] = spotFiyatlar[k]; });
+  Object.keys(futuresFiyatlar).forEach(function(k) { yeni[k] = futuresFiyatlar[k]; });
+  var yeniYonler = {};
+  Object.keys(yeni).forEach(function(sym) {
+    var eski = canliFiyatlar[sym];
+    var yeniDeger = yeni[sym];
+    if (eski === undefined) yeniYonler[sym] = fiyatYonleri[sym] || "ayni";
+    else if (parseFloat(yeniDeger) > parseFloat(eski)) yeniYonler[sym] = "yukari";
+    else if (parseFloat(yeniDeger) < parseFloat(eski)) yeniYonler[sym] = "asagi";
+    else yeniYonler[sym] = fiyatYonleri[sym] || "ayni";
+  });
+  fiyatYonleri = yeniYonler;
+  canliFiyatlar = yeni;
+  if (aktifSekme === "sinyaller") sinyalleriGoster();
+}
+var tumBalina = { islemler: [], ozet: {} };
+var balinaKategori = "kripto";
+var piyasaVerisi = null;
+var piyasaSonGuncelleme = 0;
+var aktifBot = "hepsi";
+var favoriCoinler = {};
+var sadeceFavoriler = false;
+
+function favoriYukle() {
+  try {
+    var kayitli = localStorage.getItem("ts_favoriler");
+    favoriCoinler = kayitli ? JSON.parse(kayitli) : {};
+  } catch (e) {
+    favoriCoinler = {};
+  }
 }
 
-haberler = []
-gunluk_raporlar = []  # [{"bot":.., "tarih": "YYYY-MM-DD", "tp":.., "stop":.., "zaman":..}]
-gunun_ozeti_metni = ""
-gunun_ozeti_zamani = None
-abd_borsa_durum = {}  # {"^DJI": {"isim":.., "fiyat":.., "yuzde":.., "market_state":.., "acilis_yuzde":.., "kapanis_yuzde":..}}
-YAHOO_SEMBOLLER = {"^DJI": "Dow Jones", "^GSPC": "S&P 500", "^IXIC": "Nasdaq"}
-sohbet_mesajlari = []  # [{"id":.., "kullanici_adi":.., "metin":.., "zaman":..}]
-sohbet_mesaj_id_sayaci = 0
-fiyat_alarm_id_sayaci = 0
-balina_islemler = {}  # {"BTCUSDT": [{"yon":.., "deger":.., "seviye":.., "zaman":..}, ...] (en fazla 20, en yeni basta)}
-balina_ozet = {}  # {"BTCUSDT": {"alim_yuzde":.., "satim_yuzde":.., "toplam_hacim":.., "zaman":..}}
-altcoin_sirasi = []  # Hacme gore siralanmis, SABIT altcoin sembol listesi (BTC/ETH/hisse haric)
-
-# --- UYELIK SISTEMI ---
-UYELIK_GUN_SAYISI = 30
-DENEME_GUN_SAYISI = 3
-
-# Yonetici (admin) hesabi - ilk calistirmada otomatik olusur, sifreyi degistirmek
-# istersen bu iki satiri degistirip yeniden deploy et.
-ADMIN_KULLANICI_ADI = "adiyaman_admin"
-ADMIN_SIFRE = "TradeSinyal2026!Yonetici"
-
-# Uyeler grubuna (suresi dolan/yeni kayit) bildirim gondermek icin
-TELEGRAM_TOKEN = "8605906877:AAGvPDR6jj0m0WpM4g6ZPe8AZy7IyNaI6ZU"
-UYELER_GRUP_ID = "-1003773716616"  # Sinyal grubunun kendisi (Uyeler konusu artik kullanilmiyor)
-UYELER_TOPIC_ID = 101760
-
-# Sadece yonetici bildirimleri icin ayrilmis, kimsenin uye olmadigi grup
-BILDIRIM_BOT_TOKEN = "8623808511:AAG8udqqU6qDcqWEtbF6SkZup1Ph2sasfkQ"
-BILDIRIM_GRUP_ID = "-1003766880231"
-TOPIC_YENI_UYE = 2
-TOPIC_DENEME_BITTI = 4
-TOPIC_UYELIK_BITTI = 6
-TOPIC_SOHBET = 1168
-LINK_DESENI = re.compile(
-    r"(https?://|www\.|t\.me/|\.(com|net|org|io|me|xyz|pro|co|info|tv|app|dev|gg|to|ru|cn|link|click|shop|top|site|online)\b)",
-    re.IGNORECASE
-)
-
-kullanicilar = {}  # {"kadi": {"sifre_hash":.., "telegram":.., "email":.., "durum":"bekliyor/onayli/suresi_dolmus/admin", "olusturma_tarihi":.., "onay_tarihi":.., "bildirim_gonderildi":bool}}
-token_kullanici = {}  # {"token": "kadi"} - oturum eslemesi (kalici, restart'ta kaybolmasin diye diskte saklanir)
-
-bekleyen_gun_kredisi = {}  # {"telegram_kadi": kalan_gun} - sifre sifirlama sonrasi kalan sureyi tasir
-
-toplam_ziyaret_sayisi = 0
-kullanici_ziyaret_sayaci = {}  # {"kadi": ziyaret_sayisi} - "misafir" da bir "kullanici" gibi sayilir
-
-def veriyi_yukle():
-    """Uygulama basladiginda diskteki (varsa) eski veriyi hafizaya geri yukler.
-    Her veri turu birbirinden BAGIMSIZ yukleniyor - biri (ornegin format
-    degisikligi yuzunden) hata verirse digerleri (ozellikle kullanici
-    hesaplari/oturumlari) yine de dogru sekilde yuklenmeye devam eder."""
-    global botlar, haberler, gunluk_raporlar, balina_islemler, balina_ozet, altcoin_sirasi, kullanicilar, token_kullanici, toplam_ziyaret_sayisi, kullanici_ziyaret_sayaci, bekleyen_gun_kredisi, gunun_ozeti_metni, gunun_ozeti_zamani, abd_borsa_durum, sohbet_mesajlari, sohbet_mesaj_id_sayaci, fiyat_alarm_id_sayaci
-    if not os.path.exists(VERI_DOSYASI):
-        print(f"Kalici veri dosyasi henuz yok, sifirdan basliyor: {VERI_DOSYASI}")
-        return
-
-    try:
-        with open(VERI_DOSYASI, "r") as f:
-            veri = json.load(f)
-    except Exception as e:
-        print(f"!! veri dosyasi okunamadi HATA: {e}")
-        return
-
-    try:
-        kayitli_botlar = veri.get("botlar", {})
-        for b in botlar:
-            if b in kayitli_botlar:
-                botlar[b] = kayitli_botlar[b]
-    except Exception as e:
-        print(f"!! botlar yuklenemedi HATA: {e}")
-
-    try:
-        haberler.extend(veri.get("haberler", []))
-    except Exception as e:
-        print(f"!! haberler yuklenemedi HATA: {e}")
-
-    try:
-        gunluk_raporlar.extend(veri.get("gunluk_raporlar", []))
-    except Exception as e:
-        print(f"!! gunluk_raporlar yuklenemedi HATA: {e}")
-
-    try:
-        gunun_ozeti_metni = veri.get("gunun_ozeti_metni", "")
-        gunun_ozeti_zamani = veri.get("gunun_ozeti_zamani")
-    except Exception as e:
-        print(f"!! gunun_ozeti yuklenemedi HATA: {e}")
-
-    try:
-        abd_borsa_durum = veri.get("abd_borsa_durum", {})
-    except Exception as e:
-        print(f"!! abd_borsa_durum yuklenemedi HATA: {e}")
-
-    try:
-        sohbet_mesajlari.extend(veri.get("sohbet_mesajlari", []))
-        sohbet_mesaj_id_sayaci = veri.get("sohbet_mesaj_id_sayaci", 0)
-    except Exception as e:
-        print(f"!! sohbet_mesajlari yuklenemedi HATA: {e}")
-
-    try:
-        fiyat_alarm_id_sayaci = veri.get("fiyat_alarm_id_sayaci", 0)
-    except Exception as e:
-        print(f"!! fiyat_alarm_id_sayaci yuklenemedi HATA: {e}")
-
-    try:
-        balina_islemler.update(veri.get("balina_islemler", {}))
-    except Exception as e:
-        print(f"!! balina_islemler yuklenemedi HATA: {e}")
-
-    try:
-        balina_ozet.update(veri.get("balina_ozet", {}))
-    except Exception as e:
-        print(f"!! balina_ozet yuklenemedi HATA: {e}")
-
-    try:
-        altcoin_sirasi.extend(veri.get("altcoin_sirasi", []))
-    except Exception as e:
-        print(f"!! altcoin_sirasi yuklenemedi HATA: {e}")
-
-    try:
-        kullanicilar.update(veri.get("kullanicilar", {}))
-    except Exception as e:
-        print(f"!! kullanicilar yuklenemedi HATA: {e}")
-
-    try:
-        token_kullanici.update(veri.get("token_kullanici", {}))
-    except Exception as e:
-        print(f"!! token_kullanici yuklenemedi HATA: {e}")
-
-    try:
-        toplam_ziyaret_sayisi = veri.get("toplam_ziyaret_sayisi", 0)
-        kullanici_ziyaret_sayaci.update(veri.get("kullanici_ziyaret_sayaci", {}))
-    except Exception as e:
-        print(f"!! ziyaret sayaclari yuklenemedi HATA: {e}")
-
-    try:
-        bekleyen_gun_kredisi.update(veri.get("bekleyen_gun_kredisi", {}))
-    except Exception as e:
-        print(f"!! bekleyen_gun_kredisi yuklenemedi HATA: {e}")
-
-    print(f"Kalici veri yuklendi: {VERI_DOSYASI}")
-
-_veri_kirli = False
-
-def _diske_yaz():
-    """Gercek diske yazma islemi - sadece arka plan thread'i tarafindan cagrilir."""
-    with _kayit_kilit:
-        try:
-            with open(VERI_DOSYASI, "w") as f:
-                json.dump({
-                    "botlar": botlar,
-                    "haberler": haberler,
-                    "gunluk_raporlar": gunluk_raporlar,
-                    "balina_islemler": balina_islemler,
-                    "balina_ozet": balina_ozet,
-                    "altcoin_sirasi": altcoin_sirasi,
-                    "kullanicilar": kullanicilar,
-                    "token_kullanici": token_kullanici,
-                    "toplam_ziyaret_sayisi": toplam_ziyaret_sayisi,
-                    "kullanici_ziyaret_sayaci": kullanici_ziyaret_sayaci,
-                    "bekleyen_gun_kredisi": bekleyen_gun_kredisi,
-                    "gunun_ozeti_metni": gunun_ozeti_metni,
-                    "gunun_ozeti_zamani": gunun_ozeti_zamani,
-                    "abd_borsa_durum": abd_borsa_durum,
-                    "sohbet_mesajlari": sohbet_mesajlari,
-                    "sohbet_mesaj_id_sayaci": sohbet_mesaj_id_sayaci,
-                    "fiyat_alarm_id_sayaci": fiyat_alarm_id_sayaci
-                }, f)
-        except Exception as e:
-            print(f"!! veri kaydetme HATA: {e}")
-
-def veriyi_kaydet():
-    """Her degisiklikten sonra cagrilir ama aninda diske yazmaz - sadece
-    'kirli' bayragini kaldirir. Gercek yazma islemi arka plandaki
-    periyodik_kaydet_dongusu() tarafindan toplu sekilde yapilir. Bu sayede
-    sik gelen balina/sinyal guncellemeleri API'yi ve diski yormaz."""
-    global _veri_kirli
-    _veri_kirli = True
-
-def periyodik_kaydet_dongusu():
-    """Arka planda surekli calisir: 5 saniyede bir, eger degisiklik varsa
-    (kirli bayragi kalkmissa) veriyi diske yazar."""
-    global _veri_kirli
-    while True:
-        time.sleep(5)
-        if _veri_kirli:
-            _veri_kirli = False
-            _diske_yaz()
-
-def btc_eth_fiyat_ozeti():
-    """Binance'ten BTC ve ETH icin anlik fiyat + 24s yuzde degisimini ceker."""
-    try:
-        r = requests.get(
-            "https://api.binance.com/api/v3/ticker/24hr",
-            params={"symbols": '["BTCUSDT","ETHUSDT"]'},
-            timeout=10
-        ).json()
-        parcalar = []
-        for item in r:
-            sembol = "BTC" if item["symbol"] == "BTCUSDT" else "ETH"
-            fiyat = float(item["lastPrice"])
-            yuzde = float(item["priceChangePercent"])
-            parcalar.append(f"{sembol}: ${fiyat:,.0f} (24s: %{yuzde:+.2f})")
-        return " | ".join(parcalar)
-    except Exception as e:
-        print(f"!! btc_eth_fiyat_ozeti HATA: {e}")
-        return "Fiyat verisi alinamadi"
-
-def sinyal_ozeti_metni():
-    """Bugun uretilen verilerin (LONG/SHORT sayisi, TP/Stop, aktif veri
-    sayisi) ozeti + en son uretilen verinin ne zaman oldugu bilgisini
-    olusturur. Boylece ozet metni, kisa sureli sakinlik doneminde bile
-    'hic veri yok/sessiz' izlenimi vermez - her zaman somut, en guncel
-    bir veri noktasina referans verir."""
-    bugun = datetime.now(TR_TZ).strftime("%Y-%m-%d")
-    long_sayisi = short_sayisi = tp_sayisi = stop_sayisi = aktif_sayisi = 0
-    en_son_zaman = en_son_sembol = en_son_yon = None
-    for bot, veri in botlar.items():
-        for s in veri.get("sinyaller", []):
-            zaman = s.get("zaman", "")
-            if en_son_zaman is None or zaman > en_son_zaman:
-                en_son_zaman = zaman
-                en_son_sembol = s.get("sembol")
-                en_son_yon = s.get("yon")
-            if zaman[:10] != bugun:
-                continue
-            if s.get("yon") == "LONG":
-                long_sayisi += 1
-            elif s.get("yon") == "SHORT":
-                short_sayisi += 1
-            if s.get("durum") == "aktif":
-                aktif_sayisi += 1
-            elif s.get("durum") == "tp":
-                tp_sayisi += 1
-            elif s.get("durum") == "stop":
-                stop_sayisi += 1
-
-    son_veri_bilgisi = ""
-    if en_son_zaman:
-        son_veri_bilgisi = f"En son veri {en_son_zaman} saatinde #{en_son_sembol} ({en_son_yon}) icin uretildi. "
-
-    return (f"{son_veri_bilgisi}"
-            f"Bugun toplam {long_sayisi + short_sayisi} veri uretildi "
-            f"({long_sayisi} LONG, {short_sayisi} SHORT). "
-            f"Sonuclanan islemler: {tp_sayisi} TP, {stop_sayisi} Stop. "
-            f"Su an {aktif_sayisi} aktif veri var.")
-
-def haber_ozeti_metni():
-    """Son birkac haberin kisa basliklarini birlestirir."""
-    if not haberler:
-        return "Guncel haber bulunmuyor."
-    son_haberler = haberler[:8]
-    satirlar = [f"- {h.get('ozet', h.get('baslik', ''))}" for h in son_haberler]
-    return "\n".join(satirlar)
-
-def gunun_ozetini_olustur():
-    """Sinyal ozeti + haberler + BTC/ETH fiyat hareketini Claude'a gonderip
-    kisa, dogal bir Turkce piyasa ozeti uretir. Sonuc bellekte saklanir,
-    tum kullanicilar ayni uretilmis ozeti okur (kullanici basina cagri YOK)."""
-    global gunun_ozeti_metni, gunun_ozeti_zamani
-    if not ANTHROPIC_API_KEY:
-        print("!! gunun_ozetini_olustur: ANTHROPIC_API_KEY tanimli degil, atlaniyor")
-        return
-    try:
-        prompt = (
-            "Asagidaki verilere dayanarak, TradeSinyalPro adli bir kripto veri "
-            "sitesinin ana sayfasinda gosterilecek, 3-4 cumlelik, dogal ve akici "
-            "bir Turkce piyasa ozeti yaz. Yorumlayici ve bilgilendirici bir ton "
-            "kullan, kesinlikle 'al', 'sat', 'yatirim yap' gibi dogrudan tavsiye "
-            "ifadeleri kullanma - bu sadece genel bilgilendirme amaclidir. "
-            "ONEMLI KURALLAR: (1) 'sinyal' kelimesini KESINLIKLE kullanma, "
-            "onun yerine 'veri' kelimesini kullan. (2) Kisa vadeli bir sakinlik "
-            "donemi olsa bile 'bugun hicbir sey olmadi', 'sessiz/durgun bir gun' "
-            "gibi bos/hareketsiz izlenimi veren ifadeler KULLANMA - bunun yerine "
-            "verilen 'en son veri' bilgisine dogal bir sekilde atif yap. "
-            "Sadece ozet metnini yaz, baslik veya aciklama ekleme.\n\n"
-            f"VERI DURUMU:\n{sinyal_ozeti_metni()}\n\n"
-            f"PIYASA (BTC/ETH):\n{btc_eth_fiyat_ozeti()}\n\n"
-            f"GUNCEL HABERLER:\n{haber_ozeti_metni()}"
-        )
-        yanit = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json"
-            },
-            json={
-                "model": "claude-haiku-4-5-20251001",
-                "max_tokens": 400,
-                "messages": [{"role": "user", "content": prompt}]
-            },
-            timeout=30
-        )
-        if yanit.status_code == 200:
-            sonuc = yanit.json()
-            metin = "".join([b.get("text", "") for b in sonuc.get("content", [])]).strip()
-            if metin:
-                gunun_ozeti_metni = metin
-                gunun_ozeti_zamani = tr_zaman()
-                veriyi_kaydet()
-        else:
-            print(f"!! gunun_ozetini_olustur: Claude API HATA {yanit.status_code}: {yanit.text[:200]}")
-    except Exception as e:
-        print(f"!! gunun_ozetini_olustur HATA: {e}")
-
-def gunun_ozeti_dongusu():
-    """Arka planda calisir: her saatin 01. ve 31. dakikasinda ozeti yeniden
-    uretir - boylece tam saat/yarim saatte gelen ABD piyasa verileri veya
-    FED aciklamalarindan 1 dakika sonra, veri oturduktan sonra alinir.
-    Sunucu her basladiginda da hemen bir kez uretir (bos kalmasin)."""
-    gunun_ozetini_olustur()
-    son_uretim_dakika = datetime.now(TR_TZ).minute
-    while True:
-        try:
-            simdi = datetime.now(TR_TZ)
-            if simdi.minute in (1, 31) and simdi.minute != son_uretim_dakika:
-                gunun_ozetini_olustur()
-                son_uretim_dakika = simdi.minute
-        except Exception as e:
-            print(f"!! gunun_ozeti_dongusu HATA: {e}")
-        time.sleep(20)
-
-def abd_borsa_guncelle():
-    """Yahoo Finance'ten Dow Jones/S&P 500/Nasdaq verisini ceker. Piyasa
-    'kapali/on-piyasa' -> 'REGULAR' (gercek islem saati) gecisini yakalayip
-    o anki yuzdeyi 'acilis_yuzde' olarak, 'REGULAR' -> kapali gecisini
-    yakalayip 'kapanis_yuzde' olarak SABIT sekilde saklar."""
-    global abd_borsa_durum
-    for sembol, isim in YAHOO_SEMBOLLER.items():
-        try:
-            r = requests.get(
-                f"https://query1.finance.yahoo.com/v8/finance/chart/{sembol}",
-                headers={"User-Agent": "Mozilla/5.0"},
-                timeout=10
-            )
-            meta = r.json()["chart"]["result"][0]["meta"]
-            fiyat = meta.get("regularMarketPrice")
-            onceki_kapanis = meta.get("previousClose") or meta.get("chartPreviousClose")
-            market_state = meta.get("marketState")
-            yuzde = None
-            if fiyat and onceki_kapanis:
-                yuzde = round((fiyat - onceki_kapanis) / onceki_kapanis * 100, 2)
-
-            eski = abd_borsa_durum.get(sembol, {})
-            eski_state = eski.get("market_state")
-
-            kayit = {
-                "isim": isim, "fiyat": fiyat, "yuzde": yuzde, "market_state": market_state,
-                "acilis_yuzde": eski.get("acilis_yuzde"), "kapanis_yuzde": eski.get("kapanis_yuzde")
-            }
-            if market_state == "REGULAR" and eski_state != "REGULAR":
-                kayit["acilis_yuzde"] = yuzde
-            if eski_state == "REGULAR" and market_state != "REGULAR":
-                kayit["kapanis_yuzde"] = yuzde
-
-            abd_borsa_durum[sembol] = kayit
-        except Exception as e:
-            print(f"!! abd_borsa_guncelle({sembol}) HATA: {e}")
-    veriyi_kaydet()
-
-def abd_borsa_dongusu():
-    """Arka planda 5 dakikada bir calisir - piyasa acilis/kapanis anini
-    yakalamak icin bu siklik yeterlidir, ani hassasiyet gerekmiyor."""
-    while True:
-        try:
-            abd_borsa_guncelle()
-        except Exception as e:
-            print(f"!! abd_borsa_dongusu HATA: {e}")
-        time.sleep(300)
-
-threading.Thread(target=periyodik_kaydet_dongusu, daemon=True).start()
-threading.Thread(target=gunun_ozeti_dongusu, daemon=True).start()
-def fiyat_alarmi_kontrol_dongusu():
-    """Arka planda 30 saniyede bir calisir: tum kullanicilarin aktif fiyat
-    alarmlarini, Binance Futures'tan cektigi guncel fiyatlarla karsilastirir.
-    Tetiklenen alarm icin push bildirimi gonderilir ve alarm listeden
-    silinir (tek seferlik/one-shot alarm - istenirse yenisi kurulabilir).
-    Not: Bu istekler Railway'in kendi IP'sinden gider, botlarin evdeki
-    wifi IP'siyle hicbir rate-limit paylasimi yoktur."""
-    while True:
-        try:
-            r = requests.get("https://fapi.binance.com/fapi/v1/ticker/price", timeout=15)
-            fiyat_sozluk = {item["symbol"]: float(item["price"]) for item in r.json()}
-            degisiklik_oldu = False
-            for kadi, u in list(kullanicilar.items()):
-                liste = u.get("fiyat_alarmlari", [])
-                if not liste:
-                    continue
-                kalanlar = []
-                for alarm in liste:
-                    guncel = fiyat_sozluk.get(alarm["sembol"])
-                    if guncel is None:
-                        kalanlar.append(alarm)
-                        continue
-                    tetiklendi = (
-                        (alarm["yon"] == "ustunde" and guncel >= alarm["hedef_fiyat"]) or
-                        (alarm["yon"] == "altinda" and guncel <= alarm["hedef_fiyat"])
-                    )
-                    if tetiklendi:
-                        yon_yazi = "hedefin ustune cikti" if alarm["yon"] == "ustunde" else "hedefin altina dustu"
-                        push_gonder(
-                            kadi, f"Fiyat Alarmi: #{alarm['sembol']}",
-                            f"{alarm['sembol']} {yon_yazi} (hedef: {alarm['hedef_fiyat']}, guncel: {guncel})"
-                        )
-                        degisiklik_oldu = True
-                    else:
-                        kalanlar.append(alarm)
-                if len(kalanlar) != len(liste):
-                    u["fiyat_alarmlari"] = kalanlar
-            if degisiklik_oldu:
-                veriyi_kaydet()
-        except Exception as e:
-            print(f"!! fiyat_alarmi_kontrol_dongusu HATA: {e}")
-        time.sleep(30)
-
-threading.Thread(target=abd_borsa_dongusu, daemon=True).start()
-threading.Thread(target=fiyat_alarmi_kontrol_dongusu, daemon=True).start()
-
-veriyi_yukle()
-
-# Yonetici hesabi ilk calistirmada otomatik olusur; sifre her zaman bu koddaki
-# ADMIN_SIFRE ile senkronize tutulur - eger kendi sifreni unutursan, sadece
-# yukaridaki ADMIN_SIFRE satirini degistirip yeniden deploy etmen yeterlidir.
-if ADMIN_KULLANICI_ADI not in kullanicilar:
-    kullanicilar[ADMIN_KULLANICI_ADI] = {
-        "sifre_hash": generate_password_hash(ADMIN_SIFRE),
-        "telegram": "-", "email": "-", "durum": "admin",
-        "olusturma_tarihi": tr_zaman(), "onay_tarihi": None, "bildirim_gonderildi": False
-    }
-    veriyi_kaydet()
-    print(f"Yonetici hesabi olusturuldu: {ADMIN_KULLANICI_ADI}")
-else:
-    if not check_password_hash(kullanicilar[ADMIN_KULLANICI_ADI]["sifre_hash"], ADMIN_SIFRE):
-        kullanicilar[ADMIN_KULLANICI_ADI]["sifre_hash"] = generate_password_hash(ADMIN_SIFRE)
-        veriyi_kaydet()
-        print(f"Yonetici sifresi koddaki ADMIN_SIFRE ile guncellendi")
-
-def telegram_bildir(mesaj, topic_id):
-    """Yonetici bildirim grubundaki belirtilen konuya (topic) mesaj gonderir.
-    Hata olursa sessizce gecer."""
-    try:
-        requests.post(
-            f"https://api.telegram.org/bot{BILDIRIM_BOT_TOKEN}/sendMessage",
-            json={"chat_id": BILDIRIM_GRUP_ID, "message_thread_id": topic_id,
-                  "text": mesaj, "parse_mode": "Markdown"},
-            timeout=10
-        )
-    except Exception as e:
-        print(f"!! telegram_bildir HATA: {e}")
-
-BOT_ADLARI_TR = {
-    "SINYAL_ODA_1": "Oda 1", "SINYAL_ODA_2": "Oda 2",
-    "SINYAL_ODA_3": "Oda 3", "SINYAL_ODA_4": "Oda 4"
+function favoriKaydet() {
+  localStorage.setItem("ts_favoriler", JSON.stringify(favoriCoinler));
 }
 
-def push_gonder(kadi, baslik, govde, url="/"):
-    """Bir kullanicinin kayitli tum cihazlarina push bildirimi gonderir.
-    Gecersizlesmis (410/404) abonelikleri listeden otomatik temizler."""
-    u = kullanicilar.get(kadi)
-    if not u or not VAPID_PRIVATE_KEY:
-        return
-    abonelikler = u.get("push_abonelikleri", [])
-    if not abonelikler:
-        return
-    kalanlar = []
-    for sub in abonelikler:
-        try:
-            webpush(
-                subscription_info=sub,
-                data=json.dumps({"baslik": baslik, "govde": govde, "url": url}),
-                vapid_private_key=VAPID_PRIVATE_KEY,
-                vapid_claims=dict(VAPID_CLAIMS)
-            )
-            kalanlar.append(sub)
-        except WebPushException as e:
-            status = getattr(getattr(e, "response", None), "status_code", None)
-            if status not in (404, 410):
-                kalanlar.append(sub)
-            else:
-                print(f"Gecersiz push abonelik temizlendi ({kadi})")
-        except Exception as e:
-            print(f"!! push_gonder HATA ({kadi}): {e}")
-            kalanlar.append(sub)
-    u["push_abonelikleri"] = kalanlar
-    veriyi_kaydet()
+function favoriToggle(sembol) {
+  var yeniDurum;
+  if (favoriCoinler[sembol]) {
+    delete favoriCoinler[sembol];
+    yeniDurum = false;
+  } else {
+    favoriCoinler[sembol] = true;
+    yeniDurum = true;
+  }
+  favoriKaydet();
+  sinyalleriGoster();
+  // Push bildirimlerinde kullanilmasi icin backend'e de bildir (arka planda, sessizce)
+  if (authToken) {
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", API + "/favoriler", true);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.setRequestHeader("X-Auth-Token", authToken);
+    xhr.send(JSON.stringify({ sembol: sembol, favori: yeniDurum }));
+  }
+}
 
-def yeni_sinyal_bildirimi_gonder(bot, sinyal):
-    """Yeni aktif sinyal geldiginde tum tam-erisimli kullanicilara bildirim gonderir.
-    Bir kullaniciya bildirim gider EGER:
-    - o odayi sessize almamissa, YA DA
-    - 'favori bildirim'i acmis VE bu sembol onun favorileri arasindaysa
-    (Yani favori bildirim, oda sessizken bile devreye giren bir istisna."""
-    def gonder():
-        oda_adi = BOT_ADLARI_TR.get(bot, bot)
-        sembol = sinyal.get("sembol", "")
-        yon = sinyal.get("yon", "")
-        baslik = f"{oda_adi}: #{sembol}"
-        govde = f"{yon} verisi geldi - Giris: {sinyal.get('giris') or sinyal.get('maliyet', '-')}"
-        for kadi, u in list(kullanicilar.items()):
-            if u.get("durum") not in ("onayli", "deneme", "admin"):
-                continue
-            oda_acik = bot not in (u.get("sessiz_odalar") or [])
-            favori_acik = bool(u.get("favori_bildirim")) and sembol in (u.get("favori_coinler") or [])
-            if not (oda_acik or favori_acik):
-                continue
-            push_gonder(kadi, baslik, govde)
-    threading.Thread(target=gonder, daemon=True).start()
+var favoriBildirimAcik = false;
 
-def kullanici_durumu_guncelle(kadi):
-    """Iki gecisi kontrol eder:
-    1) 'deneme' (3 gunluk ucretsiz deneme) suresi dolduysa -> 'deneme_bitti'
-    2) 'onayli' (ucretli 30 gun) suresi dolduysa -> 'suresi_dolmus'
-    Her iki durumda da (sadece bir kez) admin'e bildirim atar."""
-    u = kullanicilar.get(kadi)
-    if not u:
-        return
-    simdi = datetime.now(TR_TZ)
+function favoriBildirimDurumunuGuncelle() {
+  var btn = document.getElementById("favori-bildirim-btn");
+  if (!btn) return;
+  if (favoriBildirimAcik) {
+    btn.innerHTML = "&#128276;";
+    btn.classList.add("sessiz-aktif");
+  } else {
+    btn.innerHTML = "&#128277;";
+    btn.classList.remove("sessiz-aktif");
+  }
+}
 
-    if u.get("durum") == "deneme" and u.get("deneme_baslangic"):
-        try:
-            baslangic = datetime.strptime(u["deneme_baslangic"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=TR_TZ)
-        except Exception:
-            return
-        gecen_gun = (simdi - baslangic).days
-        if gecen_gun >= DENEME_GUN_SAYISI:
-            u["durum"] = "deneme_bitti"
-            if not u.get("bildirim_gonderildi"):
-                telegram_bildir(
-                    f"⏳ *Sayın {u.get('telegram', '-')} kullanıcısı, deneme sürümünüz sona ermiştir.*\n\n"
-                    f"Kullanici Adi: `{kadi}`\n"
-                    f"Telegram: {u.get('telegram', '-')}\n\n"
-                    f"Odeme alindiginda Yonetici panelinden onaylayabilirsiniz.",
-                    TOPIC_DENEME_BITTI
-                )
-                u["bildirim_gonderildi"] = True
-            veriyi_kaydet()
-        return
+function favoriBildirimYukle() {
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/favori-bildirim", true);
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      var yanit = JSON.parse(xhr.responseText);
+      favoriBildirimAcik = !!yanit.favori_bildirim;
+      favoriBildirimDurumunuGuncelle();
+    }
+  };
+  xhr.send();
+}
 
-    if u.get("durum") == "onayli" and u.get("onay_tarihi"):
-        try:
-            onay_tarihi = datetime.strptime(u["onay_tarihi"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=TR_TZ)
-        except Exception:
-            return
-        gecen_gun = (simdi - onay_tarihi).days
-        if gecen_gun >= UYELIK_GUN_SAYISI:
-            u["durum"] = "suresi_dolmus"
-            if not u.get("bildirim_gonderildi"):
-                telegram_bildir(
-                    f"⏰ *Sayın {u.get('telegram', '-')} kullanıcısı, 30 günlük üyelik süreniz sona ermiştir.*\n\n"
-                    f"Kullanici Adi: `{kadi}`\n"
-                    f"Telegram: {u.get('telegram', '-')}\n"
-                    f"Onay Tarihi: {u.get('onay_tarihi', '-')}\n\n"
-                    f"Yenileme icin kullaniciyla iletisime gecebilirsiniz.",
-                    TOPIC_UYELIK_BITTI
-                )
-                u["bildirim_gonderildi"] = True
-            veriyi_kaydet()
+function favoriBildirimToggle() {
+  favoriBildirimAcik = !favoriBildirimAcik;
+  favoriBildirimDurumunuGuncelle();
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/favori-bildirim", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.send(JSON.stringify({ acik: favoriBildirimAcik }));
+}
 
-def auth_kullanici(token):
-    """Token'dan kullanici adini dondurur, gecersizse None."""
-    return token_kullanici.get(token)
+function favoriFiltreToggle() {
+  sadeceFavoriler = !sadeceFavoriler;
+  var btn = document.getElementById("favori-filtre-btn");
+  if (sadeceFavoriler) btn.classList.add("active"); else btn.classList.remove("active");
+  sinyalleriGoster();
+}
+var aktifHaberKategori = "hepsi";
+var aktifSekme = "sinyaller";
+var sonGununOzeti = { metin: "", zaman: null };
+var sonAbdBorsa = {};
+var sonSohbetMesajlari = [];
+var sonPortfoy = { kayitlar: [], ozet: {} };
+var takipDurumu = {};
+var sonAlarmlar = [];
 
-def admin_mi(token):
-    kadi = auth_kullanici(token)
-    if not kadi:
-        return False
-    return kullanicilar.get(kadi, {}).get("durum") == "admin"
+var BOT_ADLARI = {
+  "SINYAL_ODA_1": "Oda 1",
+  "SINYAL_ODA_2": "Oda 2",
+  "SINYAL_ODA_3": "Oda 3",
+  "SINYAL_ODA_4": "Oda 4"
+};
 
-def veri_erisim_izni_var_mi(token):
-    """Sadece onayli, deneme suresindeki veya admin kullanicilar veri gorebilir.
-    Onay bekleyen, deneme suresi bitmis veya suresi dolmus hesaplar HICBIR veriye erisemez."""
-    kadi = auth_kullanici(token)
-    if not kadi:
-        return False
-    kullanici_durumu_guncelle(kadi)
-    durum = kullanicilar.get(kadi, {}).get("durum")
-    return durum in ("onayli", "admin", "deneme")
+function botAdi(bot) {
+  return BOT_ADLARI[bot] || bot;
+}
 
-def key_kontrol():
-    key = request.headers.get("X-API-Key")
-    return key == API_KEY
+function veriYukle() {
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/sinyaller", true);
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      tumVeriler = JSON.parse(xhr.responseText);
+      guncelle();
+    } else {
+      document.getElementById("sinyal-listesi").innerHTML =
+        '<div class="error">API hatasi: ' + xhr.status + '</div>';
+    }
+  };
+  xhr.onerror = function() {
+    document.getElementById("sinyal-listesi").innerHTML =
+      '<div class="error">API\'ye baglanılamadi.</div>';
+  };
+  xhr.send();
 
-@app.route("/")
-def index():
-    return jsonify({"durum": "TradeSinyalPro API calisiyor", "versiyon": "2.4"})
+  var xhr2 = new XMLHttpRequest();
+  xhr2.open("GET", API + "/haberler", true);
+  xhr2.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr2.onload = function() {
+    if (xhr2.status === 200) {
+      tumHaberler = JSON.parse(xhr2.responseText);
+      if (aktifSekme === "haberler") haberleriGoster();
+    }
+  };
+  xhr2.send();
 
-@app.route("/sinyal/ekle", methods=["POST"])
-def sinyal_ekle():
-    if not key_kontrol():
-        return jsonify({"hata": "Yetkisiz"}), 401
-    data = request.json
-    bot = data.get("bot")
-    if bot not in botlar:
-        return jsonify({"hata": "Gecersiz bot adi"}), 400
-    data["zaman"] = tr_zaman()
-    data["durum"] = "aktif"
-    for i, s in enumerate(botlar[bot]["sinyaller"]):
-        if s["sembol"] == data.get("sembol") and s.get("durum") == "aktif":
-            botlar[bot]["sinyaller"][i] = data
-            veriyi_kaydet()
-            return jsonify({"durum": "guncellendi"})
-    botlar[bot]["sinyaller"].append(data)
-    veriyi_kaydet()
-    yeni_sinyal_bildirimi_gonder(bot, data)
-    return jsonify({"durum": "eklendi"})
+  var xhr3 = new XMLHttpRequest();
+  xhr3.open("GET", API + "/raporlar", true);
+  xhr3.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr3.onload = function() {
+    if (xhr3.status === 200) {
+      tumRaporlar = JSON.parse(xhr3.responseText);
+      if (aktifSekme === "rapor") raporGoster();
+      if (aktifSekme === "performans") performansGoster();
+    }
+  };
+  xhr3.send();
 
-@app.route("/sinyal/guncelle", methods=["POST"])
-def sinyal_guncelle():
-    if not key_kontrol():
-        return jsonify({"hata": "Yetkisiz"}), 401
-    data = request.json
-    bot = data.get("bot")
-    sembol = data.get("sembol")
-    islem = data.get("islem")
-    if bot not in botlar:
-        return jsonify({"hata": "Gecersiz bot adi"}), 400
-    for i, s in enumerate(botlar[bot]["sinyaller"]):
-        if s["sembol"] == sembol and s.get("durum") == "aktif":
-            if islem == "tp":
-                botlar[bot]["sinyaller"][i]["durum"] = "tp"
-                botlar[bot]["sinyaller"][i]["sonuc_zamani"] = tr_zaman()
-                botlar[bot]["tp"] += 1
-            elif islem == "stop":
-                botlar[bot]["sinyaller"][i]["durum"] = "stop"
-                botlar[bot]["sinyaller"][i]["sonuc_zamani"] = tr_zaman()
-                botlar[bot]["stop"] += 1
-            elif islem == "ekleme":
-                botlar[bot]["sinyaller"][i]["maliyet"] = data.get("maliyet")
-                botlar[bot]["sinyaller"][i]["hedef"] = data.get("hedef")
-                botlar[bot]["sinyaller"][i]["asama"] = data.get("asama")
-            veriyi_kaydet()
-            return jsonify({"durum": "ok"})
-    return jsonify({"hata": "Sembol bulunamadi"}), 404
+  var xhr4 = new XMLHttpRequest();
+  xhr4.open("GET", API + "/balina", true);
+  xhr4.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr4.onload = function() {
+    if (xhr4.status === 200) {
+      tumBalina = JSON.parse(xhr4.responseText);
+      if (aktifSekme === "balina") balinaGoster();
+    }
+  };
+  xhr4.send();
 
-@app.route("/sinyal/sil", methods=["POST"])
-def sinyal_sil():
-    """Belirli bir sembolu (istege bagli durum filtresiyle) siler. Sayaci da dogru sekilde geri alir."""
-    if not key_kontrol():
-        return jsonify({"hata": "Yetkisiz"}), 401
-    data = request.json
-    bot = data.get("bot")
-    sembol = data.get("sembol")
-    durum_filtre = data.get("durum")  # None ise, eslesen tum durumlar silinir
-    if bot not in botlar:
-        return jsonify({"hata": "Gecersiz bot adi"}), 400
-    silinen = 0
-    kalanlar = []
-    for s in botlar[bot]["sinyaller"]:
-        eslesiyor = s.get("sembol") == sembol and (durum_filtre is None or s.get("durum") == durum_filtre)
-        if eslesiyor:
-            silinen += 1
-            if s.get("durum") == "tp":
-                botlar[bot]["tp"] = max(0, botlar[bot]["tp"] - 1)
-            elif s.get("durum") == "stop":
-                botlar[bot]["stop"] = max(0, botlar[bot]["stop"] - 1)
-        else:
-            kalanlar.append(s)
-    botlar[bot]["sinyaller"] = kalanlar
-    veriyi_kaydet()
-    return jsonify({"durum": "ok", "silinen_sayisi": silinen})
+  var xhr5 = new XMLHttpRequest();
+  xhr5.open("GET", "https://api.binance.com/api/v3/ticker/price", true);
+  xhr5.onload = function() {
+    if (xhr5.status === 200) {
+      var liste = JSON.parse(xhr5.responseText);
+      var sozluk = {};
+      for (var i = 0; i < liste.length; i++) sozluk[liste[i].symbol] = liste[i].price;
+      spotFiyatlar = sozluk;
+      fiyatlariBirlestirVeGoster();
+    }
+  };
+  xhr5.send();
 
-@app.route("/sinyaller")
-def sinyalleri_getir():
-    if not veri_erisim_izni_var_mi(request.headers.get("X-Auth-Token", "")):
-        return jsonify({"hata": "Yetkisiz - giris yapip onaylanmis olmaniz gerekiyor"}), 401
-    return jsonify(botlar)
+  var xhr6 = new XMLHttpRequest();
+  xhr6.open("GET", "https://fapi.binance.com/fapi/v1/ticker/price", true);
+  xhr6.onload = function() {
+    if (xhr6.status === 200) {
+      var liste6 = JSON.parse(xhr6.responseText);
+      var sozluk6 = {};
+      for (var i = 0; i < liste6.length; i++) sozluk6[liste6[i].symbol] = liste6[i].price;
+      futuresFiyatlar = sozluk6;
+      fiyatlariBirlestirVeGoster();
+    }
+  };
+  xhr6.send();
 
-@app.route("/sinyaller/<bot>")
-def bot_sinyalleri(bot):
-    if not veri_erisim_izni_var_mi(request.headers.get("X-Auth-Token", "")):
-        return jsonify({"hata": "Yetkisiz - giris yapip onaylanmis olmaniz gerekiyor"}), 401
-    if bot not in botlar:
-        return jsonify({"hata": "Gecersiz bot adi"}), 400
-    return jsonify(botlar[bot])
+  var xhr7 = new XMLHttpRequest();
+  xhr7.open("GET", API + "/gunun-ozeti", true);
+  xhr7.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr7.onload = function() {
+    if (xhr7.status === 200) {
+      var yanit7 = JSON.parse(xhr7.responseText);
+      sonGununOzeti.metin = yanit7.metin;
+      sonGununOzeti.zaman = yanit7.guncelleme_zamani;
+      gununOzetiGoster(sonGununOzeti.metin, sonGununOzeti.zaman);
+    }
+  };
+  xhr7.send();
 
-@app.route("/sinyaller/aktif")
-def aktif_sinyaller():
-    if not veri_erisim_izni_var_mi(request.headers.get("X-Auth-Token", "")):
-        return jsonify({"hata": "Yetkisiz - giris yapip onaylanmis olmaniz gerekiyor"}), 401
-    sonuc = {}
-    for bot, data in botlar.items():
-        aktif = [s for s in data["sinyaller"] if s.get("durum") == "aktif"]
-        sonuc[bot] = {"sinyaller": aktif, "tp": data["tp"], "stop": data["stop"]}
-    return jsonify(sonuc)
+  var xhr8 = new XMLHttpRequest();
+  xhr8.open("GET", API + "/abd-borsa", true);
+  xhr8.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr8.onload = function() {
+    if (xhr8.status === 200) {
+      sonAbdBorsa = JSON.parse(xhr8.responseText);
+      if (aktifSekme === "piyasa") abdBorsaGoster();
+    }
+  };
+  xhr8.send();
 
-@app.route("/istatistik")
-def istatistik_getir():
-    if not veri_erisim_izni_var_mi(request.headers.get("X-Auth-Token", "")):
-        return jsonify({"hata": "Yetkisiz - giris yapip onaylanmis olmaniz gerekiyor"}), 401
-    sonuc = {}
-    for bot, data in botlar.items():
-        toplam = data["tp"] + data["stop"]
-        basari = round((data["tp"] / toplam * 100), 1) if toplam > 0 else 0
-        sonuc[bot] = {
-            "tp": data["tp"],
-            "stop": data["stop"],
-            "aktif": len([s for s in data["sinyaller"] if s.get("durum") == "aktif"]),
-            "basari_orani": basari
+  var xhr9 = new XMLHttpRequest();
+  xhr9.open("GET", API + "/sohbet/mesajlar", true);
+  xhr9.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr9.onload = function() {
+    if (xhr9.status === 200) {
+      sonSohbetMesajlari = JSON.parse(xhr9.responseText);
+      if (aktifSekme === "sohbet") sohbetGoster();
+    }
+  };
+  xhr9.send();
+
+  var xhr10 = new XMLHttpRequest();
+  xhr10.open("GET", API + "/portfoyum", true);
+  xhr10.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr10.onload = function() {
+    if (xhr10.status === 200) {
+      sonPortfoy = JSON.parse(xhr10.responseText);
+      takipDurumu = {};
+      for (var i = 0; i < sonPortfoy.kayitlar.length; i++) {
+        var k = sonPortfoy.kayitlar[i];
+        takipDurumu[k.bot + "|" + k.sembol + "|" + k.zaman] = true;
+      }
+      if (aktifSekme === "sinyaller") sinyalleriGoster();
+      if (aktifSekme === "portfoy") portfoyGoster();
+    }
+  };
+  xhr10.send();
+
+  var xhr11 = new XMLHttpRequest();
+  xhr11.open("GET", API + "/alarm/listele", true);
+  xhr11.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr11.onload = function() {
+    if (xhr11.status === 200) {
+      sonAlarmlar = JSON.parse(xhr11.responseText);
+      if (aktifSekme === "portfoy") portfoyGoster();
+    }
+  };
+  xhr11.send();
+}
+
+function alarmlariYukle() {
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/alarm/listele", true);
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      sonAlarmlar = JSON.parse(xhr.responseText);
+      if (aktifSekme === "portfoy") portfoyGoster();
+    }
+  };
+  xhr.send();
+}
+
+function alarmKur(sembol) {
+  var hedefStr = prompt("#" + sembol + " icin hedef fiyat girin:");
+  if (!hedefStr) return;
+  var hedef = parseFloat(hedefStr.replace(",", "."));
+  if (isNaN(hedef) || hedef <= 0) {
+    alert("Gecerli bir fiyat girin.");
+    return;
+  }
+  var guncelFiyat = parseFloat(canliFiyatlar[sembol]);
+  var yon = (!isNaN(guncelFiyat) && hedef < guncelFiyat) ? "altinda" : "ustunde";
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/alarm/ekle", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    var yanit;
+    try { yanit = JSON.parse(xhr.responseText); } catch (e) { yanit = {}; }
+    if (xhr.status === 200) {
+      alert("Alarm kuruldu: #" + sembol + " " + hedef + " seviyesine " + (yon === "ustunde" ? "ulasinca" : "dusunce") + " bildirim alacaksiniz.");
+      alarmlariYukle();
+    } else {
+      alert(yanit.hata || "Alarm kurulamadi");
+    }
+  };
+  xhr.send(JSON.stringify({ sembol: sembol, hedef_fiyat: hedef, yon: yon }));
+}
+
+function alarmSil(id) {
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/alarm/sil", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() { alarmlariYukle(); };
+  xhr.send(JSON.stringify({ id: id }));
+}
+
+function gununOzetiGoster(metin, zaman) {
+  var alan = document.getElementById("gunun-ozeti-alani");
+  if (!alan) return;
+  if (aktifSekme !== "sinyaller") return;
+  if (!metin) { alan.innerHTML = ""; return; }
+  var zamanYazisi = "";
+  if (zaman) {
+    var p = zaman.split(/[- :]/);
+    var zamanObj = new Date(p[0], p[1] - 1, p[2], p[3], p[4], p[5]);
+    var farkDk = Math.round((new Date() - zamanObj) / 60000);
+    if (farkDk < 1) zamanYazisi = "az once";
+    else if (farkDk < 60) zamanYazisi = farkDk + " dk once";
+    else zamanYazisi = Math.round(farkDk / 60) + " sa once";
+  }
+  alan.innerHTML = '<div class="stat-card" style="border-left:3px solid #3b82f6">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+    '<span style="font-size:12px;font-weight:600;color:#93c5fd">📊 Gunun Ozeti</span>' +
+    (zamanYazisi ? '<span style="font-size:10px;color:#64748b">' + zamanYazisi + '</span>' : '') +
+    '</div><div style="font-size:13px;line-height:1.6;color:#e2e8f0">' + metin + '</div></div>';
+}
+
+function abdBorsaGoster() {
+  var alan = document.getElementById("abd-borsa-acilis-kapanis");
+  if (!alan) return;
+  var semboller = ["^DJI", "^GSPC", "^IXIC"];
+  var satirlar = "";
+  var veriVar = false;
+  for (var i = 0; i < semboller.length; i++) {
+    var d = sonAbdBorsa[semboller[i]];
+    if (!d) continue;
+    veriVar = true;
+    var acilisYazi = (d.acilis_yuzde !== null && d.acilis_yuzde !== undefined) ?
+      ('<span style="color:' + (d.acilis_yuzde >= 0 ? "#4ade80" : "#f87171") + '">%' + (d.acilis_yuzde >= 0 ? "+" : "") + d.acilis_yuzde + '</span>') :
+      '<span style="color:#64748b">—</span>';
+    var kapanisYazi = (d.kapanis_yuzde !== null && d.kapanis_yuzde !== undefined) ?
+      ('<span style="color:' + (d.kapanis_yuzde >= 0 ? "#4ade80" : "#f87171") + '">%' + (d.kapanis_yuzde >= 0 ? "+" : "") + d.kapanis_yuzde + '</span>') :
+      '<span style="color:#64748b">—</span>';
+    satirlar += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1e293b">' +
+      '<span style="font-size:13px;color:#e2e8f0">' + (d.isim || semboller[i]) + '</span>' +
+      '<span style="font-size:12px;display:flex;gap:14px"><span>Acilis: ' + acilisYazi + '</span><span>Kapanis: ' + kapanisYazi + '</span></span></div>';
+  }
+  if (!veriVar) { alan.innerHTML = ""; return; }
+  alan.innerHTML = '<div class="stat-card"><div style="font-size:12px;color:#94a3b8;margin-bottom:8px">ABD Borsalari - Sabit Acilis / Kapanis Yuzdeleri</div>' + satirlar + '</div>';
+}
+
+function htmlKacis(metin) {
+  var div = document.createElement("div");
+  div.textContent = metin || "";
+  return div.innerHTML;
+}
+
+function sohbetGoster() {
+  var alan = document.getElementById("sohbet-mesajlari");
+  if (!alan) return;
+  if (aktifSekme !== "sohbet") return;
+  if (!sonSohbetMesajlari || sonSohbetMesajlari.length === 0) {
+    alan.innerHTML = '<div class="empty">Henuz mesaj yok, ilk mesaji sen yaz!</div>';
+    return;
+  }
+  var html = "";
+  var adminMi = hesapDurumu === "admin";
+  for (var i = 0; i < sonSohbetMesajlari.length; i++) {
+    var m = sonSohbetMesajlari[i];
+    var benMi = m.kullanici_adi === girisliKullanici;
+    var silButon = adminMi ? ('<span onclick="sohbetSil(' + m.id + ')" style="cursor:pointer;color:#f87171;font-size:11px;margin-left:8px">Sil</span>') : "";
+    html += '<div style="background:' + (benMi ? "#0c1a3d" : "#111827") + ';border-radius:10px;padding:8px 12px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">' +
+      '<span style="font-size:11px;font-weight:600;color:#93c5fd">' + htmlKacis(m.kullanici_adi) + '</span>' +
+      '<span style="font-size:9px;color:#64748b">' + (m.zaman ? m.zaman.slice(11, 16) : "") + silButon + '</span>' +
+      '</div><div style="font-size:13px;color:#e2e8f0;word-break:break-word">' + htmlKacis(m.metin) + '</div></div>';
+  }
+  alan.innerHTML = html;
+  alan.scrollTop = alan.scrollHeight;
+}
+
+function sohbetGonder() {
+  var input = document.getElementById("sohbet-input");
+  var metin = input.value.trim();
+  if (!metin) return;
+  var linkDeseni = /(https?:\/\/|www\.|t\.me\/|\.(com|net|org|io|me|xyz|pro|co|info|tv|app|dev|gg|to|ru|cn|link|click|shop|top|site|online)\b)/i;
+  if (linkDeseni.test(metin)) {
+    alert("Mesajlarda link/URL paylasimi yapilamaz.");
+    return;
+  }
+  input.value = "";
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/sohbet/gonder", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      veriYukle();
+    } else {
+      var yanit;
+      try { yanit = JSON.parse(xhr.responseText); } catch (e) { yanit = {}; }
+      alert(yanit.hata || "Mesaj gonderilemedi");
+    }
+  };
+  xhr.send(JSON.stringify({ metin: metin }));
+}
+
+function sohbetSil(id) {
+  if (hesapDurumu !== "admin") return;
+  if (!confirm("Bu mesaji silmek istediginize emin misiniz?")) return;
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/sohbet/sil", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status === 200) veriYukle();
+  };
+  xhr.send(JSON.stringify({ id: id }));
+}
+
+function takipToggle(bot, sembol, zaman) {
+  var anahtar = bot + "|" + sembol + "|" + zaman;
+  var yeniDurum = !takipDurumu[anahtar];
+  takipDurumu[anahtar] = yeniDurum;
+  if (aktifSekme === "sinyaller") sinyalleriGoster();
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/takip-et", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() { veriYukle(); };
+  xhr.send(JSON.stringify({ bot: bot, sembol: sembol, zaman: zaman, takip: yeniDurum }));
+}
+
+function portfoyGoster() {
+  var alan = document.getElementById("portfoy-icerik");
+  if (!alan) return;
+  var ozet = sonPortfoy.ozet || {};
+  var kayitlar = sonPortfoy.kayitlar || [];
+
+  var getiriRenk = (ozet.toplam_getiri_yuzde || 0) >= 0 ? "#4ade80" : "#f87171";
+  var html = '<div class="stats-grid">';
+  html += '<div class="stat-card"><div class="stat-label">Toplam Takip</div><div class="stat-val blue">' + (ozet.toplam || 0) + '</div></div>';
+  html += '<div class="stat-card"><div class="stat-label">TP / Stop</div><div class="stat-val">' + (ozet.tp || 0) + ' / ' + (ozet.stop || 0) + '</div></div>';
+  html += '<div class="stat-card"><div class="stat-label">Takipte (Aktif)</div><div class="stat-val blue">' + (ozet.aktif || 0) + '</div></div>';
+  html += '<div class="stat-card"><div class="stat-label">Sanal Toplam Getiri</div><div class="stat-val" style="color:' + getiriRenk + '">%' + (ozet.toplam_getiri_yuzde || 0) + '</div></div>';
+  html += '</div>';
+  html += '<div style="font-size:11px;color:#64748b;margin:6px 2px 14px">Getiri hesaplamasi, gercek fiyat hareketine ' + (ozet.kaldirac || 8) + 'x sabit kaldirac varsayimi uygulanarak yapilmistir - gercek islem/kazanc degildir, sadece bilgilendirme amaclidir.</div>';
+
+  if (kayitlar.length === 0) {
+    html += '<div class="empty">Henuz takip ettiginiz bir veri yok. Veriler sekmesinde bir karttaki 📍 ikonuna dokunarak takibe alabilirsiniz.</div>';
+  } else {
+    for (var i = kayitlar.length - 1; i >= 0; i--) {
+      var k = kayitlar[i];
+      var durumRozeti = k.durum === "tp" ? '<span class="badge long">TP</span>' :
+        k.durum === "stop" ? '<span class="badge short">STOP</span>' :
+        '<span class="badge bot">Takipte</span>';
+      var getiriYazi = (k.getiri_yuzde !== null && k.getiri_yuzde !== undefined) ?
+        ('<span style="color:' + (k.getiri_yuzde >= 0 ? "#4ade80" : "#f87171") + ';font-weight:600">%' + (k.getiri_yuzde >= 0 ? "+" : "") + k.getiri_yuzde + '</span>') :
+        '<span style="color:#64748b">—</span>';
+      html += '<div class="signal-card" style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px">' +
+        '<div><div style="font-size:13px;font-weight:600">#' + k.sembol + ' <span style="font-size:10px;color:#64748b">(' + k.yon + ')</span></div>' +
+        '<div style="font-size:10px;color:#64748b;margin-top:2px">' + k.zaman + '</div></div>' +
+        '<div style="text-align:right">' + durumRozeti + '<div style="margin-top:4px">' + getiriYazi + '</div></div></div>';
+    }
+  }
+  html += '<div class="section-title" style="margin-top:20px">Fiyat Alarmlarim</div>';
+  if (!sonAlarmlar || sonAlarmlar.length === 0) {
+    html += '<div class="empty">Aktif alarmin yok. Veriler sekmesinde bir karttaki &#128276; ikonuna dokunarak alarm kurabilirsin.</div>';
+  } else {
+    for (var a = 0; a < sonAlarmlar.length; a++) {
+      var al = sonAlarmlar[a];
+      var yonYazi = al.yon === "ustunde" ? "uzerine ciktiginda" : "altina dustugunde";
+      html += '<div class="signal-card" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px">' +
+        '<div style="font-size:13px">#' + al.sembol + ' <span style="color:#94a3b8">' + al.hedef_fiyat + ' ' + yonYazi + '</span></div>' +
+        '<span onclick="alarmSil(' + al.id + ')" style="cursor:pointer;color:#f87171;font-size:12px">Sil</span></div>';
+    }
+  }
+  alan.innerHTML = html;
+}
+
+function guncelle() {
+  if (aktifSekme === "sinyaller") {
+    sinyalleriGoster();
+    gununOzetiGoster(sonGununOzeti.metin, sonGununOzeti.zaman);
+  }
+  if (aktifSekme === "performans") performansGoster();
+  if (aktifSekme === "gecmis") gecmisGoster();
+  if (aktifSekme === "rapor") raporGoster();
+  if (aktifSekme === "balina") balinaGoster();
+  if (aktifSekme === "haberler") haberleriGoster();
+  if (aktifSekme === "yonetici") yoneticiPaneliGoster();
+  if (aktifSekme === "piyasa") abdBorsaGoster();
+  if (aktifSekme === "sohbet") sohbetGoster();
+  if (aktifSekme === "portfoy") portfoyGoster();
+}
+
+function fiyatKopyala(deger, el) {
+  if (!deger || deger === "-") return;
+  var metin = String(deger);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(metin);
+  } else {
+    var ta = document.createElement("textarea");
+    ta.value = metin;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+  }
+  var eskiMetin = el.textContent;
+  el.textContent = "Kopyalandi";
+  el.style.opacity = "0.55";
+  setTimeout(function() {
+    el.textContent = eskiMetin;
+    el.style.opacity = "1";
+  }, 800);
+}
+
+function sinyalleriGoster() {
+  var toplamTp = 0, toplamStop = 0;
+  var tumBotlar = Object.keys(tumVeriler);
+  for (var bb = 0; bb < tumBotlar.length; bb++) {
+    var bdata = tumVeriler[tumBotlar[bb]];
+    toplamTp += bdata.tp || 0;
+    toplamStop += bdata.stop || 0;
+  }
+  var toplamSonuc = toplamTp + toplamStop;
+  var genelBasariOzet = document.getElementById("genel-basari-ozet");
+  if (toplamSonuc > 0) {
+    var basariYuzde = Math.round(toplamTp / toplamSonuc * 100);
+    genelBasariOzet.innerHTML = '<div class="stat-card" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px">' +
+      '<span style="font-size:12px;color:#94a3b8">Genel Basari Orani</span>' +
+      '<span class="stat-val green" style="font-size:18px">%' + basariYuzde + '</span></div>';
+  } else {
+    genelBasariOzet.innerHTML = "";
+  }
+
+  var html = "";
+  var hepsi = [];
+  var botlar = Object.keys(tumVeriler);
+  for (var b = 0; b < botlar.length; b++) {
+    var bot = botlar[b];
+    var data = tumVeriler[bot];
+    if (aktifBot !== "hepsi" && aktifBot !== bot) continue;
+    var sinyaller = (data.sinyaller || []).filter(function(s) { return s.durum === "aktif"; });
+    for (var i = 0; i < sinyaller.length; i++) {
+      hepsi.push({ s: sinyaller[i], bot: bot });
+    }
+  }
+  hepsi.sort(function(a, b) { return (b.s.zaman || "").localeCompare(a.s.zaman || ""); });
+  if (sadeceFavoriler) {
+    hepsi = hepsi.filter(function(item) { return favoriCoinler[item.s.sembol]; });
+  }
+
+  for (var k = 0; k < hepsi.length; k++) {
+    var s = hepsi[k].s;
+    var bot = hepsi[k].bot;
+    var yon = s.yon || "";
+    var cls = yon === "LONG" ? "long" : "short";
+    var e1html = s.e1 ? '<div class="sig-row"><span class="sig-key">E1</span><span class="sig-val blue kopyalanabilir" onclick="fiyatKopyala(\'' + s.e1 + '\', this)">' + s.e1 + '</span></div>' : "";
+    var e2html = s.e2 ? '<div class="sig-row"><span class="sig-key">E2</span><span class="sig-val blue kopyalanabilir" onclick="fiyatKopyala(\'' + s.e2 + '\', this)">' + s.e2 + '</span></div>' : "";
+    var e3html = s.e3 ? '<div class="sig-row"><span class="sig-key">E3</span><span class="sig-val blue kopyalanabilir" onclick="fiyatKopyala(\'' + s.e3 + '\', this)">' + s.e3 + '</span></div>' : "";
+    var asamaSayisi = s.asama || 0;
+    var kademehtml = '<div style="display:flex;gap:4px;align-items:center;margin:6px 0">' +
+      '<div style="display:flex;gap:3px;flex:1">' +
+      '<div style="flex:1;height:5px;border-radius:3px;background:' + (asamaSayisi >= 1 ? "#3b82f6" : "#1e293b") + '"></div>' +
+      '<div style="flex:1;height:5px;border-radius:3px;background:' + (asamaSayisi >= 2 ? "#3b82f6" : "#1e293b") + '"></div>' +
+      '<div style="flex:1;height:5px;border-radius:3px;background:' + (asamaSayisi >= 3 ? "#3b82f6" : "#1e293b") + '"></div>' +
+      '</div><span style="font-size:10px;color:#64748b">Kademe ' + asamaSayisi + '/3</span></div>';
+    var canliFiyat = canliFiyatlar[s.sembol];
+    var fiyatYonu = fiyatYonleri[s.sembol];
+    var fiyatRengi = fiyatYonu === "yukari" ? "#4ade80" : fiyatYonu === "asagi" ? "#f87171" : "#60a5fa";
+    var canliFiyatHtml = canliFiyat ? '<div style="text-align:center;margin:8px 0;padding:8px;background:#0c1424;border-radius:8px">' +
+      '<div style="font-size:10px;color:#64748b;letter-spacing:0.05em;margin-bottom:2px">ANLIK FIYAT</div>' +
+      '<div style="font-size:19px;font-weight:700;color:' + fiyatRengi + '">' + canliFiyat + '</div></div>' : "";
+    var favoriMi = favoriCoinler[s.sembol];
+    var yildizHtml = '<span onclick="favoriToggle(\'' + s.sembol + '\')" style="cursor:pointer;font-size:16px;margin-left:6px;color:' + (favoriMi ? "#fbbf24" : "#475569") + '">' + (favoriMi ? "&#9733;" : "&#9734;") + '</span>';
+    var takipAnahtari = bot + "|" + s.sembol + "|" + s.zaman;
+    var takipliMi = !!takipDurumu[takipAnahtari];
+    var takipHtml = '<span onclick="takipToggle(\'' + bot + '\',\'' + s.sembol + '\',\'' + s.zaman + '\')" style="cursor:pointer;font-size:14px;margin-left:6px" title="Sanal Portfoyde Takip Et">' + (takipliMi ? "📌" : "📍") + '</span>';
+    var alarmHtml = '<span onclick="alarmKur(\'' + s.sembol + '\')" style="cursor:pointer;font-size:14px;margin-left:6px" title="Fiyat Alarmi Kur">&#128276;</span>';
+    html += '<div class="signal-card ' + cls + '">';
+    html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + yildizHtml + takipHtml + alarmHtml + '</div>';
+    html += '<div class="sig-badges"><span class="badge ' + cls + '">' + yon + '</span>';
+    html += '<span class="badge bot">' + botAdi(bot) + '</span></div></div>';
+    html += canliFiyatHtml;
+    html += '<div class="sig-row"><span class="sig-key">Giris</span><span class="sig-val kopyalanabilir" onclick="fiyatKopyala(\'' + (s.giris || s.maliyet || "-") + '\', this)">' + (s.giris || s.maliyet || "-") + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">Hedef</span><span class="sig-val green kopyalanabilir" onclick="fiyatKopyala(\'' + (s.hedef || "-") + '\', this)">' + (s.hedef || "-") + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">Stop</span><span class="sig-val red kopyalanabilir" onclick="fiyatKopyala(\'' + (s.stop || "-") + '\', this)">' + (s.stop || "-") + '</span></div>';
+    html += e1html + e2html + e3html + kademehtml;
+    html += '<div class="sig-time">' + (s.zaman || "") + '</div></div>';
+  }
+  if (hepsi.length === 0) html = '<div class="empty">Su an aktif veri yok</div>';
+  document.getElementById("sinyal-listesi").innerHTML = html;
+}
+
+function trendGrafigiHtml() {
+  if (!tumRaporlar || tumRaporlar.length === 0) return "";
+  var gunler = {};
+  for (var i = 0; i < tumRaporlar.length; i++) {
+    var r = tumRaporlar[i];
+    var t = r.tarih;
+    if (!t) continue;
+    if (!gunler[t]) gunler[t] = { tp: 0, stop: 0 };
+    gunler[t].tp += r.tp || 0;
+    gunler[t].stop += r.stop || 0;
+  }
+  var tarihler = Object.keys(gunler).sort();
+  tarihler = tarihler.slice(-14);
+  if (tarihler.length === 0) return "";
+
+  var maxDeger = 1;
+  for (var k = 0; k < tarihler.length; k++) {
+    maxDeger = Math.max(maxDeger, gunler[tarihler[k]].tp, gunler[tarihler[k]].stop);
+  }
+
+  var genislikPerGun = 26, barGenislik = 9, yukseklikMax = 55, tabanY = 66;
+  var svgGenislik = tarihler.length * genislikPerGun + 8;
+  var svg = '<svg viewBox="0 0 ' + svgGenislik + ' 84" style="width:100%;height:100px" xmlns="http://www.w3.org/2000/svg">';
+  for (var m = 0; m < tarihler.length; m++) {
+    var g = gunler[tarihler[m]];
+    var x = m * genislikPerGun + 6;
+    var tpH = Math.round((g.tp / maxDeger) * yukseklikMax);
+    var stopH = Math.round((g.stop / maxDeger) * yukseklikMax);
+    svg += '<rect x="' + x + '" y="' + (tabanY - tpH) + '" width="' + barGenislik + '" height="' + tpH + '" fill="#4ade80" rx="2"></rect>';
+    svg += '<rect x="' + (x + barGenislik + 2) + '" y="' + (tabanY - stopH) + '" width="' + barGenislik + '" height="' + stopH + '" fill="#f87171" rx="2"></rect>';
+    var gunEtiket = tarihler[m].slice(5).replace("-", "/");
+    svg += '<text x="' + (x + barGenislik) + '" y="80" font-size="7" fill="#64748b" text-anchor="middle">' + gunEtiket + '</text>';
+  }
+  svg += "</svg>";
+
+  return '<div class="stat-card" style="margin-bottom:12px">' +
+    '<div style="font-size:12px;color:#94a3b8;margin-bottom:6px">Son ' + tarihler.length + ' Gun ' +
+    '<span style="color:#4ade80;margin-left:8px">&#9632; TP</span> <span style="color:#f87171">&#9632; Stop</span></div>' +
+    svg + "</div>";
+}
+
+function performansGoster() {
+  if (performansDetayBot) {
+    document.getElementById("performans-icerik").innerHTML = performansDetayHtml(performansDetayBot);
+    return;
+  }
+
+  var html = "";
+  var toplamTp = 0, toplamStop = 0, toplamAktif = 0;
+  var botlar = Object.keys(tumVeriler);
+  for (var b = 0; b < botlar.length; b++) {
+    var bot = botlar[b];
+    var data = tumVeriler[bot];
+    var tp = data.tp || 0;
+    var stop = data.stop || 0;
+    var aktif = 0;
+    var sinyaller = data.sinyaller || [];
+    for (var i = 0; i < sinyaller.length; i++) {
+      if (sinyaller[i].durum === "aktif") aktif++;
+    }
+    var toplam = tp + stop;
+    var basari = toplam > 0 ? Math.round(tp / toplam * 100) : 0;
+    toplamTp += tp; toplamStop += stop; toplamAktif += aktif;
+    html += '<div class="signal-card" style="margin-bottom:8px">';
+    html += '<div class="sig-header" style="cursor:pointer" onclick="performansDetayAc(\'' + bot + '\')"><div class="sig-symbol">' + botAdi(bot) + ' &rsaquo;</div>';
+    html += '<span class="badge bot">' + basari + '% basari</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">TP</span><span class="sig-val green">' + tp + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">Stop</span><span class="sig-val red">' + stop + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">Aktif</span><span class="sig-val blue">' + aktif + '</span></div>';
+
+    if (sinyaller.length > 0) {
+      var siraliSinyaller = sinyaller.slice().sort(function(a, b) {
+        var za = a.sonuc_zamani || a.zaman || "";
+        var zb = b.sonuc_zamani || b.zaman || "";
+        return zb.localeCompare(za);
+      });
+      html += '<div class="mini-chip-wrap">';
+      for (var j = 0; j < siraliSinyaller.length; j++) {
+        var sig = siraliSinyaller[j];
+        var durum = sig.durum || "aktif";
+        var ikon = durum === "tp" ? "✅" : durum === "stop" ? "🛑" : "🔵";
+        if (durum === "aktif") {
+          html += '<span class="mini-chip aktif tiklanabilir" onclick="sinyaleGit(\'' + bot + '\',\'' + sig.sembol + '\')">' + ikon + ' ' + sig.sembol + '</span>';
+        } else {
+          html += '<span class="mini-chip ' + durum + '">' + ikon + ' ' + sig.sembol + '</span>';
         }
-    return jsonify(sonuc)
-
-@app.route("/istatistik/sifirla", methods=["POST"])
-def istatistik_sifirla():
-    if not key_kontrol():
-        return jsonify({"hata": "Yetkisiz"}), 401
-    data = request.json or {}
-    bot = data.get("bot", "hepsi")
-    haberleri_de_sil = data.get("haberler_dahil", False)
-    raporlari_da_sil = data.get("raporlar_dahil", False)
-    if bot == "hepsi":
-        for b in botlar:
-            botlar[b]["tp"] = 0
-            botlar[b]["stop"] = 0
-            botlar[b]["sinyaller"] = []
-        if haberleri_de_sil:
-            haberler.clear()
-    elif bot in botlar:
-        botlar[bot]["tp"] = 0
-        botlar[bot]["stop"] = 0
-        botlar[bot]["sinyaller"] = []
-    if raporlari_da_sil:
-        gunluk_raporlar.clear()
-    veriyi_kaydet()
-    return jsonify({"durum": "ok"})
-
-@app.route("/haber/ekle", methods=["POST"])
-def haber_ekle():
-    if not key_kontrol():
-        return jsonify({"hata": "Yetkisiz"}), 401
-    data = request.json
-    data["zaman"] = tr_zaman()
-    haberler.insert(0, data)
-    while len(haberler) > 70:
-        haberler.pop()
-    veriyi_kaydet()
-    return jsonify({"durum": "eklendi"})
-
-@app.route("/haberler")
-def haberleri_getir():
-    if not veri_erisim_izni_var_mi(request.headers.get("X-Auth-Token", "")):
-        return jsonify({"hata": "Yetkisiz - giris yapip onaylanmis olmaniz gerekiyor"}), 401
-    kategori = request.args.get("kategori", "hepsi")
-    if kategori == "hepsi":
-        return jsonify(haberler)
-    filtrelenmis = [h for h in haberler if h.get("kategori") == kategori]
-    return jsonify(filtrelenmis)
-
-@app.route("/haber/sifirla", methods=["POST"])
-def haber_sifirla():
-    """Sadece haberleri temizler, sinyallere/istatistiklere dokunmaz."""
-    if not key_kontrol():
-        return jsonify({"hata": "Yetkisiz"}), 401
-    haberler.clear()
-    veriyi_kaydet()
-    return jsonify({"durum": "ok"})
-
-@app.route("/rapor/ekle", methods=["POST"])
-def rapor_ekle():
-    if not key_kontrol():
-        return jsonify({"hata": "Yetkisiz"}), 401
-    data = request.json
-    bot = data.get("bot")
-    if bot not in botlar:
-        return jsonify({"hata": "Gecersiz bot adi"}), 400
-    kayit = {
-        "bot": bot,
-        "tarih": data.get("tarih") or datetime.now(TR_TZ).strftime("%Y-%m-%d"),
-        "tp": data.get("tp", 0),
-        "stop": data.get("stop", 0),
-        "zaman": tr_zaman()
+      }
+      html += '</div>';
     }
-    # Ayni bot + ayni tarih icin tekrar gelirse guncelle (mukerrer kayit olmasin)
-    for i, r in enumerate(gunluk_raporlar):
-        if r["bot"] == bot and r["tarih"] == kayit["tarih"]:
-            gunluk_raporlar[i] = kayit
-            veriyi_kaydet()
-            return jsonify({"durum": "guncellendi"})
-    gunluk_raporlar.insert(0, kayit)
-    if len(gunluk_raporlar) > 500:
-        gunluk_raporlar.pop()
-    veriyi_kaydet()
-    return jsonify({"durum": "eklendi"})
+    html += '</div>';
+  }
+  var genelToplam = toplamTp + toplamStop;
+  var genelBasari = genelToplam > 0 ? Math.round(toplamTp / genelToplam * 100) : 0;
+  var ozet = '<div class="stats-grid">';
+  ozet += '<div class="stat-card"><div class="stat-label">Toplam TP</div><div class="stat-val green">' + toplamTp + '</div></div>';
+  ozet += '<div class="stat-card"><div class="stat-label">Toplam Stop</div><div class="stat-val red">' + toplamStop + '</div></div>';
+  ozet += '<div class="stat-card"><div class="stat-label">Aktif Veri</div><div class="stat-val blue">' + toplamAktif + '</div></div>';
+  ozet += '<div class="stat-card"><div class="stat-label">Genel Basari</div><div class="stat-val green">' + genelBasari + '%</div></div></div>';
+  ozet += trendGrafigiHtml();
+  ozet += '<div class="section-title">Oda Bazli Performans</div>';
+  document.getElementById("performans-icerik").innerHTML = ozet + html;
+}
 
-@app.route("/raporlar")
-def raporlari_getir():
-    if not veri_erisim_izni_var_mi(request.headers.get("X-Auth-Token", "")):
-        return jsonify({"hata": "Yetkisiz - giris yapip onaylanmis olmaniz gerekiyor"}), 401
-    return jsonify(gunluk_raporlar)
+function performansDetayHtml(bot) {
+  var data = tumVeriler[bot] || {};
+  var sinyaller = data.sinyaller || [];
+  var gruplar = {};
+  for (var i = 0; i < sinyaller.length; i++) {
+    var s = sinyaller[i];
+    if (!gruplar[s.sembol]) gruplar[s.sembol] = { tp: 0, stop: 0, aktif: 0 };
+    if (s.durum === "tp") gruplar[s.sembol].tp++;
+    else if (s.durum === "stop") gruplar[s.sembol].stop++;
+    else gruplar[s.sembol].aktif++;
+  }
 
-@app.route("/gunun-ozeti")
-def gunun_ozeti_getir():
-    """AI tarafindan uretilmis, tum kullanicilar icin ORTAK (herkes ayni
-    metni okur) gunun ozetini dondurur. Kullanici basina Claude cagrisi
-    YAPILMAZ - ozet arka planda 30 dakikada bir merkezi olarak uretilir."""
-    if not veri_erisim_izni_var_mi(request.headers.get("X-Auth-Token", "")):
-        return jsonify({"hata": "Yetkisiz - giris yapip onaylanmis olmaniz gerekiyor"}), 401
-    return jsonify({"metin": gunun_ozeti_metni, "guncelleme_zamani": gunun_ozeti_zamani})
+  var semboller = Object.keys(gruplar);
+  semboller.sort(function(a, b) {
+    var toplamA = gruplar[a].tp + gruplar[a].stop;
+    var toplamB = gruplar[b].tp + gruplar[b].stop;
+    return toplamB - toplamA;
+  });
 
-@app.route("/abd-borsa")
-def abd_borsa_getir():
-    if not veri_erisim_izni_var_mi(request.headers.get("X-Auth-Token", "")):
-        return jsonify({"hata": "Yetkisiz - giris yapip onaylanmis olmaniz gerekiyor"}), 401
-    return jsonify(abd_borsa_durum)
+  var html = '<div style="margin-bottom:12px"><button class="refresh-btn" onclick="performansDetayKapat()">&larr; Geri Don</button></div>';
+  html += '<div class="section-title">' + botAdi(bot) + ' - Coin Bazinda Performans</div>';
+  if (semboller.length === 0) {
+    html += '<div class="empty">Henuz veri yok</div>';
+  }
+  for (var k = 0; k < semboller.length; k++) {
+    var sembol = semboller[k];
+    var g = gruplar[sembol];
+    var toplam = g.tp + g.stop;
+    var basari = toplam > 0 ? Math.round(g.tp / toplam * 100) : 0;
+    html += '<div class="signal-card" style="margin-bottom:8px">';
+    html += '<div class="sig-header"><div class="sig-symbol">#' + sembol + '</div>';
+    if (toplam > 0) html += '<span class="badge bot">' + basari + '% basari</span>';
+    html += '</div>';
+    html += '<div class="sig-row"><span class="sig-key">TP</span><span class="sig-val green">' + g.tp + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">Stop</span><span class="sig-val red">' + g.stop + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">Aktif</span><span class="sig-val blue">' + g.aktif + '</span></div>';
+    html += '</div>';
+  }
+  return html;
+}
 
-@app.route("/sohbet/mesajlar")
-def sohbet_mesajlari_getir():
-    if not veri_erisim_izni_var_mi(request.headers.get("X-Auth-Token", "")):
-        return jsonify({"hata": "Yetkisiz - giris yapip onaylanmis olmaniz gerekiyor"}), 401
-    return jsonify(sohbet_mesajlari[-200:])
-
-@app.route("/sohbet/gonder", methods=["POST"])
-def sohbet_gonder():
-    """Yeni sohbet mesaji ekler. Mesajlar KALICIDIR - normal kullanicilar
-    icin hicbir silme yolu yoktur, sadece admin silebilir (asagida ayri
-    endpoint). Her mesaj ayrica admin'in Telegram grubuna da iletilir."""
-    global sohbet_mesaj_id_sayaci
-    token = request.headers.get("X-Auth-Token", "")
-    if not veri_erisim_izni_var_mi(token):
-        return jsonify({"hata": "Yetkisiz - giris yapip onaylanmis olmaniz gerekiyor"}), 401
-    kadi = auth_kullanici(token)
-    data = request.json or {}
-    metin = (data.get("metin") or "").strip()
-    if not metin:
-        return jsonify({"hata": "Bos mesaj gonderilemez"}), 400
-    if LINK_DESENI.search(metin):
-        return jsonify({"hata": "Mesajlarda link/URL paylasimi yapilamaz"}), 400
-    if len(metin) > 500:
-        metin = metin[:500]
-
-    sohbet_mesaj_id_sayaci += 1
-    mesaj = {
-        "id": sohbet_mesaj_id_sayaci,
-        "kullanici_adi": kadi,
-        "metin": metin,
-        "zaman": tr_zaman()
+function gecmisGoster() {
+  var aramaEl = document.getElementById("gecmis-arama");
+  var arama = aramaEl ? aramaEl.value.trim().toUpperCase() : "";
+  var html = "";
+  var hepsi = [];
+  var botlar = Object.keys(tumVeriler);
+  for (var b = 0; b < botlar.length; b++) {
+    var bot = botlar[b];
+    var data = tumVeriler[bot];
+    var sinyaller = data.sinyaller || [];
+    for (var i = 0; i < sinyaller.length; i++) {
+      var s = sinyaller[i];
+      if (s.durum !== "tp" && s.durum !== "stop") continue;
+      hepsi.push({ s: s, bot: bot });
     }
-    sohbet_mesajlari.append(mesaj)
-    veriyi_kaydet()
+  }
+  if (arama) {
+    hepsi = hepsi.filter(function(item) {
+      return item.s.sembol && item.s.sembol.toUpperCase().indexOf(arama) !== -1;
+    });
+  }
+  hepsi.sort(function(a, b) {
+    var za = a.s.sonuc_zamani || a.s.zaman || "";
+    var zb = b.s.sonuc_zamani || b.s.zaman || "";
+    return zb.localeCompare(za);
+  });
 
-    telegram_bildir(f"💬 *{kadi}*: {metin}", TOPIC_SOHBET)
-    return jsonify({"durum": "ok"})
+  var toplamTp = 0, toplamStop = 0;
+  for (var t = 0; t < hepsi.length; t++) {
+    if (hepsi[t].s.durum === "tp") toplamTp++; else toplamStop++;
+  }
+  var toplamIslem = toplamTp + toplamStop;
+  var toplamBasari = toplamIslem > 0 ? Math.round(toplamTp / toplamIslem * 100) : 0;
 
-@app.route("/sohbet/sil", methods=["POST"])
-def sohbet_sil():
-    """SADECE admin bir sohbet mesajini silebilir. Normal kullanicilar
-    icin bu yetenegi acan hicbir endpoint/arayuz yoktur."""
-    token = request.headers.get("X-Auth-Token", "")
-    if not admin_mi(token):
-        return jsonify({"hata": "Yetkisiz"}), 401
-    data = request.json or {}
-    mesaj_id = data.get("id")
-    global sohbet_mesajlari
-    sohbet_mesajlari = [m for m in sohbet_mesajlari if m.get("id") != mesaj_id]
-    veriyi_kaydet()
-    return jsonify({"durum": "ok"})
+  if (hepsi.length > 0) {
+    html += '<div class="stats-grid" style="margin-bottom:12px">';
+    html += '<div class="stat-card"><div class="stat-label">Toplam TP</div><div class="stat-val green">' + toplamTp + '</div></div>';
+    html += '<div class="stat-card"><div class="stat-label">Toplam Stop</div><div class="stat-val red">' + toplamStop + '</div></div>';
+    html += '</div>';
+    html += '<div class="stat-card" style="margin-bottom:16px;text-align:center">';
+    html += '<div class="stat-label">Toplam Islem: ' + toplamIslem + ' &nbsp;·&nbsp; Basari Orani</div>';
+    html += '<div class="stat-val">%' + toplamBasari + '</div>';
+    html += '</div>';
+  }
 
-@app.route("/bakim/hayalet_temizle", methods=["POST"])
-def hayalet_temizle():
-    """Eski bug'dan kalan 'hayalet' aktif kayitlari temizler.
-    Sayaclara (tp/stop) ve sonuclanmis kayitlara DOKUNMAZ - sadece
-    ayni sembolde birden fazla 'aktif' kayit varsa, en yenisini birakip
-    digerlerini (gercekte artik gecerli olmayan eski hayaletleri) siler."""
-    if not key_kontrol():
-        return jsonify({"hata": "Yetkisiz"}), 401
-    rapor = {}
-    for bot in botlar:
-        sinyaller = botlar[bot]["sinyaller"]
-        aktif_gruplar = {}
-        for s in sinyaller:
-            if s.get("durum") == "aktif":
-                aktif_gruplar.setdefault(s.get("sembol"), []).append(s)
+  for (var k = 0; k < hepsi.length; k++) {
+    var s = hepsi[k].s;
+    var bot = hepsi[k].bot;
+    var sonuc = s.durum === "tp" ? "tp" : "stop";
+    var sonucYazi = s.durum === "tp" ? "TP" : "Stop";
+    var yon = s.yon || "";
+    var yonCls = yon === "LONG" ? "long" : "short";
+    html += '<div class="signal-card ' + sonuc + '">';
+    html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + '</div>';
+    html += '<div class="sig-badges"><span class="badge ' + sonuc + '">' + sonucYazi + '</span>';
+    html += '<span class="badge bot">' + botAdi(bot) + '</span></div></div>';
+    html += '<div class="sig-row"><span class="sig-key">Yon</span><span class="badge ' + yonCls + '">' + yon + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">Giris</span><span class="sig-val">' + (s.giris || s.maliyet || "-") + '</span></div>';
+    html += '<div class="sig-time">' + (s.sonuc_zamani || s.zaman || "") + '</div></div>';
+  }
+  if (hepsi.length === 0) {
+    html = arama ? ('<div class="empty">"' + arama + '" icin gecmis kayit bulunamadi</div>') : '<div class="empty">Henuz tamamlanmis islem yok</div>';
+  }
+  document.getElementById("gecmis-icerik").innerHTML = html;
+}
 
-        silinecekler = []
-        for sembol, kayitlar in aktif_gruplar.items():
-            if len(kayitlar) > 1:
-                kayitlar.sort(key=lambda x: x.get("zaman", ""), reverse=True)
-                silinecekler.extend(kayitlar[1:])  # en yenisi haric hepsi hayalet
+function raporGoster() {
+  if (!tumRaporlar || tumRaporlar.length === 0) {
+    document.getElementById("rapor-icerik").innerHTML = '<div class="empty">Henuz gunluk rapor yok (ilk rapor gece 03:00\'te olusur)</div>';
+    return;
+  }
+  var gruplar = {};
+  var tarihler = [];
+  for (var i = 0; i < tumRaporlar.length; i++) {
+    var r = tumRaporlar[i];
+    if (!gruplar[r.tarih]) { gruplar[r.tarih] = []; tarihler.push(r.tarih); }
+    gruplar[r.tarih].push(r);
+  }
+  tarihler.sort(function(a, b) { return b.localeCompare(a); });
 
-        if silinecekler:
-            botlar[bot]["sinyaller"] = [s for s in sinyaller if s not in silinecekler]
-            rapor[bot] = len(silinecekler)
+  var html = "";
+  for (var t = 0; t < tarihler.length; t++) {
+    var tarih = tarihler[t];
+    var kayitlar = gruplar[tarih].slice();
+    kayitlar.sort(function(a, b) { return (a.bot || "").localeCompare(b.bot || ""); });
+    var gunTp = 0, gunStop = 0;
+    for (var k = 0; k < kayitlar.length; k++) { gunTp += kayitlar[k].tp; gunStop += kayitlar[k].stop; }
+    var gunToplam = gunTp + gunStop;
+    var gunBasari = gunToplam > 0 ? Math.round(gunTp / gunToplam * 100) : 0;
 
-    if rapor:
-        veriyi_kaydet()
-    return jsonify({"durum": "ok", "temizlenen": rapor})
+    html += '<div class="section-title">' + tarih + ' &nbsp;·&nbsp; Gun Toplami: ' + gunTp + ' TP / ' + gunStop + ' Stop (%' + gunBasari + ')</div>';
+    for (var k2 = 0; k2 < kayitlar.length; k2++) {
+      var r = kayitlar[k2];
+      var toplam = r.tp + r.stop;
+      var basari = toplam > 0 ? Math.round(r.tp / toplam * 100) : 0;
+      html += '<div class="signal-card" style="margin-bottom:8px">';
+      html += '<div class="sig-header"><div class="sig-symbol">' + botAdi(r.bot) + '</div>';
+      html += '<span class="badge bot">' + basari + '% basari</span></div>';
+      html += '<div class="sig-row"><span class="sig-key">TP</span><span class="sig-val green">' + r.tp + '</span></div>';
+      html += '<div class="sig-row"><span class="sig-key">Stop</span><span class="sig-val red">' + r.stop + '</span></div>';
+      html += '</div>';
+    }
+  }
+  document.getElementById("rapor-icerik").innerHTML = html;
+}
 
-# --- BALINA TAKIP ---
-BALINA_MAX_KAYIT_PER_COIN = 200
+function piyasaYukle(zorla) {
+  var simdi = Date.now();
+  if (!zorla && piyasaVerisi && (simdi - piyasaSonGuncelleme < 15000)) {
+    piyasaGoster();
+    return;
+  }
+  document.getElementById("piyasa-icerik").innerHTML = '<div class="loading">Yukleniyor...</div>';
 
-@app.route("/balina/ekle", methods=["POST"])
-def balina_ekle():
-    if not key_kontrol():
-        return jsonify({"hata": "Yetkisiz"}), 401
-    data = request.json
-    data["zaman"] = tr_zaman()
-    sembol = data.get("sembol", "BILINMEYEN")
-    balina_islemler.setdefault(sembol, []).insert(0, data)
-    if len(balina_islemler[sembol]) > BALINA_MAX_KAYIT_PER_COIN:
-        balina_islemler[sembol] = balina_islemler[sembol][:BALINA_MAX_KAYIT_PER_COIN]
-    veriyi_kaydet()
-    return jsonify({"durum": "eklendi"})
+  var fiyatlar = null, global = null;
 
-@app.route("/balina/ozet", methods=["POST"])
-def balina_ozet_guncelle():
-    if not key_kontrol():
-        return jsonify({"hata": "Yetkisiz"}), 401
-    data = request.json
+  function tamamlandiKontrol() {
+    if (fiyatlar && global) {
+      piyasaVerisi = { fiyatlar: fiyatlar, global: global };
+      piyasaSonGuncelleme = Date.now();
+      piyasaGoster();
+    }
+  }
 
-    # Toplu (batch) format: {"ozetler": [{"sembol":.., "alim_yuzde":.., ...}, ...]}
-    if isinstance(data, dict) and "ozetler" in data:
-        for oz in data["ozetler"]:
-            sembol = oz.get("sembol")
-            if not sembol:
-                continue
-            balina_ozet[sembol] = {
-                "alim_yuzde": oz.get("alim_yuzde", 0),
-                "satim_yuzde": oz.get("satim_yuzde", 0),
-                "toplam_hacim": oz.get("toplam_hacim", 0),
-                "kategori": oz.get("kategori", "kripto"),
-                "zaman": tr_zaman()
+  // Fiyatlar: Binance'in anlik borsa verisinden (TradingView ile ayni kaynaga yakin)
+  var x1 = new XMLHttpRequest();
+  x1.open("GET", "https://api.binance.com/api/v3/ticker/24hr?symbols=%5B%22BTCUSDT%22%2C%22ETHUSDT%22%5D", true);
+  x1.onload = function() {
+    if (x1.status === 200) {
+      var arr = JSON.parse(x1.responseText);
+      fiyatlar = {};
+      for (var i = 0; i < arr.length; i++) {
+        if (arr[i].symbol === "BTCUSDT") fiyatlar.bitcoin = { usd: parseFloat(arr[i].lastPrice), usd_24h_change: parseFloat(arr[i].priceChangePercent) };
+        if (arr[i].symbol === "ETHUSDT") fiyatlar.ethereum = { usd: parseFloat(arr[i].lastPrice), usd_24h_change: parseFloat(arr[i].priceChangePercent) };
+      }
+      tamamlandiKontrol();
+    } else piyasaHata();
+  };
+  x1.onerror = piyasaHata;
+  x1.send();
+
+  // Piyasa degeri ve dominans: CoinGecko /global (turetilmis istatistik, dogasi geregi birkac dk'da bir guncellenir)
+  var x2 = new XMLHttpRequest();
+  x2.open("GET", "https://api.coingecko.com/api/v3/global", true);
+  x2.onload = function() {
+    if (x2.status === 200) { global = JSON.parse(x2.responseText).data; tamamlandiKontrol(); }
+    else piyasaHata();
+  };
+  x2.onerror = piyasaHata;
+  x2.send();
+}
+
+function piyasaHata() {
+  if (aktifSekme === "piyasa" && !piyasaVerisi) {
+    document.getElementById("piyasa-icerik").innerHTML = '<div class="error">Piyasa verisi alinamadi. Internet baglantisini kontrol edip tekrar dene.</div>';
+  }
+}
+
+function piyasaGoster() {
+  if (!piyasaVerisi) return;
+  var f = piyasaVerisi.fiyatlar;
+  var g = piyasaVerisi.global;
+
+  var btcFiyat = f.bitcoin ? f.bitcoin.usd : null;
+  var btcDegisim = f.bitcoin ? f.bitcoin.usd_24h_change : null;
+  var ethFiyat = f.ethereum ? f.ethereum.usd : null;
+  var ethDegisim = f.ethereum ? f.ethereum.usd_24h_change : null;
+
+  var toplamDeger = g.total_market_cap ? g.total_market_cap.usd : null;
+  var toplamDegisim = g.market_cap_change_percentage_24h_usd;
+
+  var btcD = g.market_cap_percentage ? g.market_cap_percentage.btc : null;
+  var ethD = g.market_cap_percentage ? g.market_cap_percentage.eth : null;
+  var usdtD = g.market_cap_percentage ? g.market_cap_percentage.usdt : null;
+  var othersD = null;
+  if (g.market_cap_percentage) {
+    var toplamBilinen = 0;
+    var anahtarlar = Object.keys(g.market_cap_percentage);
+    for (var k = 0; k < anahtarlar.length; k++) { toplamBilinen += g.market_cap_percentage[anahtarlar[k]]; }
+    othersD = Math.max(0, 100 - toplamBilinen);
+  }
+
+  function paraFormat(v) {
+    if (v == null) return "-";
+    if (v >= 1e12) return "$" + (v / 1e12).toFixed(2) + "T";
+    if (v >= 1e9) return "$" + (v / 1e9).toFixed(2) + "B";
+    if (v >= 1e6) return "$" + (v / 1e6).toFixed(2) + "M";
+    return "$" + Math.round(v).toLocaleString();
+  }
+  function degisimHtml(v) {
+    if (v == null) return "";
+    var yon = v >= 0 ? "up" : "down";
+    var ok = v >= 0 ? "▲" : "▼";
+    return '<div class="price-change ' + yon + '">' + ok + ' %' + Math.abs(v).toFixed(2) + '</div>';
+  }
+  function domBar(deger, renk) {
+    if (deger == null) return "";
+    return '<div class="dom-bar"><div class="dom-fill" style="width:' + Math.min(100, deger) + '%;background:' + renk + '"></div></div>';
+  }
+
+  var html = "";
+  html += '<div class="section-title">Canli Fiyatlar</div>';
+  html += '<div class="stats-grid">';
+  html += '<div class="stat-card"><div class="stat-label">₿ BTC</div><div class="stat-val">' + (btcFiyat != null ? "$" + Math.round(btcFiyat).toLocaleString() : "-") + '</div>' + degisimHtml(btcDegisim) + '</div>';
+  html += '<div class="stat-card"><div class="stat-label">Ξ ETH</div><div class="stat-val">' + (ethFiyat != null ? "$" + Math.round(ethFiyat).toLocaleString() : "-") + '</div>' + degisimHtml(ethDegisim) + '</div>';
+  html += '</div>';
+
+  html += '<div class="stat-card" style="margin-bottom:16px">';
+  html += '<div class="stat-label">TOTAL PIYASA DEGERI</div>';
+  html += '<div class="stat-val">' + paraFormat(toplamDeger) + '</div>';
+  html += degisimHtml(toplamDegisim);
+  html += '</div>';
+
+  html += '<div class="section-title">Dominans</div>';
+  html += '<div class="stats-grid">';
+  html += '<div class="stat-card"><div class="stat-label">BTC.D</div><div class="stat-val" style="color:#f59e0b">' + (btcD != null ? "%" + btcD.toFixed(1) : "-") + '</div>' + domBar(btcD, "#f59e0b") + '</div>';
+  html += '<div class="stat-card"><div class="stat-label">ETH.D</div><div class="stat-val blue">' + (ethD != null ? "%" + ethD.toFixed(1) : "-") + '</div>' + domBar(ethD, "#60a5fa") + '</div>';
+  html += '<div class="stat-card"><div class="stat-label">OTHERS.D</div><div class="stat-val" style="color:#a78bfa">' + (othersD != null ? "%" + othersD.toFixed(1) : "-") + '</div>' + domBar(othersD, "#a78bfa") + '</div>';
+  html += '<div class="stat-card"><div class="stat-label">USDT.D</div><div class="stat-val green">' + (usdtD != null ? "%" + usdtD.toFixed(1) : "-") + '</div>' + domBar(usdtD, "#4ade80") + '</div>';
+  html += '</div>';
+
+  html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="piyasaYukle(true)">Yenile</button></div>';
+  html += '<div class="sig-time" style="text-align:center;margin-top:6px">Son guncelleme: ' + new Date(piyasaSonGuncelleme).toLocaleTimeString("tr-TR") + '</div>';
+
+  document.getElementById("piyasa-icerik").innerHTML = html;
+}
+
+function balinaFiltre(kategori, el) {
+  balinaKategori = kategori;
+  altcoinDetaySembol = null;
+  var btnlar = document.querySelectorAll("#balina .bot-btn");
+  for (var i = 0; i < btnlar.length; i++) btnlar[i].classList.remove("active");
+  el.classList.add("active");
+  balinaGoster();
+}
+
+var altcoinDetaySembol = null;
+var performansDetayBot = null;
+
+function altcoinDetayAc(sembol) {
+  altcoinDetaySembol = sembol;
+  history.pushState({ altcoinDetay: sembol }, "", "");
+  balinaGoster();
+}
+
+function altcoinDetayKapat() {
+  history.back();
+}
+
+window.addEventListener("popstate", function(e) {
+  altcoinDetaySembol = (e.state && e.state.altcoinDetay) ? e.state.altcoinDetay : null;
+  performansDetayBot = (e.state && e.state.performansDetay) ? e.state.performansDetay : null;
+  if (aktifSekme === "balina") balinaGoster();
+  if (aktifSekme === "performans") performansGoster();
+});
+
+function performansDetayAc(bot) {
+  performansDetayBot = bot;
+  history.pushState({ performansDetay: bot }, "", "");
+  performansGoster();
+}
+
+function performansDetayKapat() {
+  history.back();
+}
+
+function balinaGoster() {
+  // Backend artik islemleri coin bazinda ({"BTCUSDT":[...], ...}) gonderiyor,
+  // her coin kendi icinde en fazla 20 kayit tutuyor. Mevcut filtreleme
+  // mantigi tek bir duz liste bekledigi icin once hepsini birlestiriyoruz.
+  var islemlerSozluk = tumBalina.islemler || {};
+  var tumIslemler = [];
+  Object.keys(islemlerSozluk).forEach(function(s) {
+    tumIslemler = tumIslemler.concat(islemlerSozluk[s]);
+  });
+  var tumOzet = tumBalina.ozet || {};
+
+  // Kategorisi olmayan eski kayitlar guvenli varsayilan olarak "kripto" sayilir
+  var islemler, ozet = {};
+  if (balinaKategori === "altcoin") {
+    islemler = tumIslemler.filter(function(t) { return t.grup === "altcoin"; });
+  } else {
+    islemler = tumIslemler.filter(function(t) {
+      return (t.kategori || "kripto") === balinaKategori && t.grup !== "altcoin";
+    });
+    islemler.sort(function(a, b) { return (b.zaman || "").localeCompare(a.zaman || ""); });
+    Object.keys(tumOzet).forEach(function(s) {
+      if ((tumOzet[s].kategori || "kripto") === balinaKategori) ozet[s] = tumOzet[s];
+    });
+  }
+
+  var html = "";
+
+  // --- Coin detay gorunumu (bir coine tiklandiysa) ---
+  if (balinaKategori === "altcoin" && altcoinDetaySembol) {
+    html += altcoinDetayHtml(altcoinDetaySembol, islemlerSozluk);
+    document.getElementById("balina-icerik").innerHTML = html;
+    return;
+  }
+
+  // --- Genel Alim/Satim Baskisi ---
+  var ozetSemboller = Object.keys(ozet);
+  if (ozetSemboller.length > 0) {
+    ozetSemboller.sort(function(a, b) { return (ozet[b].toplam_hacim || 0) - (ozet[a].toplam_hacim || 0); });
+    ozetSemboller = ozetSemboller.slice(0, 12);
+
+    html += '<div class="section-title">Genel Alim / Satim Baskisi (Son 5 Dakika)</div>';
+    for (var i = 0; i < ozetSemboller.length; i++) {
+      var s = ozetSemboller[i];
+      var o = ozet[s];
+      var alim = o.alim_yuzde || 0;
+      var satim = o.satim_yuzde || 0;
+      html += '<div class="stat-card" style="margin-bottom:8px">';
+      html += '<div class="sig-header"><div class="sig-symbol">#' + s + '</div>';
+      html += '<span class="badge long">Alim %' + alim + '</span></div>';
+      html += '<div class="balina-ozet-bar">';
+      html += '<div class="balina-ozet-alim" style="width:' + alim + '%"></div>';
+      html += '<div class="balina-ozet-satim" style="width:' + satim + '%"></div>';
+      html += '</div>';
+      html += '<div class="sig-time">Satim %' + satim + '</div>';
+      html += '</div>';
+    }
+  }
+
+  // --- Son Balina Hareketleri ---
+  if (balinaKategori === "altcoin") {
+    if (islemler.length === 0) {
+      html += '<div class="empty">Henuz altcoin balina hareketi tespit edilmedi</div>';
+    } else {
+      html += altcoinTabloHtml(islemler);
+    }
+  } else {
+    if (islemler.length === 0) {
+      html += '<div class="empty">Henuz balina hareketi tespit edilmedi</div>';
+    }
+    for (var k = 0; k < islemler.length; k++) {
+      var t = islemler[k];
+      var yonCls = t.yon === "LONG" ? "long" : "short";
+      var seviyeYazi = t.seviye === "mega" ? "MEGA BALINA" : t.seviye === "buyuk" ? "Buyuk Balina" : "Balina";
+      var ikon = t.seviye === "mega" ? "\uD83D\uDC33\uD83D\uDC33\uD83D\uDC33" : t.seviye === "buyuk" ? "\uD83D\uDC33\uD83D\uDC33" : "\uD83D\uDC33";
+      var degerFormatli = "$" + Math.round(t.deger || 0).toLocaleString();
+      html += '<div class="signal-card ' + yonCls + '">';
+      html += '<div class="sig-header"><div class="sig-symbol">' + ikon + ' #' + t.sembol + '</div>';
+      html += '<div class="sig-badges"><span class="badge ' + yonCls + '">' + t.yon + '</span>';
+      html += '<span class="badge seviye-' + t.seviye + '">' + seviyeYazi + '</span></div></div>';
+      html += '<div class="sig-row"><span class="sig-key">Deger</span><span class="sig-val">' + degerFormatli + '</span></div>';
+      html += '<div class="sig-time">' + (t.zaman || "") + '</div></div>';
+    }
+  }
+
+  document.getElementById("balina-icerik").innerHTML = html;
+}
+
+function baskinlikHesapla(kayitlar) {
+  var alimHacim = 0, satimHacim = 0;
+  for (var i = 0; i < kayitlar.length; i++) {
+    var d = kayitlar[i].deger || 0;
+    if (kayitlar[i].yon === "LONG") alimHacim += d; else satimHacim += d;
+  }
+  var toplam = alimHacim + satimHacim;
+  if (toplam === 0) return null;
+  var alim = Math.round((alimHacim / toplam) * 100);
+  return { alim: alim, satim: 100 - alim };
+}
+
+function baskinlikBarHtml(kayitlar, boyut) {
+  var b = baskinlikHesapla(kayitlar);
+  if (!b) return "";
+  if (boyut === "buyuk") {
+    return '<div style="text-align:center">' +
+      '<div style="font-size:14px;font-weight:700;margin-bottom:4px">' +
+      '<span style="color:#4ade80">%' + b.alim + '</span> / <span style="color:#f87171">%' + b.satim + '</span></div>' +
+      '<div class="balina-ozet-bar" style="width:50%;height:5px;margin:0 auto">' +
+      '<div class="balina-ozet-alim" style="width:' + b.alim + '%"></div>' +
+      '<div class="balina-ozet-satim" style="width:' + b.satim + '%"></div></div></div>';
+  }
+  return '<div style="display:flex;align-items:center;gap:5px;margin-top:3px">' +
+    '<div class="balina-ozet-bar" style="width:36px;height:4px;margin-top:0">' +
+    '<div class="balina-ozet-alim" style="width:' + b.alim + '%"></div>' +
+    '<div class="balina-ozet-satim" style="width:' + b.satim + '%"></div></div>' +
+    '<span style="font-size:9px;color:#64748b">%' + b.alim + '/%' + b.satim + '</span></div>';
+}
+
+function altcoinTabloHtml(islemler) {
+  var sabitSira = tumBalina.sembol_sirasi || [];
+
+  // Her sembol icin islemleri EN YENIDEN eskiye sirali tutuyoruz
+  // (coin adinin hemen yaninda -solda- en yeni veri gorunsun diye)
+  var gruplarTam = {};
+  for (var i = 0; i < islemler.length; i++) {
+    var t = islemler[i];
+    if (!gruplarTam[t.sembol]) gruplarTam[t.sembol] = [];
+    gruplarTam[t.sembol].push(t);
+  }
+
+  // Ana tabloda sadece SON 20 kayit gosterilir (detayli gecmis icin coin adina tiklanir)
+  var gruplar = {};
+  Object.keys(gruplarTam).forEach(function(s) {
+    var tam = gruplarTam[s];
+    gruplar[s] = tam.length > 20 ? tam.slice(0, 20) : tam;
+  });
+
+  var goruntulenecekler = sabitSira.slice();
+  Object.keys(gruplar).forEach(function(s) {
+    if (goruntulenecekler.indexOf(s) === -1) goruntulenecekler.push(s);
+  });
+
+  if (goruntulenecekler.length === 0) {
+    return '<div class="empty">Coin listesi henuz yuklenmedi, birazdan gelecek</div>';
+  }
+
+  var maxSutun = 1;
+  goruntulenecekler.forEach(function(s) {
+    var uzunluk = (gruplar[s] || []).length;
+    if (uzunluk > maxSutun) maxSutun = uzunluk;
+  });
+
+  var html = '<div class="section-title">Coin Bazinda Alim / Satim Hareketleri (24s Hacme Gore Sabit Sirali) - Coin Adina Tiklayarak Son 200 Islemi Gorebilirsiniz</div>';
+  html += '<div class="balina-tablo-wrap"><table class="balina-tablo"><thead><tr><th class="coin-adi">Coin</th>';
+  for (var c = 1; c <= maxSutun; c++) html += '<th>' + c + '</th>';
+  html += '</tr></thead><tbody>';
+
+  for (var s = 0; s < goruntulenecekler.length; s++) {
+    var sembol = goruntulenecekler[s];
+    var kayitlar = gruplar[sembol] || [];
+    html += '<tr><td class="coin-adi" style="cursor:pointer" onclick="altcoinDetayAc(\'' + sembol + '\')">#' + sembol + baskinlikBarHtml(kayitlar, "kucuk") + '</td>';
+    for (var k = 0; k < maxSutun; k++) {
+      if (k < kayitlar.length) {
+        var t = kayitlar[k];
+        var cls = t.yon === "LONG" ? "long" : "short";
+        var deger = "$" + Math.round(t.deger || 0).toLocaleString();
+        var saat = t.zaman ? t.zaman.split(" ")[1] : "";
+        html += '<td class="' + cls + '" title="' + (t.zaman || "") + '">' + deger + '<div class="hucre-saat">' + saat + '</div></td>';
+      } else {
+        html += '<td class="bos">-</td>';
+      }
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+  return html;
+}
+
+function altcoinDetayHtml(sembol, islemlerSozluk) {
+  var kayitlar = (islemlerSozluk[sembol] || []).filter(function(t) { return t.grup === "altcoin"; });
+  var html = '<div style="margin-bottom:12px"><button class="refresh-btn" onclick="altcoinDetayKapat()">&larr; Tabloya Don</button></div>';
+  html += '<div class="section-title">#' + sembol + ' - Son ' + kayitlar.length + ' Islem</div>';
+  html += '<div style="margin-bottom:10px">' + baskinlikBarHtml(kayitlar, "buyuk") + '</div>';
+  if (kayitlar.length === 0) {
+    html += '<div class="empty">Bu coin icin henuz islem yok</div>';
+    return html;
+  }
+
+  var SATIR = 10, SUTUN = 20;
+  html += '<div class="balina-tablo-wrap"><table class="balina-tablo"><tbody>';
+  for (var r = 0; r < SATIR; r++) {
+    html += '<tr>';
+    for (var c = 0; c < SUTUN; c++) {
+      var idx = r * SUTUN + c;
+      if (idx < kayitlar.length) {
+        var t = kayitlar[idx];
+        var cls = t.yon === "LONG" ? "long" : "short";
+        var deger = "$" + Math.round(t.deger || 0).toLocaleString();
+        var saat = t.zaman ? t.zaman.split(" ")[1] : "";
+        html += '<td class="' + cls + '" title="' + (t.zaman || "") + '">' + deger + '<div class="hucre-saat">' + saat + '</div></td>';
+      } else {
+        html += '<td class="bos">-</td>';
+      }
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+  return html;
+}
+
+// --- YEDEK (eski) tasarim: kutucuklu/hap seklinde gorunum.
+// Beklendigi gibi geri donmek istenirse yukaridaki cagriyi
+// altcoinIzgaraHtml(islemler) olarak degistirmek yeterli. ---
+function altcoinIzgaraHtml(islemler) {
+  var sabitSira = tumBalina.sembol_sirasi || [];
+
+  // Her sembol icin islemleri grupla (backend'den yeni->eski geldigi icin,
+  // soldan saga "excel gibi" eklensin diye eskiden yeniye ceviriyoruz)
+  var gruplar = {};
+  for (var i = 0; i < islemler.length; i++) {
+    var t = islemler[i];
+    if (!gruplar[t.sembol]) gruplar[t.sembol] = [];
+    gruplar[t.sembol].unshift(t);
+  }
+
+  // Sira listesinde olmayan ama islem gelmis semboller varsa (henuz sira
+  // guncellenmediyse) onlari da sonuna ekleyelim, hic veri kaybolmasin
+  var goruntulenecekler = sabitSira.slice();
+  Object.keys(gruplar).forEach(function(s) {
+    if (goruntulenecekler.indexOf(s) === -1) goruntulenecekler.push(s);
+  });
+
+  if (goruntulenecekler.length === 0) {
+    return '<div class="empty">Coin listesi henuz yuklenmedi, birazdan gelecek</div>';
+  }
+
+  var html = '<div class="section-title">Coin Bazinda Alim / Satim Hareketleri (24s Hacme Gore Sabit Sirali)</div>';
+  for (var s = 0; s < goruntulenecekler.length; s++) {
+    var sembol = goruntulenecekler[s];
+    var kayitlar = gruplar[sembol] || [];
+    html += '<div class="stat-card" style="margin-bottom:8px">';
+    html += '<div class="sig-header"><div class="sig-symbol">#' + sembol + '</div>';
+    html += '<span class="badge bot">' + kayitlar.length + ' islem</span></div>';
+    if (kayitlar.length === 0) {
+      html += '<div class="sig-time">Henuz islem yok</div>';
+    } else {
+      html += '<div class="mini-chip-wrap">';
+      for (var k = 0; k < kayitlar.length; k++) {
+        var t = kayitlar[k];
+        var cls = t.yon === "LONG" ? "long" : "short";
+        var deger = "$" + Math.round(t.deger || 0).toLocaleString();
+        html += '<span class="mini-chip ' + cls + '" title="' + (t.zaman || "") + '">' + deger + '</span>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  return html;
+}
+
+function haberleriGoster() {
+  var html = "";
+  var liste = tumHaberler;
+  if (aktifHaberKategori !== "hepsi") {
+    liste = tumHaberler.filter(function(h) {
+      return h.kategori && h.kategori.toLowerCase() === aktifHaberKategori;
+    });
+  }
+  if (liste.length === 0) {
+    html = '<div class="empty">Henuz haber yok</div>';
+    document.getElementById("haber-listesi").innerHTML = html;
+    return;
+  }
+  for (var i = 0; i < liste.length; i++) {
+    var h = liste[i];
+    var yon = h.sentiment || "notr";
+    html += '<div class="news-card ' + yon + '">';
+    html += '<div class="news-header"><div class="news-badges">';
+    if (h.kategori) html += '<span class="badge kripto">' + h.kategori + '</span>';
+    html += '<span class="badge ' + yon + '">' + (yon === "olumlu" ? "Olumlu" : yon === "olumsuz" ? "Olumsuz" : "Notr") + '</span>';
+    html += '</div></div>';
+    html += '<div class="news-title">' + (h.baslik || "") + '</div>';
+    if (h.maddeler && h.maddeler.length > 0) {
+      html += '<ul class="news-bullets">';
+      for (var j = 0; j < h.maddeler.length; j++) {
+        html += '<li class="news-bullet">' + h.maddeler[j] + '</li>';
+      }
+      html += '</ul>';
+    }
+    html += '<div class="news-time">' + (h.zaman || "") + '</div></div>';
+  }
+  document.getElementById("haber-listesi").innerHTML = html;
+}
+
+function sinyaleGit(bot, sembol) {
+  // Sinyaller sekmesine gec
+  var tablar = document.querySelectorAll(".tab");
+  for (var i = 0; i < tablar.length; i++) tablar[i].classList.remove("active");
+  if (tablar.length > 0) tablar[0].classList.add("active");
+  var divlar = document.querySelectorAll(".content > div");
+  for (var i = 0; i < divlar.length; i++) divlar[i].style.display = "none";
+  document.getElementById("sinyaller").style.display = "block";
+  aktifSekme = "sinyaller";
+
+  // Ilgili odaya filtrele
+  aktifBot = bot;
+  var btnlar = document.querySelectorAll("#sinyaller .bot-btn");
+  for (var i = 0; i < btnlar.length; i++) {
+    btnlar[i].classList.remove("active");
+    var onclickMetni = btnlar[i].getAttribute("onclick") || "";
+    if (onclickMetni.indexOf("'" + bot + "'") !== -1) {
+      btnlar[i].classList.add("active");
+    }
+  }
+
+  sinyalleriGoster();
+
+  // KartI bul, kaydir ve gecici olarak vurgula
+  setTimeout(function() {
+    var kartlar = document.querySelectorAll("#sinyal-listesi .signal-card");
+    for (var i = 0; i < kartlar.length; i++) {
+      if (kartlar[i].textContent.indexOf("#" + sembol) !== -1) {
+        kartlar[i].scrollIntoView({ behavior: "smooth", block: "center" });
+        kartlar[i].classList.add("highlight-pulse");
+        (function(el) {
+          setTimeout(function() { el.classList.remove("highlight-pulse"); }, 2200);
+        })(kartlar[i]);
+        break;
+      }
+    }
+  }, 60);
+}
+
+function sekmeAc(id, el) {
+  aktifSekme = id;
+  var tablar = document.querySelectorAll(".tab");
+  for (var i = 0; i < tablar.length; i++) tablar[i].classList.remove("active");
+  el.classList.add("active");
+  var divlar = document.querySelectorAll(".content > div");
+  for (var i = 0; i < divlar.length; i++) divlar[i].style.display = "none";
+  document.getElementById(id).style.display = "block";
+  guncelle();
+}
+
+function botFiltre(bot, el) {
+  aktifBot = bot;
+  var btnlar = document.querySelectorAll("#sinyaller .bot-btn:not(#favori-filtre-btn)");
+  for (var i = 0; i < btnlar.length; i++) btnlar[i].classList.remove("active");
+  el.classList.add("active");
+  sinyalleriGoster();
+}
+
+function haberFiltre(kategori, el) {
+  aktifHaberKategori = kategori;
+  var btnlar = document.querySelectorAll("#haberler .bot-btn");
+  for (var i = 0; i < btnlar.length; i++) btnlar[i].classList.remove("active");
+  el.classList.add("active");
+  haberleriGoster();
+}
+
+function formDegistir(hangisi) {
+  document.getElementById("giris-form").style.display = hangisi === "giris" ? "block" : "none";
+  document.getElementById("kayit-form").style.display = hangisi === "kayit" ? "block" : "none";
+  document.getElementById("giris-hata").style.display = "none";
+  document.getElementById("kayit-hata").style.display = "none";
+  document.getElementById("kayit-basari").style.display = "none";
+}
+
+function girisYap() {
+  var kadi = document.getElementById("giris-kadi").value.trim();
+  var sifre = document.getElementById("giris-sifre").value;
+  var hataEl = document.getElementById("giris-hata");
+  hataEl.style.display = "none";
+  if (!kadi || !sifre) {
+    hataEl.textContent = "Kullanici adi ve sifre gerekli";
+    hataEl.style.display = "block";
+    return;
+  }
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/giris", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.onload = function() {
+    var yanit;
+    try { yanit = JSON.parse(xhr.responseText); } catch (e) { yanit = {}; }
+    if (xhr.status === 200) {
+      authToken = yanit.token;
+      hesapDurumu = yanit.hesap_durumu;
+      hesapKalanGun = yanit.kalan_gun;
+      girisliKullanici = yanit.kullanici_adi;
+      localStorage.setItem("ts_token", authToken);
+      girisBasarili();
+    } else {
+      hataEl.textContent = yanit.hata || "Giris basarisiz";
+      hataEl.style.display = "block";
+    }
+  };
+  xhr.onerror = function() {
+    hataEl.textContent = "Baglanti hatasi, tekrar deneyin";
+    hataEl.style.display = "block";
+  };
+  xhr.send(JSON.stringify({ kullanici_adi: kadi, sifre: sifre }));
+}
+
+function kayitOl() {
+  var kadi = document.getElementById("kayit-kadi").value.trim();
+  var sifre = document.getElementById("kayit-sifre").value;
+  var telegram = document.getElementById("kayit-telegram").value.trim();
+  var email = document.getElementById("kayit-email").value.trim();
+  var hataEl = document.getElementById("kayit-hata");
+  var basariEl = document.getElementById("kayit-basari");
+  hataEl.style.display = "none";
+  basariEl.style.display = "none";
+
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/kayit", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.onload = function() {
+    var yanit;
+    try { yanit = JSON.parse(xhr.responseText); } catch (e) { yanit = {}; }
+    if (xhr.status === 200) {
+      basariEl.textContent = "Kaydiniz alindi! Onay bekleniyor, simdi giris yapabilirsiniz.";
+      basariEl.style.display = "block";
+      document.getElementById("kayit-kadi").value = "";
+      document.getElementById("kayit-sifre").value = "";
+      document.getElementById("kayit-telegram").value = "";
+      document.getElementById("kayit-email").value = "";
+    } else {
+      hataEl.textContent = yanit.hata || "Kayit basarisiz";
+      hataEl.style.display = "block";
+    }
+  };
+  xhr.onerror = function() {
+    hataEl.textContent = "Baglanti hatasi, tekrar deneyin";
+    hataEl.style.display = "block";
+  };
+  xhr.send(JSON.stringify({ kullanici_adi: kadi, sifre: sifre, telegram: telegram, email: email }));
+}
+
+function sifreFormAcKapat() {
+  var f = document.getElementById("sifre-form");
+  f.style.display = (f.style.display === "none") ? "block" : "none";
+}
+
+function sifreDegistir() {
+  var eski = document.getElementById("sifre-eski").value;
+  var yeni = document.getElementById("sifre-yeni").value;
+  var hataEl = document.getElementById("sifre-hata");
+  var basariEl = document.getElementById("sifre-basari");
+  hataEl.style.display = "none";
+  basariEl.style.display = "none";
+
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/sifre_degistir", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken);
+  xhr.onload = function() {
+    var yanit;
+    try { yanit = JSON.parse(xhr.responseText); } catch (e) { yanit = {}; }
+    if (xhr.status === 200) {
+      basariEl.textContent = "Sifreniz basariyla degistirildi.";
+      basariEl.style.display = "block";
+      document.getElementById("sifre-eski").value = "";
+      document.getElementById("sifre-yeni").value = "";
+    } else {
+      hataEl.textContent = yanit.hata || "Sifre degistirilemedi";
+      hataEl.style.display = "block";
+    }
+  };
+  xhr.onerror = function() {
+    hataEl.textContent = "Baglanti hatasi, tekrar deneyin";
+    hataEl.style.display = "block";
+  };
+  xhr.send(JSON.stringify({ eski_sifre: eski, yeni_sifre: yeni }));
+}
+
+function cikisYap() {
+  if (authToken) {
+    var xhrCikis = new XMLHttpRequest();
+    xhrCikis.open("POST", API + "/cikis", true);
+    xhrCikis.setRequestHeader("X-Auth-Token", authToken);
+    xhrCikis.send();
+  }
+  localStorage.removeItem("ts_token");
+  authToken = null;
+  hesapDurumu = null;
+  girisliKullanici = null;
+  document.getElementById("app-icerik").style.display = "none";
+  document.getElementById("auth-ekrani").style.display = "flex";
+  formDegistir("giris");
+}
+
+function girisBasarili() {
+  document.getElementById("auth-ekrani").style.display = "none";
+  document.getElementById("app-icerik").style.display = "block";
+  if (hesapDurumu === "admin") {
+    localStorage.setItem("ts_admin_cihazi", "1");
+  } else {
+    ziyaretKaydet(girisliKullanici);
+  }
+  erisimGuncelle();
+  veriYukle();
+  setInterval(veriYukle, 10000);
+}
+
+function ziyaretKaydet(kullaniciAdi) {
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/ziyaret/kaydet", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.send(JSON.stringify({ kullanici_adi: kullaniciAdi || "misafir" }));
+}
+
+function anaSayfayaGit() {
+  var tamErisim = (hesapDurumu === "onayli" || hesapDurumu === "admin" || hesapDurumu === "deneme");
+  var hedefSekme = tamErisim ? "sinyaller" : "gecmis";
+  var tablar = document.querySelectorAll("#tabs-alani .tab");
+  for (var i = 0; i < tablar.length; i++) {
+    if ((tablar[i].getAttribute("onclick") || "").indexOf("'" + hedefSekme + "'") !== -1) {
+      sekmeAc(hedefSekme, tablar[i]);
+      break;
+    }
+  }
+  if (tamErisim) {
+    aktifBot = "hepsi";
+    var botBtnlar = document.querySelectorAll("#sinyaller .bot-btn");
+    for (var j = 0; j < botBtnlar.length; j++) {
+      botBtnlar[j].classList.remove("active");
+      if ((botBtnlar[j].getAttribute("onclick") || "").indexOf("'hepsi'") !== -1) botBtnlar[j].classList.add("active");
+    }
+    sinyalleriGoster();
+  }
+}
+
+var sessizOdalar = {};
+
+function sessizButonlariGuncelle() {
+  var btnlar = document.querySelectorAll(".oda-sessiz-btn");
+  for (var i = 0; i < btnlar.length; i++) {
+    var oda = btnlar[i].getAttribute("data-oda");
+    if (sessizOdalar[oda]) {
+      btnlar[i].innerHTML = "&#128277;";
+      btnlar[i].classList.add("sessiz-aktif");
+    } else {
+      btnlar[i].innerHTML = "&#128276;";
+      btnlar[i].classList.remove("sessiz-aktif");
+    }
+  }
+}
+
+function sessizOdalariYukle() {
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/sessiz-odalar", true);
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      var liste = JSON.parse(xhr.responseText).sessiz_odalar || [];
+      sessizOdalar = {};
+      for (var i = 0; i < liste.length; i++) sessizOdalar[liste[i]] = true;
+      sessizButonlariGuncelle();
+    }
+  };
+  xhr.send();
+}
+
+function odaSessizToggle(oda) {
+  var yeniDurum = !sessizOdalar[oda];
+  sessizOdalar[oda] = yeniDurum;
+  sessizButonlariGuncelle();
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/sessiz-odalar", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.send(JSON.stringify({ oda: oda, sessiz: yeniDurum }));
+}
+
+function urlBase64ToUint8Array(base64String) {
+  var padding = "=".repeat((4 - base64String.length % 4) % 4);
+  var base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  var rawData = atob(base64);
+  var outputArray = new Uint8Array(rawData.length);
+  for (var i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
+function bildirimBanneriGizle() {
+  document.getElementById("bildirim-banner-alani").innerHTML = "";
+}
+
+function bildirimBanneriniGoster() {
+  var alan = document.getElementById("bildirim-banner-alani");
+  if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+    alan.innerHTML = "";
+    return;
+  }
+  if (Notification.permission === "granted" && localStorage.getItem("ts_bildirim_acik") === "1") {
+    alan.innerHTML = "";
+    return;
+  }
+  if (Notification.permission === "denied") {
+    alan.innerHTML = "";
+    return;
+  }
+  alan.innerHTML = '<div class="bildirim-banner">Yeni veri geldiginde haberdar olmak icin bildirimleri acabilirsiniz.' +
+    '<button onclick="bildirimleriAc()">Bildirimleri Ac</button></div>';
+}
+
+function bildirimleriAc() {
+  Notification.requestPermission().then(function(izin) {
+    if (izin !== "granted") {
+      bildirimBanneriGizle();
+      return;
+    }
+    navigator.serviceWorker.ready.then(function(reg) {
+      var xhrKey = new XMLHttpRequest();
+      xhrKey.open("GET", API + "/push/public-key", true);
+      xhrKey.onload = function() {
+        if (xhrKey.status !== 200) return;
+        var anahtar = JSON.parse(xhrKey.responseText).publicKey;
+        if (!anahtar) return;
+        reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(anahtar)
+        }).then(function(sub) {
+          var xhrSub = new XMLHttpRequest();
+          xhrSub.open("POST", API + "/push/abone-ol", true);
+          xhrSub.setRequestHeader("Content-Type", "application/json");
+          xhrSub.setRequestHeader("X-Auth-Token", authToken);
+          xhrSub.onload = function() {
+            if (xhrSub.status === 200) {
+              localStorage.setItem("ts_bildirim_acik", "1");
+              bildirimBanneriGizle();
             }
-        veriyi_kaydet()
-        return jsonify({"durum": "ok", "guncellenen": len(data["ozetler"])})
+          };
+          xhrSub.send(JSON.stringify({ subscription: sub }));
+        }).catch(function() {});
+      };
+      xhrKey.send();
+    });
+  });
+}
 
-    # Eski (tekil) format geriye donuk uyumluluk icin korunuyor
-    sembol = data.get("sembol")
-    if not sembol:
-        return jsonify({"hata": "Sembol gerekli"}), 400
-    balina_ozet[sembol] = {
-        "alim_yuzde": data.get("alim_yuzde", 0),
-        "satim_yuzde": data.get("satim_yuzde", 0),
-        "toplam_hacim": data.get("toplam_hacim", 0),
-        "kategori": data.get("kategori", "kripto"),
-        "zaman": tr_zaman()
+var pwaKurulumPrompt = null;
+
+window.addEventListener("beforeinstallprompt", function(e) {
+  e.preventDefault();
+  pwaKurulumPrompt = e;
+  pwaKurulumBanneriniGoster();
+});
+
+function pwaStandaloneMi() {
+  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+}
+
+function pwaIosMu() {
+  var ua = window.navigator.userAgent;
+  return /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+}
+
+function pwaKurulumBanneriniGoster() {
+  var alan = document.getElementById("pwa-kurulum-banner-alani");
+  if (!alan) return;
+  if (pwaStandaloneMi() || localStorage.getItem("ts_pwa_kurulum_kapatildi") === "1") {
+    alan.innerHTML = "";
+    return;
+  }
+  if (pwaKurulumPrompt) {
+    alan.innerHTML = '<div class="bildirim-banner">TradeSinyalPro\'yu ana ekraniniza ekleyip uygulama gibi kullanabilirsiniz.' +
+      '<button onclick="pwaKur()">Ana Ekrana Ekle</button>' +
+      '<span onclick="pwaKurulumBanneriniKapat()" style="cursor:pointer;color:#64748b;font-size:11px;margin-left:6px">Kapat</span></div>';
+  } else if (pwaIosMu()) {
+    alan.innerHTML = '<div class="bildirim-banner">Ana ekrana eklemek icin: Paylas &#8593; simgesine, sonra "Ana Ekrana Ekle" secenegine dokunun.' +
+      '<span onclick="pwaKurulumBanneriniKapat()" style="cursor:pointer;color:#64748b;font-size:11px;margin-left:6px">Kapat</span></div>';
+  } else {
+    alan.innerHTML = "";
+  }
+}
+
+function pwaKur() {
+  if (!pwaKurulumPrompt) return;
+  pwaKurulumPrompt.prompt();
+  pwaKurulumPrompt.userChoice.then(function() {
+    pwaKurulumPrompt = null;
+    document.getElementById("pwa-kurulum-banner-alani").innerHTML = "";
+  });
+}
+
+function pwaKurulumBanneriniKapat() {
+  localStorage.setItem("ts_pwa_kurulum_kapatildi", "1");
+  document.getElementById("pwa-kurulum-banner-alani").innerHTML = "";
+}
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(function() {});
+}
+
+function erisimGuncelle() {
+  var bannerAlani = document.getElementById("durum-banner-alani");
+  var tamErisim = (hesapDurumu === "onayli" || hesapDurumu === "admin" || hesapDurumu === "deneme");
+
+  var kalanGostergesi = document.getElementById("kalan-sure-gostergesi");
+  if (hesapDurumu === "deneme" && hesapKalanGun !== null && hesapKalanGun !== undefined) {
+    kalanGostergesi.textContent = "Kalan deneme: " + hesapKalanGun + " gün";
+  } else if (hesapDurumu === "onayli" && hesapKalanGun !== null && hesapKalanGun !== undefined) {
+    kalanGostergesi.textContent = "Kalan: " + hesapKalanGun + " gün";
+  } else {
+    kalanGostergesi.textContent = "";
+  }
+
+  var tablar = document.querySelectorAll("#tabs-alani .tab");
+  for (var i = 0; i < tablar.length; i++) {
+    var tamGerekli = tablar[i].getAttribute("data-tam-erisim") === "1";
+    if (tamGerekli) tablar[i].style.display = tamErisim ? "" : "none";
+  }
+  document.getElementById("yonetici-tab").style.display = (hesapDurumu === "admin") ? "" : "none";
+
+  if (tamErisim) {
+    bildirimBanneriniGoster();
+    sessizOdalariYukle();
+    favoriBildirimYukle();
+  } else {
+    bildirimBanneriGizle();
+  }
+  pwaKurulumBanneriniGoster();
+
+  if (hesapDurumu === "deneme" && hesapKalanGun !== null && hesapKalanGun <= 1) {
+    bannerAlani.innerHTML = '<div class="durum-banner suresi-dolmus">⚠️ Deneme süreniz yarın sona eriyor!' +
+      '<button onclick="window.open(\'https://t.me/TradeSinyal_Pro\',\'_blank\')" style="margin-left:8px;background:#3b82f6;color:#fff;border:none;padding:5px 12px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">Yenile</button></div>';
+  } else if (hesapDurumu === "deneme") {
+    var gunYazisi = (hesapKalanGun === 1) ? "1 gun" : (hesapKalanGun + " gun");
+    bannerAlani.innerHTML = '<div class="durum-banner bekliyor">Ucretsiz deneme surumundesiniz. Kalan sure: ' + gunYazisi + '.</div>';
+  } else if (hesapDurumu === "onayli" && hesapKalanGun !== null && hesapKalanGun <= 1) {
+    bannerAlani.innerHTML = '<div class="durum-banner suresi-dolmus">⚠️ Üyeliğiniz yarın sona eriyor!' +
+      '<button onclick="window.open(\'https://t.me/TradeSinyal_Pro\',\'_blank\')" style="margin-left:8px;background:#3b82f6;color:#fff;border:none;padding:5px 12px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">Yenile</button></div>';
+  } else if (hesapDurumu === "deneme_bitti") {
+    bannerAlani.innerHTML = '<div class="durum-banner suresi-dolmus">Deneme süreniz sona erdi. Uyeliginizi baslatmak icin bize ulasin.</div>';
+  } else if (hesapDurumu === "bekliyor") {
+    bannerAlani.innerHTML = '<div class="durum-banner bekliyor">Hesabiniz onay bekliyor. Onaylandiktan sonra tum ozelliklere erisebileceksiniz.</div>';
+  } else if (hesapDurumu === "suresi_dolmus") {
+    bannerAlani.innerHTML = '<div class="durum-banner suresi-dolmus">Uyeliginizin suresi doldu. Yenilemek icin bize ulasin.</div>';
+  } else {
+    bannerAlani.innerHTML = "";
+  }
+
+  if (!tamErisim && aktifSekme !== "iletisim" && aktifSekme !== "yonetici") {
+    var tablar2 = document.querySelectorAll("#tabs-alani .tab");
+    for (var j = 0; j < tablar2.length; j++) {
+      if ((tablar2[j].getAttribute("onclick") || "").indexOf("'iletisim'") !== -1) {
+        sekmeAc("iletisim", tablar2[j]);
+        break;
+      }
     }
-    veriyi_kaydet()
-    return jsonify({"durum": "ok"})
+  }
+}
 
-@app.route("/balina/sembol_sirasi", methods=["POST"])
-def balina_sembol_sirasi_guncelle():
-    if not key_kontrol():
-        return jsonify({"hata": "Yetkisiz"}), 401
-    global altcoin_sirasi
-    data = request.json or {}
-    yeni_sira = data.get("sirali_semboller")
-    if isinstance(yeni_sira, list) and yeni_sira:
-        altcoin_sirasi = yeni_sira
-        veriyi_kaydet()
-    return jsonify({"durum": "ok"})
-
-@app.route("/balina")
-def balina_getir():
-    if not veri_erisim_izni_var_mi(request.headers.get("X-Auth-Token", "")):
-        return jsonify({"hata": "Yetkisiz - giris yapip onaylanmis olmaniz gerekiyor"}), 401
-    return jsonify({"islemler": balina_islemler, "ozet": balina_ozet, "sembol_sirasi": altcoin_sirasi})
-
-# --- UYELIK SISTEMI ENDPOINT'LERI ---
-
-@app.route("/kayit", methods=["POST"])
-def kayit_ol():
-    data = request.json or {}
-    kadi = (data.get("kullanici_adi") or "").strip()
-    sifre = data.get("sifre") or ""
-    telegram = (data.get("telegram") or "").strip()
-    email = (data.get("email") or "").strip()
-
-    if not kadi or not sifre or not telegram:
-        return jsonify({"hata": "Kullanici adi, sifre ve telegram kullanici adi zorunludur"}), 400
-    if len(sifre) < 6:
-        return jsonify({"hata": "Sifre en az 6 karakter olmalidir"}), 400
-    if kadi in kullanicilar:
-        return jsonify({"hata": "Bu kullanici adi zaten alinmis"}), 409
-
-    telegram_norm = telegram_normalize(telegram)
-    for mevcut_kadi, mevcut_u in kullanicilar.items():
-        if telegram_normalize(mevcut_u.get("telegram")) == telegram_norm:
-            return jsonify({"hata": "Bu Telegram kullanici adiyla zaten bir hesap mevcut"}), 409
-
-    kullanicilar[kadi] = {
-        "sifre_hash": generate_password_hash(sifre),
-        "telegram": telegram,
-        "email": email,
-        "durum": "bekliyor",
-        "olusturma_tarihi": tr_zaman(),
-        "deneme_baslangic": None,
-        "onay_tarihi": None,
-        "bildirim_gonderildi": False,
-        "push_abonelikleri": [],
-        "sessiz_odalar": [],
-        "favori_coinler": [],
-        "favori_bildirim": False,
-        "aktif_tokenlar": [],
-        "takip_listesi": [],
-        "fiyat_alarmlari": []
+function yoneticiPaneliGoster() {
+  var xhrZiyaret = new XMLHttpRequest();
+  xhrZiyaret.open("GET", API + "/admin/ziyaretler", true);
+  xhrZiyaret.setRequestHeader("X-Auth-Token", authToken);
+  xhrZiyaret.onload = function() {
+    if (xhrZiyaret.status !== 200) return;
+    var veri = JSON.parse(xhrZiyaret.responseText);
+    var html = '<div class="section-title">Site Ziyaret Istatistikleri</div>';
+    html += '<div class="stats-grid">';
+    html += '<div class="stat-card"><div class="stat-label">Toplam Ziyaret</div><div class="stat-val">' + veri.toplam_ziyaret + '</div></div>';
+    html += '<div class="stat-card"><div class="stat-label">Farkli Kullanici</div><div class="stat-val blue">' + veri.farkli_kullanici_sayisi + '</div></div>';
+    html += '</div>';
+    if (veri.kullanici_bazli && veri.kullanici_bazli.length > 0) {
+      html += '<div class="section-title">Kullanici Bazinda Ziyaret</div>';
+      for (var i = 0; i < veri.kullanici_bazli.length; i++) {
+        var k = veri.kullanici_bazli[i];
+        html += '<div class="signal-card" style="margin-bottom:6px">';
+        html += '<div class="sig-header"><div class="sig-symbol">' + k.kullanici_adi + '</div>';
+        html += '<span class="badge bot">' + k.ziyaret_sayisi + ' ziyaret</span></div></div>';
+      }
     }
-    veriyi_kaydet()
-    telegram_bildir(
-        f"🆕 *Sayın {telegram} kullanıcısı, üyelik başvurusu yaptı.*\n\n"
-        f"Kullanici Adi: `{kadi}`\n"
-        f"Telegram: {telegram}\n"
-        f"Email: {email or '-'}\n\n"
-        f"Deneme suresini baslatmak veya dogrudan onaylamak icin Yonetici panelini kullanabilirsiniz.",
-        TOPIC_YENI_UYE
-    )
-    return jsonify({"durum": "ok"})
+    document.getElementById("yonetici-ziyaret-icerik").innerHTML = html;
+  };
+  xhrZiyaret.send();
 
-def kalan_gun_hesapla(u):
-    """Aktif deneme veya odenmis uyelik icin kalan gun sayisini dondurur, yoksa None."""
-    try:
-        if u.get("durum") == "deneme" and u.get("deneme_baslangic"):
-            baslangic = datetime.strptime(u["deneme_baslangic"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=TR_TZ)
-            return max(0, DENEME_GUN_SAYISI - (datetime.now(TR_TZ) - baslangic).days)
-        if u.get("durum") == "onayli" and u.get("onay_tarihi"):
-            onay = datetime.strptime(u["onay_tarihi"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=TR_TZ)
-            return max(0, UYELIK_GUN_SAYISI - (datetime.now(TR_TZ) - onay).days)
-    except Exception:
-        pass
-    return None
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/admin/kullanicilar", true);
+  xhr.setRequestHeader("X-Auth-Token", authToken);
+  xhr.onload = function() {
+    if (xhr.status !== 200) {
+      document.getElementById("yonetici-icerik").innerHTML = '<div class="empty">Yetkisiz erisim</div>';
+      return;
+    }
+    var liste = JSON.parse(xhr.responseText);
+    var html = "";
+    if (liste.length === 0) {
+      html = '<div class="empty">Henuz kayitli kullanici yok</div>';
+    }
+    for (var i = 0; i < liste.length; i++) {
+      var u = liste[i];
+      var durumRozet = u.durum === "bekliyor" ? '<span class="badge seviye-buyuk">Onay Bekliyor</span>'
+                      : u.durum === "deneme" ? '<span class="badge aktif">Deneme (Aktif)</span>'
+                      : u.durum === "deneme_bitti" ? '<span class="badge seviye-buyuk">Deneme Bitti</span>'
+                      : u.durum === "onayli" ? '<span class="badge long">Onayli</span>'
+                      : '<span class="badge short">Suresi Doldu</span>';
+      html += '<div class="signal-card" style="margin-bottom:8px">';
+      html += '<div class="sig-header"><div class="sig-symbol">' + u.kullanici_adi + '</div>' + durumRozet + '</div>';
+      html += '<div class="sig-row"><span class="sig-key">Telegram</span><span class="sig-val">' + (u.telegram || "-") + '</span></div>';
+      html += '<div class="sig-row"><span class="sig-key">Email</span><span class="sig-val">' + (u.email || "-") + '</span></div>';
+      if (u.durum === "deneme" && u.kalan_gun !== null && u.kalan_gun !== undefined) {
+        html += '<div class="sig-row"><span class="sig-key">Kalan Deneme</span><span class="sig-val">' + u.kalan_gun + ' gün</span></div>';
+      } else if (u.durum === "onayli" && u.kalan_gun !== null && u.kalan_gun !== undefined) {
+        html += '<div class="sig-row"><span class="sig-key">Kalan Süre</span><span class="sig-val">' + u.kalan_gun + ' gün</span></div>';
+      }
+      html += '<div class="sig-time">Kayit: ' + (u.olusturma_tarihi || "-") + '</div>';
+      if (u.onay_tarihi) html += '<div class="sig-time">Onay: ' + u.onay_tarihi + '</div>';
+      if (u.durum === "bekliyor") {
+        html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciDenemeBaslat(\'' + u.kullanici_adi + '\')">Deneme Baslat (3 Gun)</button></div>';
+      }
+      if (u.durum !== "onayli") {
+        var butonYazisi = u.durum === "suresi_dolmus" ? "Yenile (30 Gun)" : "Direkt Onayla (30 Gun)";
+        html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciOnayla(\'' + u.kullanici_adi + '\')">' + butonYazisi + '</button></div>';
+      }
+      html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciSifreSifirla(\'' + u.kullanici_adi + '\')">Sifre Sifirla (Kaydi Sil)</button></div>';
+      html += '</div>';
+    }
+    document.getElementById("yonetici-icerik").innerHTML = html;
+  };
+  xhr.send();
+}
 
-GIRIS_MAX_DENEME = 5
-GIRIS_KILIT_DAKIKA = 15
+function kullaniciOnayla(kadi) {
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/admin/onayla", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken);
+  xhr.onload = function() { yoneticiPaneliGoster(); };
+  xhr.send(JSON.stringify({ kullanici_adi: kadi }));
+}
 
-basarisiz_giris = {}  # {"kadi": {"sayac": N, "kilit_bitis": "YYYY-MM-DD HH:MM:SS" or None}}
+function kullaniciDenemeBaslat(kadi) {
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/admin/deneme_baslat", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken);
+  xhr.onload = function() { yoneticiPaneliGoster(); };
+  xhr.send(JSON.stringify({ kullanici_adi: kadi }));
+}
 
-def giris_kilitli_mi(kadi):
-    kayit = basarisiz_giris.get(kadi)
-    if not kayit or not kayit.get("kilit_bitis"):
-        return False
-    try:
-        kilit_bitis = datetime.strptime(kayit["kilit_bitis"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=TR_TZ)
-    except Exception:
-        return False
-    return datetime.now(TR_TZ) < kilit_bitis
+function kullaniciSifreSifirla(kadi) {
+  var onay = confirm(
+    kadi + " icin sifre sifirlanacak.\n\n" +
+    "Bu islem kullanicinin KAYDINI SILER. Kullanici ayni Telegram kullanici adiyla " +
+    "yeniden kayit olup siz tekrar onayladiginizda, varsa kalan uyelik gunleri " +
+    "otomatik olarak korunur (sifirdan 30 gun baslamaz).\n\n" +
+    "Devam etmek istiyor musunuz?"
+  );
+  if (!onay) return;
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/admin/sifre_sifirla", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken);
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      var yanit = JSON.parse(xhr.responseText);
+      var mesaj = "Kayit silindi.";
+      if (yanit.kalan_gun_saklandi > 0) {
+        mesaj += " " + yanit.kalan_gun_saklandi + " gunluk uyelik suresi, yeniden kayit oldugunda otomatik uygulanmak uzere saklandi.";
+      }
+      alert(mesaj);
+      yoneticiPaneliGoster();
+    } else {
+      var yanit2;
+      try { yanit2 = JSON.parse(xhr.responseText); } catch (e) { yanit2 = {}; }
+      alert("Hata: " + (yanit2.hata || "Islem basarisiz"));
+    }
+  };
+  xhr.send(JSON.stringify({ kullanici_adi: kadi }));
+}
 
-@app.route("/giris", methods=["POST"])
-def giris_yap():
-    data = request.json or {}
-    kadi = (data.get("kullanici_adi") or "").strip()
-    sifre = data.get("sifre") or ""
+function sayfaBaslat() {
+  var kayitliToken = localStorage.getItem("ts_token");
+  if (!kayitliToken) {
+    document.getElementById("yukleniyor-ekrani").style.display = "none";
+    document.getElementById("auth-ekrani").style.display = "flex";
+    if (localStorage.getItem("ts_admin_cihazi") !== "1") ziyaretKaydet("misafir");
+    return;
+  }
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/hesap/durum", true);
+  xhr.setRequestHeader("X-Auth-Token", kayitliToken);
+  xhr.onload = function() {
+    document.getElementById("yukleniyor-ekrani").style.display = "none";
+    if (xhr.status === 200) {
+      var yanit = JSON.parse(xhr.responseText);
+      authToken = kayitliToken;
+      hesapDurumu = yanit.hesap_durumu;
+      hesapKalanGun = yanit.kalan_gun;
+      girisliKullanici = yanit.kullanici_adi;
+      girisBasarili();
+    } else {
+      localStorage.removeItem("ts_token");
+      document.getElementById("auth-ekrani").style.display = "flex";
+      if (localStorage.getItem("ts_admin_cihazi") !== "1") ziyaretKaydet("misafir");
+    }
+  };
+  xhr.onerror = function() {
+    document.getElementById("yukleniyor-ekrani").style.display = "none";
+    document.getElementById("auth-ekrani").style.display = "flex";
+    if (localStorage.getItem("ts_admin_cihazi") !== "1") ziyaretKaydet("misafir");
+  };
+  xhr.send();
+}
 
-    if giris_kilitli_mi(kadi):
-        return jsonify({"hata": f"Cok fazla basarisiz deneme. {GIRIS_KILIT_DAKIKA} dakika sonra tekrar deneyin."}), 429
-
-    u = kullanicilar.get(kadi)
-    if not u or not check_password_hash(u["sifre_hash"], sifre):
-        kayit = basarisiz_giris.setdefault(kadi, {"sayac": 0, "kilit_bitis": None})
-        kayit["sayac"] += 1
-        if kayit["sayac"] >= GIRIS_MAX_DENEME:
-            kilit_bitis = datetime.now(TR_TZ) + timedelta(minutes=GIRIS_KILIT_DAKIKA)
-            kayit["kilit_bitis"] = kilit_bitis.strftime("%Y-%m-%d %H:%M:%S")
-            kayit["sayac"] = 0
-        return jsonify({"hata": "Kullanici adi veya sifre hatali"}), 401
-
-    basarisiz_giris.pop(kadi, None)  # basarili giris denemeleri sifirlar
-    kullanici_durumu_guncelle(kadi)
-
-    # Kullanici basina en fazla MAX_CIHAZ eszamanli oturum (admin haric).
-    # Sinir doluysa, bir cihazdan cikis yapilmadan yeni giris REDDEDILIR
-    # (eski oturum otomatik dusurulmez).
-    if u["durum"] != "admin":
-        aktif_tokenlar = u.setdefault("aktif_tokenlar", [])
-        if len(aktif_tokenlar) >= MAX_CIHAZ:
-            return jsonify({
-                "hata": f"En fazla {MAX_CIHAZ} cihazda ayni anda oturum acabilirsiniz. "
-                        f"Once baska bir cihazdan cikis yapin."
-            }), 403
-
-    token = secrets.token_hex(32)
-    if u["durum"] != "admin":
-        u["aktif_tokenlar"].append(token)
-
-    token_kullanici[token] = kadi
-    veriyi_kaydet()
-    return jsonify({
-        "durum": "ok", "token": token,
-        "hesap_durumu": u["durum"], "kullanici_adi": kadi,
-        "kalan_gun": kalan_gun_hesapla(u)
-    })
-
-@app.route("/cikis", methods=["POST"])
-def cikis_yap():
-    """Gercek oturum kapatma - token'i gecersiz kilar ve o cihazin
-    'aktif_tokenlar' listesindeki yerini bosaltir, boylece MAX_CIHAZ
-    sinirina takilan baska bir cihaz artik giris yapabilir."""
-    token = request.headers.get("X-Auth-Token", "")
-    kadi = token_kullanici.get(token)
-    if kadi:
-        token_kullanici.pop(token, None)
-        u = kullanicilar.get(kadi)
-        if u and token in u.get("aktif_tokenlar", []):
-            u["aktif_tokenlar"].remove(token)
-        veriyi_kaydet()
-    return jsonify({"durum": "ok"})
-
-@app.route("/hesap/durum")
-def hesap_durumu():
-    token = request.headers.get("X-Auth-Token", "")
-    kadi = auth_kullanici(token)
-    if not kadi:
-        return jsonify({"hata": "Gecersiz oturum"}), 401
-    kullanici_durumu_guncelle(kadi)
-    u = kullanicilar[kadi]
-    return jsonify({
-        "durum": "ok", "hesap_durumu": u["durum"], "kullanici_adi": kadi,
-        "kalan_gun": kalan_gun_hesapla(u)
-    })
-
-@app.route("/push/public-key")
-def push_public_key():
-    """Frontend'in abonelik olustururken kullanacagi genel VAPID anahtari."""
-    return jsonify({"publicKey": VAPID_PUBLIC_KEY})
-
-@app.route("/push/abone-ol", methods=["POST"])
-def push_abone_ol():
-    """Tarayicidan gelen push abonelik bilgisini kullaniciya kaydeder.
-    Ayni endpoint tekrar gelirse (ornegin yeniden yuklendiginde) eskisinin
-    yerine gecer, tekrar tekrar eklenmez."""
-    token = request.headers.get("X-Auth-Token", "")
-    kadi = auth_kullanici(token)
-    if not kadi:
-        return jsonify({"hata": "Gecersiz oturum"}), 401
-    data = request.json or {}
-    abonelik = data.get("subscription")
-    if not abonelik or not abonelik.get("endpoint"):
-        return jsonify({"hata": "Gecersiz abonelik verisi"}), 400
-    u = kullanicilar[kadi]
-    mevcut = [a for a in u.get("push_abonelikleri", []) if a.get("endpoint") != abonelik.get("endpoint")]
-    mevcut.append(abonelik)
-    u["push_abonelikleri"] = mevcut
-    veriyi_kaydet()
-    return jsonify({"durum": "ok"})
-
-@app.route("/sessiz-odalar", methods=["GET"])
-def sessiz_odalar_getir():
-    token = request.headers.get("X-Auth-Token", "")
-    kadi = auth_kullanici(token)
-    if not kadi:
-        return jsonify({"hata": "Gecersiz oturum"}), 401
-    u = kullanicilar[kadi]
-    return jsonify({"sessiz_odalar": u.get("sessiz_odalar", [])})
-
-@app.route("/sessiz-odalar", methods=["POST"])
-def sessiz_odalar_guncelle():
-    """Bir odayi sessize alir/acar. Bu tercih kullaniciya (hesaba) bagli
-    kaydedilir, hangi cihazdan girerse girsin ayni kalir."""
-    token = request.headers.get("X-Auth-Token", "")
-    kadi = auth_kullanici(token)
-    if not kadi:
-        return jsonify({"hata": "Gecersiz oturum"}), 401
-    data = request.json or {}
-    oda = data.get("oda")
-    sessiz = bool(data.get("sessiz"))
-    if oda not in botlar:
-        return jsonify({"hata": "Gecersiz oda"}), 400
-    u = kullanicilar[kadi]
-    liste = u.get("sessiz_odalar", [])
-    if sessiz and oda not in liste:
-        liste.append(oda)
-    elif not sessiz and oda in liste:
-        liste.remove(oda)
-    u["sessiz_odalar"] = liste
-    veriyi_kaydet()
-    return jsonify({"durum": "ok", "sessiz_odalar": liste})
-
-def sinyal_bul(bot, sembol, zaman):
-    """Belirli bir bot+sembol+zaman ucluesune ait tekil sinyal kaydini bulur."""
-    for s in botlar.get(bot, {}).get("sinyaller", []):
-        if s.get("sembol") == sembol and s.get("zaman") == zaman:
-            return s
-    return None
-
-@app.route("/takip-et", methods=["POST"])
-def takip_et():
-    """Kullanicinin sanal portfoy icin bir veriyi (bot+sembol+zaman ile
-    tekil olarak) takip listesine ekler/cikarir."""
-    token = request.headers.get("X-Auth-Token", "")
-    kadi = auth_kullanici(token)
-    if not kadi:
-        return jsonify({"hata": "Gecersiz oturum"}), 401
-    data = request.json or {}
-    bot = data.get("bot")
-    sembol = data.get("sembol")
-    zaman = data.get("zaman")
-    takip_ac = bool(data.get("takip", True))
-    if not bot or not sembol or not zaman:
-        return jsonify({"hata": "bot, sembol ve zaman gerekli"}), 400
-
-    u = kullanicilar[kadi]
-    liste = u.get("takip_listesi", [])
-    kayit = {"bot": bot, "sembol": sembol, "zaman": zaman}
-    zaten_var = any(k["bot"] == bot and k["sembol"] == sembol and k["zaman"] == zaman for k in liste)
-
-    if takip_ac and not zaten_var:
-        liste.append(kayit)
-    elif not takip_ac and zaten_var:
-        liste = [k for k in liste if not (k["bot"] == bot and k["sembol"] == sembol and k["zaman"] == zaman)]
-
-    u["takip_listesi"] = liste
-    veriyi_kaydet()
-    return jsonify({"durum": "ok", "takip_listesi": liste})
-
-@app.route("/portfoyum")
-def portfoyum_getir():
-    """Kullanicinin takip listesindeki her veri icin, sonuclanmissa
-    (TP/Stop) gercek fiyat hareketinden sabit bir kaldirac varsayimiyla
-    sanal getiri yuzdesini hesaplar. Henuz sonuclanmamis (aktif) olanlar
-    icin yuzde hesaplanmaz, sadece 'takipte' olarak listelenir."""
-    token = request.headers.get("X-Auth-Token", "")
-    kadi = auth_kullanici(token)
-    if not kadi:
-        return jsonify({"hata": "Gecersiz oturum"}), 401
-    u = kullanicilar[kadi]
-    liste = u.get("takip_listesi", [])
-
-    sonuclar = []
-    toplam_getiri = 0.0
-    tp_sayisi = stop_sayisi = aktif_sayisi = 0
-
-    for kayit in liste:
-        s = sinyal_bul(kayit["bot"], kayit["sembol"], kayit["zaman"])
-        if not s:
-            continue
-        durum = s.get("durum")
-        giris = s.get("giris") or s.get("maliyet")
-        yon = s.get("yon")
-        satir = {
-            "bot": kayit["bot"], "sembol": kayit["sembol"], "yon": yon,
-            "zaman": kayit["zaman"], "durum": durum, "getiri_yuzde": None
-        }
-        if durum == "aktif" or not giris:
-            aktif_sayisi += 1
-        else:
-            cikis_fiyat = s.get("hedef") if durum == "tp" else s.get("stop")
-            if cikis_fiyat:
-                try:
-                    giris_f = float(giris)
-                    cikis_f = float(cikis_fiyat)
-                    fiyat_degisim = ((cikis_f - giris_f) / giris_f) if yon == "LONG" else ((giris_f - cikis_f) / giris_f)
-                    getiri = round(fiyat_degisim * 100 * PORTFOY_KALDIRAC, 2)
-                    satir["getiri_yuzde"] = getiri
-                    toplam_getiri += getiri
-                except Exception:
-                    pass
-            if durum == "tp":
-                tp_sayisi += 1
-            elif durum == "stop":
-                stop_sayisi += 1
-        sonuclar.append(satir)
-
-    return jsonify({
-        "kayitlar": sonuclar,
-        "ozet": {
-            "toplam": len(sonuclar), "tp": tp_sayisi, "stop": stop_sayisi,
-            "aktif": aktif_sayisi, "toplam_getiri_yuzde": round(toplam_getiri, 2),
-            "kaldirac": PORTFOY_KALDIRAC
-        }
-    })
-
-@app.route("/alarm/ekle", methods=["POST"])
-def alarm_ekle():
-    global fiyat_alarm_id_sayaci
-    token = request.headers.get("X-Auth-Token", "")
-    kadi = auth_kullanici(token)
-    if not kadi:
-        return jsonify({"hata": "Gecersiz oturum"}), 401
-    data = request.json or {}
-    sembol = (data.get("sembol") or "").strip().upper()
-    yon = data.get("yon")
-    try:
-        hedef_fiyat = float(data.get("hedef_fiyat"))
-    except (TypeError, ValueError):
-        return jsonify({"hata": "Gecerli bir hedef fiyat girin"}), 400
-    if not sembol or yon not in ("ustunde", "altinda"):
-        return jsonify({"hata": "sembol ve yon (ustunde/altinda) gerekli"}), 400
-
-    fiyat_alarm_id_sayaci += 1
-    u = kullanicilar[kadi]
-    liste = u.setdefault("fiyat_alarmlari", [])
-    if len(liste) >= 20:
-        return jsonify({"hata": "En fazla 20 aktif alarm kurabilirsiniz"}), 400
-    liste.append({
-        "id": fiyat_alarm_id_sayaci, "sembol": sembol, "hedef_fiyat": hedef_fiyat,
-        "yon": yon, "olusturma_zamani": tr_zaman()
-    })
-    veriyi_kaydet()
-    return jsonify({"durum": "ok", "fiyat_alarmlari": liste})
-
-@app.route("/alarm/listele")
-def alarm_listele():
-    token = request.headers.get("X-Auth-Token", "")
-    kadi = auth_kullanici(token)
-    if not kadi:
-        return jsonify({"hata": "Gecersiz oturum"}), 401
-    return jsonify(kullanicilar[kadi].get("fiyat_alarmlari", []))
-
-@app.route("/alarm/sil", methods=["POST"])
-def alarm_sil():
-    token = request.headers.get("X-Auth-Token", "")
-    kadi = auth_kullanici(token)
-    if not kadi:
-        return jsonify({"hata": "Gecersiz oturum"}), 401
-    data = request.json or {}
-    alarm_id = data.get("id")
-    u = kullanicilar[kadi]
-    u["fiyat_alarmlari"] = [a for a in u.get("fiyat_alarmlari", []) if a.get("id") != alarm_id]
-    veriyi_kaydet()
-    return jsonify({"durum": "ok", "fiyat_alarmlari": u["fiyat_alarmlari"]})
-
-@app.route("/favoriler", methods=["POST"])
-def favori_guncelle():
-    """Bir coini favorilere ekler/cikarir. Push bildirimlerinde 'favori
-    bildirim' acikken bu listeye bakilir."""
-    token = request.headers.get("X-Auth-Token", "")
-    kadi = auth_kullanici(token)
-    if not kadi:
-        return jsonify({"hata": "Gecersiz oturum"}), 401
-    data = request.json or {}
-    sembol = data.get("sembol")
-    favori = bool(data.get("favori"))
-    if not sembol:
-        return jsonify({"hata": "Sembol gerekli"}), 400
-    u = kullanicilar[kadi]
-    liste = u.get("favori_coinler", [])
-    if favori and sembol not in liste:
-        liste.append(sembol)
-    elif not favori and sembol in liste:
-        liste.remove(sembol)
-    u["favori_coinler"] = liste
-    veriyi_kaydet()
-    return jsonify({"durum": "ok", "favori_coinler": liste})
-
-@app.route("/favori-bildirim", methods=["GET"])
-def favori_bildirim_getir():
-    token = request.headers.get("X-Auth-Token", "")
-    kadi = auth_kullanici(token)
-    if not kadi:
-        return jsonify({"hata": "Gecersiz oturum"}), 401
-    u = kullanicilar[kadi]
-    return jsonify({"favori_bildirim": bool(u.get("favori_bildirim")), "favori_coinler": u.get("favori_coinler", [])})
-
-@app.route("/favori-bildirim", methods=["POST"])
-def favori_bildirim_guncelle():
-    """Favori odasi zilini acar/kapatir. Acikken, sessize alinmis odalardaki
-    favori coinler icin bile bildirim gelmeye devam eder."""
-    token = request.headers.get("X-Auth-Token", "")
-    kadi = auth_kullanici(token)
-    if not kadi:
-        return jsonify({"hata": "Gecersiz oturum"}), 401
-    data = request.json or {}
-    acik = bool(data.get("acik"))
-    u = kullanicilar[kadi]
-    u["favori_bildirim"] = acik
-    veriyi_kaydet()
-    return jsonify({"durum": "ok", "favori_bildirim": acik})
-
-@app.route("/ziyaret/kaydet", methods=["POST"])
-def ziyaret_kaydet():
-    """PWA her acildiginda cagirir. Kimlik bilinmiyorsa 'misafir' olarak sayilir."""
-    global toplam_ziyaret_sayisi
-    data = request.json or {}
-    kadi = data.get("kullanici_adi") or "misafir"
-    toplam_ziyaret_sayisi += 1
-    kullanici_ziyaret_sayaci[kadi] = kullanici_ziyaret_sayaci.get(kadi, 0) + 1
-    veriyi_kaydet()
-    return jsonify({"durum": "ok"})
-
-@app.route("/admin/ziyaretler")
-def admin_ziyaretler_getir():
-    token = request.headers.get("X-Auth-Token", "")
-    if not admin_mi(token):
-        return jsonify({"hata": "Yetkisiz"}), 401
-    kullanici_bazli = sorted(
-        [{"kullanici_adi": k, "ziyaret_sayisi": v} for k, v in kullanici_ziyaret_sayaci.items()],
-        key=lambda x: x["ziyaret_sayisi"], reverse=True
-    )
-    return jsonify({
-        "toplam_ziyaret": toplam_ziyaret_sayisi,
-        "farkli_kullanici_sayisi": len(kullanici_ziyaret_sayaci),
-        "kullanici_bazli": kullanici_bazli
-    })
-
-@app.route("/admin/kullanicilar")
-def admin_kullanicilari_getir():
-    token = request.headers.get("X-Auth-Token", "")
-    if not admin_mi(token):
-        return jsonify({"hata": "Yetkisiz"}), 401
-    # Once tum onaylilarin suresini kontrol edip guncelleyelim (guncel liste icin)
-    for kadi, u in kullanicilar.items():
-        if u.get("durum") in ("onayli", "deneme"):
-            kullanici_durumu_guncelle(kadi)
-    liste = []
-    for kadi, u in kullanicilar.items():
-        if u.get("durum") == "admin":
-            continue
-        liste.append({
-            "kullanici_adi": kadi,
-            "telegram": u.get("telegram", "-"),
-            "email": u.get("email", "-"),
-            "durum": u.get("durum"),
-            "olusturma_tarihi": u.get("olusturma_tarihi"),
-            "onay_tarihi": u.get("onay_tarihi"),
-            "kalan_gun": kalan_gun_hesapla(u)
-        })
-    # Bekleyenler en üstte
-    liste.sort(key=lambda x: (x["durum"] != "bekliyor", x["olusturma_tarihi"]), reverse=False)
-    return jsonify(liste)
-
-@app.route("/admin/onayla", methods=["POST"])
-def admin_onayla():
-    token = request.headers.get("X-Auth-Token", "")
-    if not admin_mi(token):
-        return jsonify({"hata": "Yetkisiz"}), 401
-    data = request.json or {}
-    kadi = data.get("kullanici_adi")
-    if kadi not in kullanicilar:
-        return jsonify({"hata": "Kullanici bulunamadi"}), 404
-
-    u = kullanicilar[kadi]
-    u["durum"] = "onayli"
-    u["bildirim_gonderildi"] = False
-
-    kredi_anahtari = telegram_normalize(u.get("telegram"))
-    kalan_gun = bekleyen_gun_kredisi.pop(kredi_anahtari, None) if kredi_anahtari else None
-
-    if kalan_gun is not None and kalan_gun > 0:
-        # onay_tarihini geriye tarihlendirerek, yeni 30 gun yerine sadece
-        # kalan_gun kadar surenin devam etmesini sagliyoruz
-        gecmis_gun = UYELIK_GUN_SAYISI - kalan_gun
-        onay_tarihi = datetime.now(TR_TZ) - timedelta(days=gecmis_gun)
-        u["onay_tarihi"] = onay_tarihi.strftime("%Y-%m-%d %H:%M:%S")
-        u["kalan_gun_devredildi"] = kalan_gun
-    else:
-        u["onay_tarihi"] = tr_zaman()
-
-    veriyi_kaydet()
-    return jsonify({"durum": "ok", "devredilen_gun": kalan_gun or 0})
-
-@app.route("/admin/deneme_baslat", methods=["POST"])
-def admin_deneme_baslat():
-    token = request.headers.get("X-Auth-Token", "")
-    if not admin_mi(token):
-        return jsonify({"hata": "Yetkisiz"}), 401
-    data = request.json or {}
-    kadi = data.get("kullanici_adi")
-    if kadi not in kullanicilar:
-        return jsonify({"hata": "Kullanici bulunamadi"}), 404
-    u = kullanicilar[kadi]
-    u["durum"] = "deneme"
-    u["deneme_baslangic"] = tr_zaman()
-    u["bildirim_gonderildi"] = False
-    veriyi_kaydet()
-    return jsonify({"durum": "ok"})
-
-@app.route("/sifre_degistir", methods=["POST"])
-def sifre_degistir():
-    token = request.headers.get("X-Auth-Token", "")
-    kadi = auth_kullanici(token)
-    if not kadi:
-        return jsonify({"hata": "Gecersiz oturum"}), 401
-    data = request.json or {}
-    eski_sifre = data.get("eski_sifre") or ""
-    yeni_sifre = data.get("yeni_sifre") or ""
-    u = kullanicilar[kadi]
-    if not check_password_hash(u["sifre_hash"], eski_sifre):
-        return jsonify({"hata": "Mevcut sifre hatali"}), 401
-    if len(yeni_sifre) < 6:
-        return jsonify({"hata": "Yeni sifre en az 6 karakter olmalidir"}), 400
-    u["sifre_hash"] = generate_password_hash(yeni_sifre)
-    veriyi_kaydet()
-    return jsonify({"durum": "ok"})
-
-def telegram_normalize(t):
-    return (t or "").strip().lstrip("@").lower()
-
-@app.route("/admin/sifre_sifirla", methods=["POST"])
-def admin_sifre_sifirla():
-    token = request.headers.get("X-Auth-Token", "")
-    if not admin_mi(token):
-        return jsonify({"hata": "Yetkisiz"}), 401
-    data = request.json or {}
-    kadi = data.get("kullanici_adi")
-    if kadi not in kullanicilar:
-        return jsonify({"hata": "Kullanici bulunamadi"}), 404
-
-    u = kullanicilar[kadi]
-    kalan_gun = 0
-    if u.get("durum") == "onayli" and u.get("onay_tarihi"):
-        try:
-            onay = datetime.strptime(u["onay_tarihi"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=TR_TZ)
-            gecen_gun = (datetime.now(TR_TZ) - onay).days
-            kalan_gun = max(0, UYELIK_GUN_SAYISI - gecen_gun)
-        except Exception:
-            kalan_gun = 0
-
-    if kalan_gun > 0 and u.get("telegram"):
-        bekleyen_gun_kredisi[telegram_normalize(u["telegram"])] = kalan_gun
-
-    # Bu kullaniciya ait tum oturum token'larini gecersiz kil
-    for t in [tk for tk, kk in token_kullanici.items() if kk == kadi]:
-        del token_kullanici[t]
-
-    del kullanicilar[kadi]
-    veriyi_kaydet()
-    return jsonify({"durum": "ok", "kalan_gun_saklandi": kalan_gun})
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+favoriYukle();
+sayfaBaslat();
+</script>
+</body>
+</html>
