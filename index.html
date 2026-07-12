@@ -210,6 +210,7 @@
     <div style="text-align:center;font-size:11px;color:#94a3b8;background:#0c1a3d;padding:8px 12px;border-radius:8px;margin-bottom:10px">
       ⚠️ Burada paylaşılan veriler yatırım tavsiyesi değildir, bilgilendirme amaçlıdır.
     </div>
+    <div id="gunun-ozeti-alani" style="margin-bottom:10px"></div>
     <div id="genel-basari-ozet" style="margin-bottom:10px"></div>
     <div class="bot-filter">
       <button class="bot-btn active" onclick="botFiltre('hepsi',this)">Tumu</button>
@@ -469,6 +470,7 @@ function favoriFiltreToggle() {
 }
 var aktifHaberKategori = "hepsi";
 var aktifSekme = "sinyaller";
+var sonGununOzeti = { metin: "", zaman: null };
 
 var BOT_ADLARI = {
   "SINYAL_ODA_1": "Oda 1",
@@ -559,10 +561,47 @@ function veriYukle() {
     }
   };
   xhr6.send();
+
+  var xhr7 = new XMLHttpRequest();
+  xhr7.open("GET", API + "/gunun-ozeti", true);
+  xhr7.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr7.onload = function() {
+    if (xhr7.status === 200) {
+      var yanit7 = JSON.parse(xhr7.responseText);
+      sonGununOzeti.metin = yanit7.metin;
+      sonGununOzeti.zaman = yanit7.guncelleme_zamani;
+      gununOzetiGoster(sonGununOzeti.metin, sonGununOzeti.zaman);
+    }
+  };
+  xhr7.send();
+}
+
+function gununOzetiGoster(metin, zaman) {
+  var alan = document.getElementById("gunun-ozeti-alani");
+  if (!alan) return;
+  if (aktifSekme !== "sinyaller") return;
+  if (!metin) { alan.innerHTML = ""; return; }
+  var zamanYazisi = "";
+  if (zaman) {
+    var p = zaman.split(/[- :]/);
+    var zamanObj = new Date(p[0], p[1] - 1, p[2], p[3], p[4], p[5]);
+    var farkDk = Math.round((new Date() - zamanObj) / 60000);
+    if (farkDk < 1) zamanYazisi = "az once";
+    else if (farkDk < 60) zamanYazisi = farkDk + " dk once";
+    else zamanYazisi = Math.round(farkDk / 60) + " sa once";
+  }
+  alan.innerHTML = '<div class="stat-card" style="border-left:3px solid #3b82f6">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+    '<span style="font-size:12px;font-weight:600;color:#93c5fd">📊 Gunun Ozeti</span>' +
+    (zamanYazisi ? '<span style="font-size:10px;color:#64748b">' + zamanYazisi + '</span>' : '') +
+    '</div><div style="font-size:13px;line-height:1.6;color:#e2e8f0">' + metin + '</div></div>';
 }
 
 function guncelle() {
-  if (aktifSekme === "sinyaller") sinyalleriGoster();
+  if (aktifSekme === "sinyaller") {
+    sinyalleriGoster();
+    gununOzetiGoster(sonGununOzeti.metin, sonGununOzeti.zaman);
+  }
   if (aktifSekme === "performans") performansGoster();
   if (aktifSekme === "gecmis") gecmisGoster();
   if (aktifSekme === "rapor") raporGoster();
