@@ -201,13 +201,13 @@
 
 <div class="tabs" id="tabs-alani">
   <div class="tab active" onclick="sekmeAc('sinyaller',this)" data-tam-erisim="1">Veriler</div>
+  <div class="tab" onclick="sekmeAc('portfoy',this)" data-tam-erisim="1">Portfoyum</div>
   <div class="tab" onclick="sekmeAc('performans',this)" data-tam-erisim="1">Performans</div>
   <div class="tab" onclick="sekmeAc('gecmis',this)" data-tam-erisim="1">Gecmis</div>
   <div class="tab" onclick="sekmeAc('rapor',this)" data-tam-erisim="1">Gunluk Rapor</div>
   <div class="tab" onclick="sekmeAc('piyasa',this)" data-tam-erisim="1">Piyasa</div>
   <div class="tab" onclick="sekmeAc('balina',this)" data-tam-erisim="1">Balina Takip</div>
   <div class="tab" onclick="sekmeAc('haberler',this)" data-tam-erisim="1">Haberler</div>
-  <div class="tab" onclick="sekmeAc('portfoy',this)" data-tam-erisim="1">Portfoyum</div>
   <div class="tab" onclick="sekmeAc('iletisim',this)">Iletisim</div>
   <div class="tab" onclick="sekmeAc('yonetici',this)" id="yonetici-tab" style="display:none">Yonetici</div>
 </div>
@@ -365,7 +365,7 @@
   <span class="sohbet-widget-badge" id="sohbet-badge">0</span>
 </button>
 <div class="sohbet-widget-panel" id="sohbet-panel">
-  <div class="sohbet-widget-header">Sohbet</div>
+  <div class="sohbet-widget-header">Sohbet <span style="font-weight:400;color:#64748b;font-size:10px">— /analiz BTC yazarak coin analizi alabilirsiniz</span></div>
   <div id="sohbet-mesajlari" class="sohbet-widget-mesajlar"></div>
   <div class="sohbet-widget-input-alani">
     <input id="sohbet-input" type="text" placeholder="Mesajinizi yazin..." maxlength="500"
@@ -729,7 +729,10 @@ function htmlKacis(metin) {
 
 var sohbetWidgetAcik = false;
 var sohbetOkunmamisSayisi = 0;
-var sohbetSonBilinenSayisi = null;
+var sohbetSonBilinenSayisi = (function() {
+  var kayitli = localStorage.getItem("ts_sohbet_son_sayi");
+  return kayitli !== null ? parseInt(kayitli, 10) : null;
+})();
 
 function sohbetWidgetToggle() {
   sohbetWidgetAcik = !sohbetWidgetAcik;
@@ -759,27 +762,31 @@ function sohbetGoster() {
 
   var mevcutSayi = (sonSohbetMesajlari || []).length;
   if (sohbetSonBilinenSayisi === null) {
-    // Ilk yukleme: mevcut gecmisi "okunmamis" saymiyoruz, sadece baz aliyoruz
+    // Ilk yukleme (bu cihazda hic kayit yoksa): mevcut gecmisi "okunmamis" saymiyoruz, sadece baz aliyoruz
     sohbetSonBilinenSayisi = mevcutSayi;
+    localStorage.setItem("ts_sohbet_son_sayi", String(mevcutSayi));
   } else if (mevcutSayi > sohbetSonBilinenSayisi) {
     if (!sohbetWidgetAcik) {
       sohbetOkunmamisSayisi += (mevcutSayi - sohbetSonBilinenSayisi);
       sohbetBadgeGuncelle();
     }
     sohbetSonBilinenSayisi = mevcutSayi;
-  } else {
+    localStorage.setItem("ts_sohbet_son_sayi", String(mevcutSayi));
+  } else if (mevcutSayi < sohbetSonBilinenSayisi) {
+    // Admin mesaj sildiyse sayim geriye duser, senkronize et
     sohbetSonBilinenSayisi = mevcutSayi;
+    localStorage.setItem("ts_sohbet_son_sayi", String(mevcutSayi));
   }
 
   if (!sohbetWidgetAcik) return;
 
-  if (!sonSohbetMesajlari || sonSohbetMesajlari.length === 0) {
-    alan.innerHTML = '<div class="empty">Henuz mesaj yok, ilk mesaji sen yaz!</div>';
+  if ((!sonSohbetMesajlari || sonSohbetMesajlari.length === 0) && sohbetYerelMesajlar.length === 0) {
+    alan.innerHTML = '<div class="empty">Henuz mesaj yok, ilk mesaji sen yaz! (Ipucu: /analiz BTC yazarak coin analizi alabilirsiniz)</div>';
     return;
   }
   var html = "";
   var adminMi = hesapDurumu === "admin";
-  for (var i = 0; i < sonSohbetMesajlari.length; i++) {
+  for (var i = 0; i < (sonSohbetMesajlari || []).length; i++) {
     var m = sonSohbetMesajlari[i];
     var benMi = m.kullanici_adi === girisliKullanici;
     var silButon = adminMi ? ('<span onclick="sohbetSil(' + m.id + ')" style="cursor:pointer;color:#f87171;font-size:11px;margin-left:8px">Sil</span>') : "";
@@ -789,6 +796,20 @@ function sohbetGoster() {
       '<span style="font-size:9px;color:#64748b">' + (m.zaman ? m.zaman.slice(11, 16) : "") + silButon + '</span>' +
       '</div><div style="font-size:13px;color:#e2e8f0;word-break:break-word">' + htmlKacis(m.metin) + '</div></div>';
   }
+  // Yerel (sadece bu cihazda gorunen) coin analizi komut/yanitlari - sunucudaki
+  // paylasimli sohbete KAYDEDILMEZ, sadece kendi ekraninizda gorunur
+  for (var j = 0; j < sohbetYerelMesajlar.length; j++) {
+    var y = sohbetYerelMesajlar[j];
+    if (y.tip === "kullanici") {
+      html += '<div style="background:#0c1a3d;border-radius:10px;padding:8px 12px">' +
+        '<div style="font-size:11px;font-weight:600;color:#93c5fd;margin-bottom:2px">' + htmlKacis(girisliKullanici || "Siz") + '</div>' +
+        '<div style="font-size:13px;color:#e2e8f0;word-break:break-word">' + htmlKacis(y.metin) + '</div></div>';
+    } else {
+      html += '<div style="background:#1e1b4b;border-radius:10px;padding:8px 12px">' +
+        '<div style="font-size:11px;font-weight:600;color:#a5b4fc;margin-bottom:2px">TradeSinyalPro AI</div>' +
+        '<div style="font-size:13px;color:#e2e8f0;word-break:break-word;white-space:pre-wrap">' + htmlKacis(y.metin) + '</div></div>';
+    }
+  }
   alan.innerHTML = html;
   alan.scrollTop = alan.scrollHeight;
 }
@@ -797,6 +818,14 @@ function sohbetGonder() {
   var input = document.getElementById("sohbet-input");
   var metin = input.value.trim();
   if (!metin) return;
+
+  if (/^\/analiz\b/i.test(metin)) {
+    var sembolKismi = metin.replace(/^\/analiz\s*/i, "");
+    input.value = "";
+    coinAnaliziBaslat(sembolKismi);
+    return;
+  }
+
   var linkDeseni = /(https?:\/\/|www\.|t\.me\/|\.(com|net|org|io|me|xyz|pro|co|info|tv|app|dev|gg|to|ru|cn|link|click|shop|top|site|online)\b)/i;
   if (linkDeseni.test(metin)) {
     alert("Mesajlarda link/URL paylasimi yapilamaz.");
@@ -830,6 +859,220 @@ function sohbetSil(id) {
     if (xhr.status === 200) veriYukle();
   };
   xhr.send(JSON.stringify({ id: id }));
+}
+
+// ============================================================
+// COIN ANALIZI (/analiz komutu) - Sohbet widget'i icinden calisir
+// Mum verisi ve tum TA hesaplamalari (RSI, destek/direnc, uyumsuzluk)
+// TARAYICIDA yapilir - boylece Binance'in Railway IP engelinden
+// etkilenmez. Sadece hazir sayilarin Turkce anlatimi backend uzerinden
+// Claude'a gonderilir; Claude hicbir sayi HESAPLAMAZ, sadece anlatir.
+// ============================================================
+
+var sohbetYerelMesajlar = []; // {id, tip: "kullanici"|"bot", metin}
+var sohbetYerelIdSayaci = 0;
+
+function sohbetYerelMesajEkle(tip, metin, ozelId) {
+  var id = ozelId || ("yerel-" + (++sohbetYerelIdSayaci));
+  sohbetYerelMesajlar.push({ id: id, tip: tip, metin: metin });
+  sohbetGoster();
+  return id;
+}
+
+function sohbetYerelMesajGuncelle(id, yeniMetin) {
+  for (var i = 0; i < sohbetYerelMesajlar.length; i++) {
+    if (sohbetYerelMesajlar[i].id === id) { sohbetYerelMesajlar[i].metin = yeniMetin; break; }
+  }
+  sohbetGoster();
+}
+
+function rsiHesapla(kapanislar, periyot) {
+  periyot = periyot || 14;
+  var rsiDizisi = new Array(kapanislar.length).fill(null);
+  if (kapanislar.length < periyot + 1) return rsiDizisi;
+  var kazanclar = [], kayiplar = [];
+  for (var i = 1; i < kapanislar.length; i++) {
+    var fark = kapanislar[i] - kapanislar[i - 1];
+    kazanclar.push(fark > 0 ? fark : 0);
+    kayiplar.push(fark < 0 ? -fark : 0);
+  }
+  var ortKazanc = 0, ortKayip = 0;
+  for (var k = 0; k < periyot; k++) { ortKazanc += kazanclar[k]; ortKayip += kayiplar[k]; }
+  ortKazanc /= periyot; ortKayip /= periyot;
+  rsiDizisi[periyot] = ortKayip === 0 ? 100 : (100 - (100 / (1 + (ortKazanc / ortKayip))));
+  for (var m = periyot; m < kazanclar.length; m++) {
+    ortKazanc = (ortKazanc * (periyot - 1) + kazanclar[m]) / periyot;
+    ortKayip = (ortKayip * (periyot - 1) + kayiplar[m]) / periyot;
+    rsiDizisi[m + 1] = ortKayip === 0 ? 100 : (100 - (100 / (1 + (ortKazanc / ortKayip))));
+  }
+  return rsiDizisi;
+}
+
+function pivotYuksekleriBul(mumlar, pencere) {
+  pencere = pencere || 2;
+  var pivotlar = [];
+  for (var i = pencere; i < mumlar.length - pencere; i++) {
+    var merkez = mumlar[i].yuksek;
+    var pivotMu = true;
+    for (var j = i - pencere; j <= i + pencere; j++) {
+      if (j === i) continue;
+      if (mumlar[j].yuksek >= merkez) { pivotMu = false; break; }
+    }
+    if (pivotMu) pivotlar.push({ index: i, deger: merkez });
+  }
+  return pivotlar;
+}
+
+function pivotDusukleriBul(mumlar, pencere) {
+  pencere = pencere || 2;
+  var pivotlar = [];
+  for (var i = pencere; i < mumlar.length - pencere; i++) {
+    var merkez = mumlar[i].dusuk;
+    var pivotMu = true;
+    for (var j = i - pencere; j <= i + pencere; j++) {
+      if (j === i) continue;
+      if (mumlar[j].dusuk <= merkez) { pivotMu = false; break; }
+    }
+    if (pivotMu) pivotlar.push({ index: i, deger: merkez });
+  }
+  return pivotlar;
+}
+
+function destekDirencBul(mumlar, guncelFiyat) {
+  var yuksekPivotlar = pivotYuksekleriBul(mumlar, 2);
+  var dusukPivotlar = pivotDusukleriBul(mumlar, 2);
+  var direnc = null, destek = null;
+  for (var i = yuksekPivotlar.length - 1; i >= 0; i--) {
+    if (yuksekPivotlar[i].deger > guncelFiyat) { direnc = yuksekPivotlar[i].deger; break; }
+  }
+  for (var j = dusukPivotlar.length - 1; j >= 0; j--) {
+    if (dusukPivotlar[j].deger < guncelFiyat) { destek = dusukPivotlar[j].deger; break; }
+  }
+  if (direnc === null) direnc = Math.max.apply(null, mumlar.map(function(m) { return m.yuksek; }));
+  if (destek === null) destek = Math.min.apply(null, mumlar.map(function(m) { return m.dusuk; }));
+  return { destek: destek, direnc: direnc };
+}
+
+function uyumsuzlukBul(mumlar, rsiDizisi) {
+  var yuksekPivotlar = pivotYuksekleriBul(mumlar, 2).filter(function(p) {
+    return rsiDizisi[p.index] !== null && rsiDizisi[p.index] !== undefined;
+  });
+  var dusukPivotlar = pivotDusukleriBul(mumlar, 2).filter(function(p) {
+    return rsiDizisi[p.index] !== null && rsiDizisi[p.index] !== undefined;
+  });
+  if (yuksekPivotlar.length >= 2) {
+    var sonY = yuksekPivotlar[yuksekPivotlar.length - 1];
+    var oncekiY = yuksekPivotlar[yuksekPivotlar.length - 2];
+    if (sonY.deger > oncekiY.deger && rsiDizisi[sonY.index] < rsiDizisi[oncekiY.index]) return "negatif";
+  }
+  if (dusukPivotlar.length >= 2) {
+    var sonD = dusukPivotlar[dusukPivotlar.length - 1];
+    var oncekiD = dusukPivotlar[dusukPivotlar.length - 2];
+    if (sonD.deger < oncekiD.deger && rsiDizisi[sonD.index] > rsiDizisi[oncekiD.index]) return "pozitif";
+  }
+  return null;
+}
+
+function binanceKlineGetir(sembol, interval, limit, basarili, hata) {
+  var xhr = new XMLHttpRequest();
+  var url = "https://fapi.binance.com/fapi/v1/klines?symbol=" + encodeURIComponent(sembol) + "&interval=" + interval + "&limit=" + limit;
+  xhr.open("GET", url, true);
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      try {
+        var ham = JSON.parse(xhr.responseText);
+        if (!Array.isArray(ham) || ham.length === 0) { hata(); return; }
+        var mumlar = ham.map(function(k) {
+          return { acilis: parseFloat(k[1]), yuksek: parseFloat(k[2]), dusuk: parseFloat(k[3]), kapanis: parseFloat(k[4]) };
+        });
+        basarili(mumlar);
+      } catch (e) { hata(); }
+    } else { hata(); }
+  };
+  xhr.onerror = function() { hata(); };
+  xhr.send();
+}
+
+function coinAnaliziSembolCoz(girdi) {
+  var s = (girdi || "").trim().toUpperCase().replace("#", "").replace(/\s+/g, "");
+  if (!s) return null;
+  if (s.indexOf("USDT") === -1) s += "USDT";
+  return s;
+}
+
+function coinAnaliziHataGoster(mesajId, sembol) {
+  sohbetYerelMesajGuncelle(mesajId, "⚠️ " + sembol + " icin veri alinamadi. Sembolu kontrol edip tekrar deneyin (ornek: /analiz BTC).");
+}
+
+function coinAnaliziBaslat(sembolRaw) {
+  var sembol = coinAnaliziSembolCoz(sembolRaw);
+  if (!sembol) {
+    sohbetYerelMesajEkle("bot", "Kullanim: /analiz BTC seklinde bir coin belirtin.");
+    return;
+  }
+  sohbetYerelMesajEkle("kullanici", "/analiz " + sembolRaw.trim().toUpperCase());
+  var yukleniyorId = sohbetYerelMesajEkle("bot", "⏳ " + sembol + " icin analiz hazirlaniyor...");
+
+  var zamanDilimleri = ["15m", "1h", "4h"];
+  var sonuclar = {};
+  var tamamlanan = 0;
+  var hataOldu = false;
+
+  function tumZamanDilimleriTamam() {
+    binanceKlineGetir(sembol, "1d", 2, function(gunlukMumlar) {
+      var bugunAcilis = gunlukMumlar[gunlukMumlar.length - 1].acilis;
+      var guncelFiyat = sonuclar["15m"].guncelFiyat;
+      var gunlukDegisim = Math.round(((guncelFiyat - bugunAcilis) / bugunAcilis) * 10000) / 100;
+      coinAnaliziYorumIste(sembol, gunlukDegisim, guncelFiyat, sonuclar, yukleniyorId);
+    }, function() { coinAnaliziHataGoster(yukleniyorId, sembol); });
+  }
+
+  zamanDilimleri.forEach(function(dilim) {
+    binanceKlineGetir(sembol, dilim, 150, function(mumlar) {
+      if (hataOldu) return;
+      var kapanislar = mumlar.map(function(m) { return m.kapanis; });
+      var rsiDizisi = rsiHesapla(kapanislar, 14);
+      var guncelRsi = rsiDizisi[rsiDizisi.length - 1];
+      var guncelFiyat = kapanislar[kapanislar.length - 1];
+      var dr = destekDirencBul(mumlar, guncelFiyat);
+      var uyumsuzluk = uyumsuzlukBul(mumlar, rsiDizisi);
+      sonuclar[dilim] = {
+        rsi: (guncelRsi !== null && guncelRsi !== undefined) ? Math.round(guncelRsi * 10) / 10 : null,
+        destek: dr.destek, direnc: dr.direnc, uyumsuzluk: uyumsuzluk, guncelFiyat: guncelFiyat
+      };
+      tamamlanan++;
+      if (tamamlanan === zamanDilimleri.length) tumZamanDilimleriTamam();
+    }, function() {
+      if (!hataOldu) { hataOldu = true; coinAnaliziHataGoster(yukleniyorId, sembol); }
+    });
+  });
+}
+
+function coinAnaliziYorumIste(sembol, gunlukDegisim, guncelFiyat, zamanDilimVerileri, mesajId) {
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/coin-analiz-yorumla", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    var yanit;
+    try { yanit = JSON.parse(xhr.responseText); } catch (e) { yanit = {}; }
+    if (xhr.status === 200 && yanit.yorum) {
+      sohbetYerelMesajGuncelle(mesajId, yanit.yorum);
+    } else if (xhr.status === 429) {
+      sohbetYerelMesajGuncelle(mesajId, "⏳ " + (yanit.hata || "Gunluk analiz hakkiniz doldu."));
+    } else {
+      sohbetYerelMesajGuncelle(mesajId, "⚠️ Analiz olusturulamadi: " + (yanit.hata || "bilinmeyen hata"));
+    }
+  };
+  xhr.onerror = function() {
+    sohbetYerelMesajGuncelle(mesajId, "⚠️ Sunucuya ulasilamadi.");
+  };
+  xhr.send(JSON.stringify({
+    sembol: sembol,
+    gunluk_degisim_yuzde: gunlukDegisim,
+    guncel_fiyat: guncelFiyat,
+    zaman_dilimleri: zamanDilimVerileri
+  }));
 }
 
 function takipToggle(bot, sembol, zaman) {
