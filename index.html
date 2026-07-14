@@ -141,6 +141,12 @@
   .bildirim-banner { padding: 10px 14px; font-size: 12px; text-align: center; background: #0c1a3d; color: #93c5fd; display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
   .bildirim-banner button { background: #3b82f6; color: #fff; border: none; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
   .cikis-btn { background: none; border: none; color: #64748b; font-size: 12px; cursor: pointer; text-decoration: underline; }
+  .sohbet-widget-buton { position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px; border-radius: 50%; background: #3b82f6; border: none; box-shadow: 0 4px 14px rgba(0,0,0,0.4); cursor: pointer; z-index: 9999; font-size: 24px; display: flex; align-items: center; justify-content: center; }
+  .sohbet-widget-badge { position: absolute; top: -4px; right: -4px; background: #ef4444; color: #fff; font-size: 11px; font-weight: 700; min-width: 20px; height: 20px; border-radius: 10px; display: none; align-items: center; justify-content: center; padding: 0 4px; border: 2px solid #0a0f1e; }
+  .sohbet-widget-panel { position: fixed; bottom: 86px; right: 20px; width: 320px; max-width: calc(100vw - 32px); height: 420px; max-height: calc(100vh - 120px); background: #111827; border: 1px solid #1e293b; border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); z-index: 9999; display: none; flex-direction: column; overflow: hidden; }
+  .sohbet-widget-header { padding: 12px 14px; background: #0c1a3d; font-size: 13px; font-weight: 600; color: #93c5fd; border-bottom: 1px solid #1e293b; }
+  .sohbet-widget-mesajlar { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .sohbet-widget-input-alani { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #1e293b; background: #111827; }
 </style>
 </head>
 <body>
@@ -201,7 +207,6 @@
   <div class="tab" onclick="sekmeAc('piyasa',this)" data-tam-erisim="1">Piyasa</div>
   <div class="tab" onclick="sekmeAc('balina',this)" data-tam-erisim="1">Balina Takip</div>
   <div class="tab" onclick="sekmeAc('haberler',this)" data-tam-erisim="1">Haberler</div>
-  <div class="tab" onclick="sekmeAc('sohbet',this)" data-tam-erisim="1">Sohbet</div>
   <div class="tab" onclick="sekmeAc('portfoy',this)" data-tam-erisim="1">Portfoyum</div>
   <div class="tab" onclick="sekmeAc('iletisim',this)">Iletisim</div>
   <div class="tab" onclick="sekmeAc('yonetici',this)" id="yonetici-tab" style="display:none">Yonetici</div>
@@ -279,10 +284,7 @@
                 { "s": "CRYPTOCAP:BTC.D", "d": "BTC Dominans" },
                 { "s": "CRYPTOCAP:ETH.D", "d": "ETH Dominans" },
                 { "s": "CRYPTOCAP:USDT.D", "d": "USDT Dominans" },
-                { "s": "CRYPTOCAP:OTHERS.D", "d": "Diger Dominans" },
-                { "s": "TVC:DJI", "d": "Dow Jones" },
-                { "s": "TVC:SPX", "d": "S&P 500" },
-                { "s": "TVC:IXIC", "d": "Nasdaq" }
+                { "s": "CRYPTOCAP:OTHERS.D", "d": "Diger Dominans" }
               ],
               "originalTitle": "Kripto"
             },
@@ -323,16 +325,6 @@
     <div id="haber-listesi"><div class="loading">Yukleniyor...</div></div>
   </div>
 
-  <div id="sohbet" style="display:none">
-    <div id="sohbet-mesajlari" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
-    <div style="display:flex;gap:8px;position:sticky;bottom:0;background:#0a0f1e;padding:8px 0">
-      <input id="sohbet-input" type="text" placeholder="Mesajinizi yazin..." maxlength="500"
-        style="flex:1;background:#111827;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px"
-        onkeypress="if(event.key==='Enter')sohbetGonder()">
-      <button class="refresh-btn" onclick="sohbetGonder()">Gonder</button>
-    </div>
-  </div>
-
   <div id="portfoy" style="display:none">
     <div id="portfoy-icerik"><div class="loading">Yukleniyor...</div></div>
   </div>
@@ -365,6 +357,21 @@
     <input class="auth-input" id="sifre-eski" type="password" placeholder="Mevcut sifre">
     <input class="auth-input" id="sifre-yeni" type="password" placeholder="Yeni sifre (en az 6 karakter)">
     <button class="auth-btn" onclick="sifreDegistir()">Degistir</button>
+  </div>
+</div>
+
+<button class="sohbet-widget-buton" id="sohbet-widget-buton" onclick="sohbetWidgetToggle()">
+  &#128172;
+  <span class="sohbet-widget-badge" id="sohbet-badge">0</span>
+</button>
+<div class="sohbet-widget-panel" id="sohbet-panel">
+  <div class="sohbet-widget-header">Sohbet</div>
+  <div id="sohbet-mesajlari" class="sohbet-widget-mesajlar"></div>
+  <div class="sohbet-widget-input-alani">
+    <input id="sohbet-input" type="text" placeholder="Mesajinizi yazin..." maxlength="500"
+      style="flex:1;background:#0a0f1e;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px"
+      onkeypress="if(event.key==='Enter')sohbetGonder()">
+    <button class="refresh-btn" onclick="sohbetGonder()">Gonder</button>
   </div>
 </div>
 
@@ -607,7 +614,7 @@ function veriYukle() {
   xhr9.onload = function() {
     if (xhr9.status === 200) {
       sonSohbetMesajlari = JSON.parse(xhr9.responseText);
-      if (aktifSekme === "sohbet") sohbetGoster();
+      sohbetGoster();
     }
   };
   xhr9.send();
@@ -720,10 +727,52 @@ function htmlKacis(metin) {
   return div.innerHTML;
 }
 
+var sohbetWidgetAcik = false;
+var sohbetOkunmamisSayisi = 0;
+var sohbetSonBilinenSayisi = null;
+
+function sohbetWidgetToggle() {
+  sohbetWidgetAcik = !sohbetWidgetAcik;
+  var panel = document.getElementById("sohbet-panel");
+  if (panel) panel.style.display = sohbetWidgetAcik ? "flex" : "none";
+  if (sohbetWidgetAcik) {
+    sohbetOkunmamisSayisi = 0;
+    sohbetBadgeGuncelle();
+    sohbetGoster();
+  }
+}
+
+function sohbetBadgeGuncelle() {
+  var badge = document.getElementById("sohbet-badge");
+  if (!badge) return;
+  if (sohbetOkunmamisSayisi > 0) {
+    badge.textContent = sohbetOkunmamisSayisi > 99 ? "99+" : String(sohbetOkunmamisSayisi);
+    badge.style.display = "flex";
+  } else {
+    badge.style.display = "none";
+  }
+}
+
 function sohbetGoster() {
   var alan = document.getElementById("sohbet-mesajlari");
   if (!alan) return;
-  if (aktifSekme !== "sohbet") return;
+
+  var mevcutSayi = (sonSohbetMesajlari || []).length;
+  if (sohbetSonBilinenSayisi === null) {
+    // Ilk yukleme: mevcut gecmisi "okunmamis" saymiyoruz, sadece baz aliyoruz
+    sohbetSonBilinenSayisi = mevcutSayi;
+  } else if (mevcutSayi > sohbetSonBilinenSayisi) {
+    if (!sohbetWidgetAcik) {
+      sohbetOkunmamisSayisi += (mevcutSayi - sohbetSonBilinenSayisi);
+      sohbetBadgeGuncelle();
+    }
+    sohbetSonBilinenSayisi = mevcutSayi;
+  } else {
+    sohbetSonBilinenSayisi = mevcutSayi;
+  }
+
+  if (!sohbetWidgetAcik) return;
+
   if (!sonSohbetMesajlari || sonSohbetMesajlari.length === 0) {
     alan.innerHTML = '<div class="empty">Henuz mesaj yok, ilk mesaji sen yaz!</div>';
     return;
@@ -814,6 +863,7 @@ function portfoyGoster() {
   if (kayitlar.length === 0) {
     html += '<div class="empty">Henuz takip ettiginiz bir veri yok. Veriler sekmesinde bir karttaki 📍 ikonuna dokunarak takibe alabilirsiniz.</div>';
   } else {
+    html += '<div style="text-align:right;margin-bottom:10px"><span onclick="portfoyHepsiniSil()" style="cursor:pointer;color:#f87171;font-size:12px;background:#2d0a0a;padding:6px 12px;border-radius:8px">Hepsini Sil</span></div>';
     for (var i = kayitlar.length - 1; i >= 0; i--) {
       var k = kayitlar[i];
       var durumRozeti = k.durum === "tp" ? '<span class="badge long">TP</span>' :
@@ -825,7 +875,8 @@ function portfoyGoster() {
       html += '<div class="signal-card" style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px">' +
         '<div><div style="font-size:13px;font-weight:600">#' + k.sembol + ' <span style="font-size:10px;color:#64748b">(' + k.yon + ')</span></div>' +
         '<div style="font-size:10px;color:#64748b;margin-top:2px">' + k.zaman + '</div></div>' +
-        '<div style="text-align:right">' + durumRozeti + '<div style="margin-top:4px">' + getiriYazi + '</div></div></div>';
+        '<div style="display:flex;align-items:center;gap:10px"><div style="text-align:right">' + durumRozeti + '<div style="margin-top:4px">' + getiriYazi + '</div></div>' +
+        '<span onclick="portfoyKayitSil(\'' + k.bot + '\',\'' + k.sembol + '\',\'' + k.zaman + '\')" style="cursor:pointer;color:#f87171;font-size:15px" title="Sil">&#128465;</span></div></div>';
     }
   }
   html += '<div class="section-title" style="margin-top:20px">Fiyat Alarmlarim</div>';
@@ -843,6 +894,32 @@ function portfoyGoster() {
   alan.innerHTML = html;
 }
 
+function portfoyKayitSil(bot, sembol, zaman) {
+  var anahtar = bot + "|" + sembol + "|" + zaman;
+  takipDurumu[anahtar] = false;
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/takip-et", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() { veriYukle(); };
+  xhr.send(JSON.stringify({ bot: bot, sembol: sembol, zaman: zaman, takip: false }));
+}
+
+function portfoyHepsiniSil() {
+  if (!confirm("Portfoydeki tum takip ettiginiz verileri silmek istediginize emin misiniz?")) return;
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/portfoy/temizle", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      takipDurumu = {};
+      veriYukle();
+    }
+  };
+  xhr.send("{}");
+}
+
 function guncelle() {
   if (aktifSekme === "sinyaller") {
     sinyalleriGoster();
@@ -854,7 +931,6 @@ function guncelle() {
   if (aktifSekme === "haberler") haberleriGoster();
   if (aktifSekme === "yonetici") yoneticiPaneliGoster();
   if (aktifSekme === "piyasa") abdBorsaGoster();
-  if (aktifSekme === "sohbet") sohbetGoster();
   if (aktifSekme === "portfoy") portfoyGoster();
 }
 
@@ -944,9 +1020,8 @@ function sinyalleriGoster() {
     var takipAnahtari = bot + "|" + s.sembol + "|" + s.zaman;
     var takipliMi = !!takipDurumu[takipAnahtari];
     var takipHtml = '<span onclick="takipToggle(\'' + bot + '\',\'' + s.sembol + '\',\'' + s.zaman + '\')" style="cursor:pointer;font-size:14px;margin-left:6px" title="Sanal Portfoyde Takip Et">' + (takipliMi ? "📌" : "📍") + '</span>';
-    var alarmHtml = '<span onclick="alarmKur(\'' + s.sembol + '\')" style="cursor:pointer;font-size:14px;margin-left:6px" title="Fiyat Alarmi Kur">&#128276;</span>';
     html += '<div class="signal-card ' + cls + '">';
-    html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + yildizHtml + takipHtml + alarmHtml + '</div>';
+    html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + yildizHtml + takipHtml + '</div>';
     html += '<div class="sig-badges"><span class="badge ' + cls + '">' + yon + '</span>';
     html += '<span class="badge bot">' + botAdi(bot) + '</span></div></div>';
     html += canliFiyatHtml;
@@ -1521,7 +1596,7 @@ function altcoinTabloHtml(islemler) {
     if (uzunluk > maxSutun) maxSutun = uzunluk;
   });
 
-  var html = '<div class="section-title">Coin Bazinda Alim / Satim Hareketleri (24s Hacme Gore Sabit Sirali) - Coin Adina Tiklayarak Son 200 Islemi Gorebilirsiniz</div>';
+  var html = '<div class="section-title">Coin Bazinda Alim / Satim Hareketleri (24s Hacme Gore Sabit Sirali) - Coin Adina Tiklayarak Son 500 Islemi Gorebilirsiniz</div>';
   html += '<div class="balina-tablo-wrap"><table class="balina-tablo"><thead><tr><th class="coin-adi">Coin</th>';
   for (var c = 1; c <= maxSutun; c++) html += '<th>' + c + '</th>';
   html += '</tr></thead><tbody>';
@@ -1529,7 +1604,7 @@ function altcoinTabloHtml(islemler) {
   for (var s = 0; s < goruntulenecekler.length; s++) {
     var sembol = goruntulenecekler[s];
     var kayitlar = gruplar[sembol] || [];
-    html += '<tr><td class="coin-adi" style="cursor:pointer" onclick="altcoinDetayAc(\'' + sembol + '\')">#' + sembol + baskinlikBarHtml(kayitlar, "kucuk") + '</td>';
+    html += '<tr><td class="coin-adi" style="cursor:pointer" onclick="altcoinDetayAc(\'' + sembol + '\')">#' + sembol + baskinlikBarHtml(gruplarTam[sembol] || [], "kucuk") + '</td>';
     for (var k = 0; k < maxSutun; k++) {
       if (k < kayitlar.length) {
         var t = kayitlar[k];
@@ -1637,6 +1712,7 @@ function haberleriGoster() {
       return h.kategori && h.kategori.toLowerCase() === aktifHaberKategori;
     });
   }
+  liste = liste.slice(0, 20);
   if (liste.length === 0) {
     html = '<div class="empty">Henuz haber yok</div>';
     document.getElementById("haber-listesi").innerHTML = html;
