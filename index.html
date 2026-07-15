@@ -144,12 +144,16 @@
   .sohbet-widget-buton { position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px; border-radius: 50%; background: #3b82f6; border: none; box-shadow: 0 4px 14px rgba(0,0,0,0.4); cursor: pointer; z-index: 9999; font-size: 24px; display: flex; align-items: center; justify-content: center; }
   .sohbet-widget-badge { position: absolute; top: -4px; right: -4px; background: #ef4444; color: #fff; font-size: 11px; font-weight: 700; min-width: 20px; height: 20px; border-radius: 10px; display: none; align-items: center; justify-content: center; padding: 0 4px; border: 2px solid #0a0f1e; }
   .sohbet-widget-panel { position: fixed; bottom: 86px; right: 20px; width: 320px; max-width: calc(100vw - 32px); height: 420px; max-height: calc(100vh - 120px); background: #111827; border: 1px solid #1e293b; border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); z-index: 9999; display: none; flex-direction: column; overflow: hidden; }
-  .sohbet-widget-header { padding: 12px 14px; background: #0c1a3d; font-size: 13px; font-weight: 600; color: #93c5fd; border-bottom: 1px solid #1e293b; }
+  .sohbet-widget-header { padding: 12px 14px; background: #0c1a3d; border-bottom: 1px solid #1e293b; display: flex; gap: 16px; }
+  .sohbet-widget-tab { font-size: 13px; font-weight: 600; color: #64748b; cursor: pointer; padding-bottom: 2px; border-bottom: 2px solid transparent; }
+  .sohbet-widget-tab.active { color: #93c5fd; border-bottom-color: #3b82f6; }
   .sohbet-widget-mesajlar { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
   .sohbet-widget-input-alani { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #1e293b; background: #111827; }
+  #filigran-katmani { position: fixed; inset: 0; pointer-events: none; z-index: 100000; background-repeat: repeat; opacity: 0.10; display: none; }
 </style>
 </head>
 <body>
+<div id="filigran-katmani"></div>
 
 <div id="yukleniyor-ekrani" class="auth-screen">
   <div style="text-align:center;color:#64748b">Yukleniyor...</div>
@@ -365,13 +369,23 @@
   <span class="sohbet-widget-badge" id="sohbet-badge">0</span>
 </button>
 <div class="sohbet-widget-panel" id="sohbet-panel">
-  <div class="sohbet-widget-header">Sohbet <span style="font-weight:400;color:#64748b;font-size:10px">— /analiz BTC yazarak coin analizi alabilirsiniz</span></div>
+  <div class="sohbet-widget-header">
+    <span class="sohbet-widget-tab active" id="sohbet-tab-sohbet" onclick="sohbetPanelSekmeDegistir('sohbet')">Sohbet</span>
+    <span class="sohbet-widget-tab" id="sohbet-tab-analiz" onclick="sohbetPanelSekmeDegistir('analiz')">Coin Analiz</span>
+  </div>
   <div id="sohbet-mesajlari" class="sohbet-widget-mesajlar"></div>
-  <div class="sohbet-widget-input-alani">
+  <div id="analiz-mesajlari" class="sohbet-widget-mesajlar" style="display:none"></div>
+  <div class="sohbet-widget-input-alani" id="sohbet-input-alani">
     <input id="sohbet-input" type="text" placeholder="Mesajinizi yazin..." maxlength="500"
       style="flex:1;background:#0a0f1e;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px"
       onkeypress="if(event.key==='Enter')sohbetGonder()">
     <button class="refresh-btn" onclick="sohbetGonder()">Gonder</button>
+  </div>
+  <div class="sohbet-widget-input-alani" id="analiz-input-alani" style="display:none">
+    <input id="analiz-input" type="text" placeholder="Coin sembolu girin (orn: BTC)" maxlength="20"
+      style="flex:1;background:#0a0f1e;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px"
+      onkeypress="if(event.key==='Enter')analizGonder()">
+    <button class="refresh-btn" onclick="analizGonder()">Analiz Et</button>
   </div>
 </div>
 
@@ -383,6 +397,7 @@ var authToken = null;
 var hesapDurumu = null;
 var hesapKalanGun = null;
 var girisliKullanici = null;
+var filigranAcik = true;
 var tumVeriler = {};
 var tumHaberler = [];
 var tumRaporlar = [];
@@ -742,7 +757,20 @@ function sohbetWidgetToggle() {
     sohbetOkunmamisSayisi = 0;
     sohbetBadgeGuncelle();
     sohbetGoster();
+    coinAnaliziGoster();
   }
+}
+
+var sohbetPanelSekmesi = "sohbet";
+
+function sohbetPanelSekmeDegistir(sekme) {
+  sohbetPanelSekmesi = sekme;
+  document.getElementById("sohbet-tab-sohbet").classList.toggle("active", sekme === "sohbet");
+  document.getElementById("sohbet-tab-analiz").classList.toggle("active", sekme === "analiz");
+  document.getElementById("sohbet-mesajlari").style.display = sekme === "sohbet" ? "flex" : "none";
+  document.getElementById("analiz-mesajlari").style.display = sekme === "analiz" ? "flex" : "none";
+  document.getElementById("sohbet-input-alani").style.display = sekme === "sohbet" ? "flex" : "none";
+  document.getElementById("analiz-input-alani").style.display = sekme === "analiz" ? "flex" : "none";
 }
 
 function sohbetBadgeGuncelle() {
@@ -780,13 +808,13 @@ function sohbetGoster() {
 
   if (!sohbetWidgetAcik) return;
 
-  if ((!sonSohbetMesajlari || sonSohbetMesajlari.length === 0) && sohbetYerelMesajlar.length === 0) {
-    alan.innerHTML = '<div class="empty">Henuz mesaj yok, ilk mesaji sen yaz! (Ipucu: /analiz BTC yazarak coin analizi alabilirsiniz)</div>';
+  if (!sonSohbetMesajlari || sonSohbetMesajlari.length === 0) {
+    alan.innerHTML = '<div class="empty">Henuz mesaj yok, ilk mesaji sen yaz!</div>';
     return;
   }
   var html = "";
   var adminMi = hesapDurumu === "admin";
-  for (var i = 0; i < (sonSohbetMesajlari || []).length; i++) {
+  for (var i = 0; i < sonSohbetMesajlari.length; i++) {
     var m = sonSohbetMesajlari[i];
     var benMi = m.kullanici_adi === girisliKullanici;
     var silButon = adminMi ? ('<span onclick="sohbetSil(' + m.id + ')" style="cursor:pointer;color:#f87171;font-size:11px;margin-left:8px">Sil</span>') : "";
@@ -796,8 +824,20 @@ function sohbetGoster() {
       '<span style="font-size:9px;color:#64748b">' + (m.zaman ? m.zaman.slice(11, 16) : "") + silButon + '</span>' +
       '</div><div style="font-size:13px;color:#e2e8f0;word-break:break-word">' + htmlKacis(m.metin) + '</div></div>';
   }
-  // Yerel (sadece bu cihazda gorunen) coin analizi komut/yanitlari - sunucudaki
-  // paylasimli sohbete KAYDEDILMEZ, sadece kendi ekraninizda gorunur
+  alan.innerHTML = html;
+  alan.scrollTop = alan.scrollHeight;
+}
+
+function coinAnaliziGoster() {
+  // Coin analizi komut/yanitlari SADECE bu cihazda/kullanicida gorunur -
+  // sunucudaki paylasimli sohbete hicbir zaman kaydedilmez, baska kullanicilar goremez.
+  var alan = document.getElementById("analiz-mesajlari");
+  if (!alan) return;
+  if (sohbetYerelMesajlar.length === 0) {
+    alan.innerHTML = '<div class="empty">Henuz analiz yapmadiniz. Asagiya bir coin sembolu yazip "Analiz Et" butonuna basin (ornek: BTC).</div>';
+    return;
+  }
+  var html = "";
   for (var j = 0; j < sohbetYerelMesajlar.length; j++) {
     var y = sohbetYerelMesajlar[j];
     if (y.tip === "kullanici") {
@@ -812,6 +852,14 @@ function sohbetGoster() {
   }
   alan.innerHTML = html;
   alan.scrollTop = alan.scrollHeight;
+}
+
+function analizGonder() {
+  var input = document.getElementById("analiz-input");
+  var deger = input.value.trim();
+  if (!deger) return;
+  input.value = "";
+  coinAnaliziBaslat(deger);
 }
 
 function sohbetGonder() {
@@ -875,7 +923,7 @@ var sohbetYerelIdSayaci = 0;
 function sohbetYerelMesajEkle(tip, metin, ozelId) {
   var id = ozelId || ("yerel-" + (++sohbetYerelIdSayaci));
   sohbetYerelMesajlar.push({ id: id, tip: tip, metin: metin });
-  sohbetGoster();
+  coinAnaliziGoster();
   return id;
 }
 
@@ -883,7 +931,7 @@ function sohbetYerelMesajGuncelle(id, yeniMetin) {
   for (var i = 0; i < sohbetYerelMesajlar.length; i++) {
     if (sohbetYerelMesajlar[i].id === id) { sohbetYerelMesajlar[i].metin = yeniMetin; break; }
   }
-  sohbetGoster();
+  coinAnaliziGoster();
 }
 
 function rsiHesapla(kapanislar, periyot) {
@@ -1005,12 +1053,16 @@ function coinAnaliziHataGoster(mesajId, sembol) {
 }
 
 function coinAnaliziBaslat(sembolRaw) {
+  if (sohbetPanelSekmesi !== "analiz") {
+    var sekmeEl = document.getElementById("sohbet-tab-analiz");
+    if (sekmeEl) sohbetPanelSekmeDegistir("analiz");
+  }
   var sembol = coinAnaliziSembolCoz(sembolRaw);
   if (!sembol) {
-    sohbetYerelMesajEkle("bot", "Kullanim: /analiz BTC seklinde bir coin belirtin.");
+    sohbetYerelMesajEkle("bot", "Kullanim: BTC gibi bir coin sembolu girin.");
     return;
   }
-  sohbetYerelMesajEkle("kullanici", "/analiz " + sembolRaw.trim().toUpperCase());
+  sohbetYerelMesajEkle("kullanici", sembolRaw.trim().toUpperCase());
   var yukleniyorId = sohbetYerelMesajEkle("bot", "⏳ " + sembol + " icin analiz hazirlaniyor...");
 
   var zamanDilimleri = ["15m", "1h", "4h"];
@@ -2077,6 +2129,7 @@ function girisYap() {
       hesapDurumu = yanit.hesap_durumu;
       hesapKalanGun = yanit.kalan_gun;
       girisliKullanici = yanit.kullanici_adi;
+      filigranAcik = yanit.filigran_acik !== false;
       localStorage.setItem("ts_token", authToken);
       girisBasarili();
     } else {
@@ -2163,6 +2216,26 @@ function sifreDegistir() {
   xhr.send(JSON.stringify({ eski_sifre: eski, yeni_sifre: yeni }));
 }
 
+function filigranUygula() {
+  var kat = document.getElementById("filigran-katmani");
+  if (!kat) return;
+  if (!girisliKullanici || !filigranAcik) {
+    kat.style.display = "none";
+    return;
+  }
+  var simdi = new Date();
+  var pad = function(n) { return n < 10 ? "0" + n : String(n); };
+  var tarihSaat = pad(simdi.getDate()) + "." + pad(simdi.getMonth() + 1) + "." + simdi.getFullYear() +
+    " " + pad(simdi.getHours()) + ":" + pad(simdi.getMinutes());
+  var metin = girisliKullanici + "  •  " + tarihSaat;
+  var metinKacisli = metin.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="340" height="170">' +
+    '<text x="10" y="95" font-size="14" fill="white" font-family="Arial" transform="rotate(-25 170 85)">' +
+    metinKacisli + '</text></svg>';
+  kat.style.backgroundImage = 'url("data:image/svg+xml;utf8,' + encodeURIComponent(svg) + '")';
+  kat.style.display = "block";
+}
+
 function cikisYap() {
   if (authToken) {
     var xhrCikis = new XMLHttpRequest();
@@ -2177,6 +2250,7 @@ function cikisYap() {
   document.getElementById("app-icerik").style.display = "none";
   document.getElementById("auth-ekrani").style.display = "flex";
   formDegistir("giris");
+  filigranUygula();
 }
 
 function girisBasarili() {
@@ -2187,6 +2261,8 @@ function girisBasarili() {
   } else {
     ziyaretKaydet(girisliKullanici);
   }
+  filigranUygula();
+  setInterval(filigranUygula, 60000);
   erisimGuncelle();
   veriYukle();
   setInterval(veriYukle, 10000);
@@ -2505,6 +2581,8 @@ function yoneticiPaneliGoster() {
         html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciOnayla(\'' + u.kullanici_adi + '\')">' + butonYazisi + '</button></div>';
       }
       html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciSifreSifirla(\'' + u.kullanici_adi + '\')">Sifre Sifirla (Kaydi Sil)</button></div>';
+      var filigranButonYazisi = u.filigran_kapali ? "Filigrani Ac" : "Filigrani Kapat";
+      html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciFiligranToggle(\'' + u.kullanici_adi + '\')">' + filigranButonYazisi + '</button></div>';
       html += '</div>';
     }
     document.getElementById("yonetici-icerik").innerHTML = html;
@@ -2524,6 +2602,15 @@ function kullaniciOnayla(kadi) {
 function kullaniciDenemeBaslat(kadi) {
   var xhr = new XMLHttpRequest();
   xhr.open("POST", API + "/admin/deneme_baslat", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken);
+  xhr.onload = function() { yoneticiPaneliGoster(); };
+  xhr.send(JSON.stringify({ kullanici_adi: kadi }));
+}
+
+function kullaniciFiligranToggle(kadi) {
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/admin/filigran-toggle", true);
   xhr.setRequestHeader("Content-Type", "application/json");
   xhr.setRequestHeader("X-Auth-Token", authToken);
   xhr.onload = function() { yoneticiPaneliGoster(); };
@@ -2580,6 +2667,7 @@ function sayfaBaslat() {
       hesapDurumu = yanit.hesap_durumu;
       hesapKalanGun = yanit.kalan_gun;
       girisliKullanici = yanit.kullanici_adi;
+      filigranAcik = yanit.filigran_acik !== false;
       girisBasarili();
     } else {
       localStorage.removeItem("ts_token");
