@@ -212,6 +212,7 @@
   <div class="tab" onclick="sekmeAc('rapor',this)" data-tam-erisim="1">Gunluk Rapor</div>
   <div class="tab" onclick="sekmeAc('piyasa',this)" data-tam-erisim="1">Piyasa</div>
   <div class="tab" onclick="sekmeAc('balina',this)" data-tam-erisim="1">Balina Takip</div>
+  <div class="tab" onclick="sekmeAc('uzunkisa',this)" data-tam-erisim="1">Uzun/Kisa</div>
   <div class="tab" onclick="sekmeAc('haberler',this)" data-tam-erisim="1">Haberler</div>
   <div class="tab" onclick="sekmeAc('iletisim',this)">Iletisim</div>
   <div class="tab" onclick="sekmeAc('yonetici',this)" id="yonetici-tab" style="display:none">Yonetici</div>
@@ -317,6 +318,27 @@
       <button class="bot-btn" onclick="balinaFiltre('hisse',this)">ABD Hisseleri</button>
     </div>
     <div id="balina-icerik"><div class="loading">Yukleniyor...</div></div>
+  </div>
+
+  <div id="uzunkisa" style="display:none">
+    <div class="bot-filter" id="uzunkisa-coin-filtre">
+      <button class="bot-btn active" onclick="uzunKisaCoinSec('BTCUSDT','BTC',this)">BTC</button>
+      <button class="bot-btn" onclick="uzunKisaCoinSec('ETHUSDT','ETH',this)">ETH</button>
+      <button class="bot-btn" onclick="uzunKisaCoinSec('SOLUSDT','SOL',this)">SOL</button>
+      <button class="bot-btn" onclick="uzunKisaCoinSec('XRPUSDT','XRP',this)">XRP</button>
+      <button class="bot-btn" onclick="uzunKisaCoinSec('DOGEUSDT','DOGE',this)">DOGE</button>
+      <button class="bot-btn" onclick="uzunKisaCoinSec('BNBUSDT','BNB',this)">BNB</button>
+    </div>
+    <div style="padding:0 16px 12px">
+      <select id="uzunkisa-periyot" onchange="uzunKisaVeriGetir()"
+        style="background:#111827;border:1px solid #1e293b;color:#e2e8f0;padding:8px 12px;border-radius:8px;font-size:13px">
+        <option value="15m">15 Dakika</option>
+        <option value="1h" selected>1 Saat</option>
+        <option value="4h">4 Saat</option>
+        <option value="1d">1 Gun</option>
+      </select>
+    </div>
+    <div id="uzunkisa-icerik"><div class="loading">Yukleniyor...</div></div>
   </div>
 
   <div id="haberler" style="display:none">
@@ -1126,6 +1148,159 @@ function coinAnaliziYorumIste(sembol, gunlukDegisim, guncelFiyat, zamanDilimVeri
     guncel_fiyat: guncelFiyat,
     zaman_dilimleri: zamanDilimVerileri
   }));
+}
+
+// ============================================================
+// UZUN/KISA (Long/Short) ORANLARI - Binance, OKX, Bybit'ten
+// TARAYICIDA (dogrudan) cekilir - Railway/Binance IP engelinden
+// etkilenmez. Sadece bu 3 borsa desteklenir (Coinglass'taki gibi
+// 18 borsa degil) - digerleri bu veriyi ya ucretsiz sunmuyor ya da
+// entegrasyonu ayrica arastirma gerektiriyor.
+// ============================================================
+
+var uzunKisaAktifSembol = "BTCUSDT";
+var uzunKisaAktifIsim = "BTC";
+
+var UZUNKISA_PERIYOT_ESLEME = {
+  binance: { "15m": "15m", "1h": "1h", "4h": "4h", "1d": "1d" },
+  okx:     { "15m": "15m", "1h": "1H", "4h": "4H", "1d": "1D" },
+  bybit:   { "15m": "15min", "1h": "1h", "4h": "4h", "1d": "1d" }
+};
+
+function uzunKisaCoinSec(sembol, isim, el) {
+  uzunKisaAktifSembol = sembol;
+  uzunKisaAktifIsim = isim;
+  var btnlar = document.querySelectorAll("#uzunkisa-coin-filtre .bot-btn");
+  for (var i = 0; i < btnlar.length; i++) btnlar[i].classList.remove("active");
+  el.classList.add("active");
+  uzunKisaVeriGetir();
+}
+
+function uzunKisaBinanceGetir(sembol, periyot, basarili, hata) {
+  var xhr = new XMLHttpRequest();
+  var url = "https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=" +
+    encodeURIComponent(sembol) + "&period=" + periyot + "&limit=1";
+  xhr.open("GET", url, true);
+  xhr.onload = function() {
+    try {
+      var veri = JSON.parse(xhr.responseText);
+      if (!Array.isArray(veri) || veri.length === 0) { hata(); return; }
+      var son = veri[veri.length - 1];
+      basarili({
+        uzun: Math.round(parseFloat(son.longAccount) * 1000) / 10,
+        kisa: Math.round(parseFloat(son.shortAccount) * 1000) / 10
+      });
+    } catch (e) { hata(); }
+  };
+  xhr.onerror = hata;
+  xhr.send();
+}
+
+function uzunKisaOkxGetir(coinBaz, periyot, basarili, hata) {
+  var xhr = new XMLHttpRequest();
+  var url = "https://www.okx.com/api/v5/rubik/stat/contracts/long-short-account-ratio?ccy=" +
+    encodeURIComponent(coinBaz) + "&period=" + periyot;
+  xhr.open("GET", url, true);
+  xhr.onload = function() {
+    try {
+      var veri = JSON.parse(xhr.responseText);
+      if (!veri.data || veri.data.length === 0) { hata(); return; }
+      var oran = parseFloat(veri.data[0][1]); // [timestamp, oran] - oran = uzun/kisa katsayisi
+      if (!oran || isNaN(oran)) { hata(); return; }
+      var uzunYuzde = (oran / (oran + 1)) * 100;
+      basarili({
+        uzun: Math.round(uzunYuzde * 10) / 10,
+        kisa: Math.round((100 - uzunYuzde) * 10) / 10
+      });
+    } catch (e) { hata(); }
+  };
+  xhr.onerror = hata;
+  xhr.send();
+}
+
+function uzunKisaBybitGetir(sembol, periyot, basarili, hata) {
+  var xhr = new XMLHttpRequest();
+  var url = "https://api.bybit.com/v5/market/account-ratio?category=linear&symbol=" +
+    encodeURIComponent(sembol) + "&period=" + periyot + "&limit=1";
+  xhr.open("GET", url, true);
+  xhr.onload = function() {
+    try {
+      var veri = JSON.parse(xhr.responseText);
+      if (!veri.result || !veri.result.list || veri.result.list.length === 0) { hata(); return; }
+      var son = veri.result.list[0];
+      basarili({
+        uzun: Math.round(parseFloat(son.buyRatio) * 1000) / 10,
+        kisa: Math.round(parseFloat(son.sellRatio) * 1000) / 10
+      });
+    } catch (e) { hata(); }
+  };
+  xhr.onerror = hata;
+  xhr.send();
+}
+
+function uzunKisaBarHtml(uzun, kisa) {
+  return '<div style="display:flex;align-items:center;gap:10px">' +
+    '<div class="balina-ozet-bar" style="flex:1;height:22px;margin-top:0">' +
+    '<div class="balina-ozet-alim" style="width:' + uzun + '%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#052e16">' + uzun + '%</div>' +
+    '<div class="balina-ozet-satim" style="width:' + kisa + '%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#450a0a">' + kisa + '%</div></div></div>';
+}
+
+function uzunKisaSatirHtml(isim, ikonHarf, sonuc) {
+  if (!sonuc) {
+    return '<div class="signal-card" style="display:flex;align-items:center;gap:10px;padding:10px 14px">' +
+      '<div style="width:26px;height:26px;border-radius:50%;background:#1e293b;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">' + ikonHarf + '</div>' +
+      '<div style="width:90px;font-size:13px;font-weight:600;flex-shrink:0">' + isim + '</div>' +
+      '<div style="flex:1;font-size:11px;color:#64748b">Veri alinamadi</div></div>';
+  }
+  return '<div class="signal-card" style="display:flex;align-items:center;gap:10px;padding:10px 14px">' +
+    '<div style="width:26px;height:26px;border-radius:50%;background:#1e293b;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">' + ikonHarf + '</div>' +
+    '<div style="width:90px;font-size:13px;font-weight:600;flex-shrink:0">' + isim + '</div>' +
+    '<div style="flex:1">' + uzunKisaBarHtml(sonuc.uzun, sonuc.kisa) + '</div></div>';
+}
+
+function uzunKisaVeriGetir() {
+  var alan = document.getElementById("uzunkisa-icerik");
+  if (!alan) return;
+  alan.innerHTML = '<div class="loading">Yukleniyor...</div>';
+
+  var periyotSecim = document.getElementById("uzunkisa-periyot").value;
+  var sembol = uzunKisaAktifSembol;
+  var coinBaz = uzunKisaAktifIsim;
+  var sonuclar = { binance: null, okx: null, bybit: null };
+  var tamamlanan = 0;
+
+  function hepsiTamamlandi() {
+    var gecerliler = [];
+    if (sonuclar.binance) gecerliler.push(sonuclar.binance);
+    if (sonuclar.okx) gecerliler.push(sonuclar.okx);
+    if (sonuclar.bybit) gecerliler.push(sonuclar.bybit);
+
+    var html = '<div style="padding:0 16px">';
+    if (gecerliler.length > 0) {
+      var ortUzun = gecerliler.reduce(function(t, s) { return t + s.uzun; }, 0) / gecerliler.length;
+      var ortKisa = 100 - ortUzun;
+      html += '<div style="margin-bottom:10px">' +
+        uzunKisaSatirHtml("Tumu (Ort.)", "T", { uzun: Math.round(ortUzun * 10) / 10, kisa: Math.round(ortKisa * 10) / 10 }) +
+        '</div>';
+    } else {
+      html += '<div class="error">Hicbir borsadan veri alinamadi, lutfen tekrar deneyin.</div>';
+    }
+    html += '<div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">';
+    html += uzunKisaSatirHtml("Binance", "B", sonuclar.binance);
+    html += uzunKisaSatirHtml("OKX", "O", sonuclar.okx);
+    html += uzunKisaSatirHtml("Bybit", "BY", sonuclar.bybit);
+    html += '</div></div>';
+    alan.innerHTML = html;
+  }
+
+  function birTamamlandi() {
+    tamamlanan++;
+    if (tamamlanan === 3) hepsiTamamlandi();
+  }
+
+  uzunKisaBinanceGetir(sembol, UZUNKISA_PERIYOT_ESLEME.binance[periyotSecim], function(r) { sonuclar.binance = r; birTamamlandi(); }, birTamamlandi);
+  uzunKisaOkxGetir(coinBaz, UZUNKISA_PERIYOT_ESLEME.okx[periyotSecim], function(r) { sonuclar.okx = r; birTamamlandi(); }, birTamamlandi);
+  uzunKisaBybitGetir(sembol, UZUNKISA_PERIYOT_ESLEME.bybit[periyotSecim], function(r) { sonuclar.bybit = r; birTamamlandi(); }, birTamamlandi);
 }
 
 function takipToggle(bot, sembol, zaman) {
@@ -2083,6 +2258,10 @@ function sekmeAc(id, el) {
   for (var i = 0; i < divlar.length; i++) divlar[i].style.display = "none";
   document.getElementById(id).style.display = "block";
   guncelle();
+  // Uzun/Kisa verisi 3 farkli dis borsadan (Binance/OKX/Bybit) canli cekildigi
+  // icin 10sn'lik otomatik guncelleme dongusune DAHIL EDILMEZ - sadece sekme
+  // acildiginda bir kez cekilir, gerisi kullanicinin coin/periyot secimine baglidir.
+  if (id === "uzunkisa") uzunKisaVeriGetir();
 }
 
 function botFiltre(bot, el) {
