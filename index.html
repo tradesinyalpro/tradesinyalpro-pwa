@@ -150,11 +150,9 @@
   .sohbet-widget-tab.active { color: #93c5fd; border-bottom-color: #3b82f6; }
   .sohbet-widget-mesajlar { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
   .sohbet-widget-input-alani { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #1e293b; background: #111827; }
-  #filigran-katmani { position: fixed; inset: 0; pointer-events: none; z-index: 100000; background-repeat: repeat; opacity: 0.10; display: none; }
 </style>
 </head>
 <body>
-<div id="filigran-katmani"></div>
 
 <div id="yukleniyor-ekrani" class="auth-screen">
   <div style="text-align:center;color:#64748b">Yukleniyor...</div>
@@ -420,7 +418,6 @@ var authToken = null;
 var hesapDurumu = null;
 var hesapKalanGun = null;
 var girisliKullanici = null;
-var filigranAcik = true;
 var tumVeriler = {};
 var tumHaberler = [];
 var tumRaporlar = [];
@@ -2299,7 +2296,6 @@ function girisYap() {
       hesapDurumu = yanit.hesap_durumu;
       hesapKalanGun = yanit.kalan_gun;
       girisliKullanici = yanit.kullanici_adi;
-      filigranAcik = yanit.filigran_acik !== false;
       localStorage.setItem("ts_token", authToken);
       girisBasarili();
     } else {
@@ -2386,20 +2382,6 @@ function sifreDegistir() {
   xhr.send(JSON.stringify({ eski_sifre: eski, yeni_sifre: yeni }));
 }
 
-function filigranUygula() {
-  var kat = document.getElementById("filigran-katmani");
-  if (!kat) return;
-  if (!girisliKullanici || !filigranAcik) {
-    kat.style.display = "none";
-    return;
-  }
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="220" height="90">' +
-    '<text x="10" y="50" font-size="15" fill="white" font-family="Arial" font-weight="600">' +
-    'TradeSinyalPro</text></svg>';
-  kat.style.backgroundImage = 'url("data:image/svg+xml;utf8,' + encodeURIComponent(svg) + '")';
-  kat.style.display = "block";
-}
-
 function cikisYap() {
   if (authToken) {
     var xhrCikis = new XMLHttpRequest();
@@ -2414,7 +2396,6 @@ function cikisYap() {
   document.getElementById("app-icerik").style.display = "none";
   document.getElementById("auth-ekrani").style.display = "flex";
   formDegistir("giris");
-  filigranUygula();
   document.documentElement.classList.remove("admin-secim-acik");
 }
 
@@ -2428,7 +2409,6 @@ function girisBasarili() {
     ziyaretKaydet(girisliKullanici);
     document.documentElement.classList.remove("admin-secim-acik");
   }
-  filigranUygula();
   erisimGuncelle();
   veriYukle();
   setInterval(veriYukle, 10000);
@@ -2747,8 +2727,6 @@ function yoneticiPaneliGoster() {
         html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciOnayla(\'' + u.kullanici_adi + '\')">' + butonYazisi + '</button></div>';
       }
       html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciSifreSifirla(\'' + u.kullanici_adi + '\')">Sifre Sifirla (Kaydi Sil)</button></div>';
-      var filigranButonYazisi = u.filigran_kapali ? "Filigrani Ac" : "Filigrani Kapat";
-      html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciFiligranToggle(\'' + u.kullanici_adi + '\')">' + filigranButonYazisi + '</button></div>';
       html += '</div>';
     }
     document.getElementById("yonetici-icerik").innerHTML = html;
@@ -2768,15 +2746,6 @@ function kullaniciOnayla(kadi) {
 function kullaniciDenemeBaslat(kadi) {
   var xhr = new XMLHttpRequest();
   xhr.open("POST", API + "/admin/deneme_baslat", true);
-  xhr.setRequestHeader("Content-Type", "application/json");
-  xhr.setRequestHeader("X-Auth-Token", authToken);
-  xhr.onload = function() { yoneticiPaneliGoster(); };
-  xhr.send(JSON.stringify({ kullanici_adi: kadi }));
-}
-
-function kullaniciFiligranToggle(kadi) {
-  var xhr = new XMLHttpRequest();
-  xhr.open("POST", API + "/admin/filigran-toggle", true);
   xhr.setRequestHeader("Content-Type", "application/json");
   xhr.setRequestHeader("X-Auth-Token", authToken);
   xhr.onload = function() { yoneticiPaneliGoster(); };
@@ -2833,7 +2802,6 @@ function sayfaBaslat() {
       hesapDurumu = yanit.hesap_durumu;
       hesapKalanGun = yanit.kalan_gun;
       girisliKullanici = yanit.kullanici_adi;
-      filigranAcik = yanit.filigran_acik !== false;
       girisBasarili();
     } else {
       localStorage.removeItem("ts_token");
