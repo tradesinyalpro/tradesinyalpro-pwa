@@ -144,7 +144,7 @@
   .cikis-btn { background: none; border: none; color: #64748b; font-size: 12px; cursor: pointer; text-decoration: underline; }
   .sohbet-widget-buton { position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px; border-radius: 50%; background: #3b82f6; border: none; box-shadow: 0 4px 14px rgba(0,0,0,0.4); cursor: pointer; z-index: 9999; font-size: 24px; display: flex; align-items: center; justify-content: center; }
   .sohbet-widget-badge { position: absolute; top: -4px; right: -4px; background: #ef4444; color: #fff; font-size: 11px; font-weight: 700; min-width: 20px; height: 20px; border-radius: 10px; display: none; align-items: center; justify-content: center; padding: 0 4px; border: 2px solid #0a0f1e; }
-  .sohbet-widget-panel { position: fixed; bottom: 86px; right: 20px; width: 320px; max-width: calc(100vw - 32px); height: 420px; max-height: calc(100vh - 120px); background: #111827; border: 1px solid #1e293b; border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); z-index: 9999; display: none; flex-direction: column; overflow: hidden; }
+  .sohbet-widget-panel { position: fixed; bottom: 86px; right: 20px; width: 380px; max-width: calc(100vw - 32px); height: 560px; max-height: calc(100vh - 110px); background: #111827; border: 1px solid #1e293b; border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); z-index: 9999; display: none; flex-direction: column; overflow: hidden; }
   .sohbet-widget-header { padding: 12px 14px; background: #0c1a3d; border-bottom: 1px solid #1e293b; display: flex; gap: 16px; }
   .sohbet-widget-tab { font-size: 13px; font-weight: 600; color: #64748b; cursor: pointer; padding-bottom: 2px; border-bottom: 2px solid transparent; }
   .sohbet-widget-tab.active { color: #93c5fd; border-bottom-color: #3b82f6; }
@@ -1121,6 +1121,7 @@ function coinAnaliziBaslat(sembolRaw) {
 }
 
 function coinAnaliziYorumIste(sembol, gunlukDegisim, guncelFiyat, zamanDilimVerileri, mesajId) {
+  var yasalUyari = "\n\n⚠️ Yasal uyari: Bu bilgiler piyasa verileri ve makroekonomik takvim isiginda hazirlanmistir. Kisisel yatirim tavsiyesi degildir. Kripto varliklar yuksek volatiliteye sahiptir. Islem karari almadan once kendi risk toleransinizi ve bagimsiz arastirmanizi gozden gecirin.";
   var xhr = new XMLHttpRequest();
   xhr.open("POST", API + "/coin-analiz-yorumla", true);
   xhr.setRequestHeader("Content-Type", "application/json");
@@ -1129,7 +1130,7 @@ function coinAnaliziYorumIste(sembol, gunlukDegisim, guncelFiyat, zamanDilimVeri
     var yanit;
     try { yanit = JSON.parse(xhr.responseText); } catch (e) { yanit = {}; }
     if (xhr.status === 200 && yanit.yorum) {
-      sohbetYerelMesajGuncelle(mesajId, yanit.yorum);
+      sohbetYerelMesajGuncelle(mesajId, yanit.yorum + yasalUyari);
     } else if (xhr.status === 429) {
       sohbetYerelMesajGuncelle(mesajId, "⏳ " + (yanit.hata || "Gunluk analiz hakkiniz doldu."));
     } else {
