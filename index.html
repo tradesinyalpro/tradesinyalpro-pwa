@@ -2090,7 +2090,8 @@ function altcoinDetayHtml(sembol, islemlerSozluk) {
     return html;
   }
 
-  var SATIR = 10, SUTUN = 20;
+  var SUTUN = 20;
+  var SATIR = Math.ceil(kayitlar.length / SUTUN);
   html += '<div class="balina-tablo-wrap"><table class="balina-tablo"><tbody>';
   for (var r = 0; r < SATIR; r++) {
     html += '<tr>';
