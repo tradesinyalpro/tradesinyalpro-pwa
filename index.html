@@ -1198,8 +1198,10 @@ function uzunKisaBinanceGetir(sembol, periyot, basarili, hata) {
 
 function uzunKisaOkxGetir(coinBaz, periyot, basarili, hata) {
   var xhr = new XMLHttpRequest();
-  var url = "https://www.okx.com/api/v5/rubik/stat/contracts/long-short-account-ratio?ccy=" +
-    encodeURIComponent(coinBaz) + "&period=" + periyot;
+  // OKX'in kendi adresi tarayicidan direkt cagrilinca CORS engeline takiliyor
+  // (sunucu tarafinda calisan Cloudflare Worker proxy'de bu sorun yok).
+  var okxPath = "/api/v5/rubik/stat/contracts/long-short-account-ratio?ccy=" + coinBaz + "&period=" + periyot;
+  var url = "https://tradesinyalpro-binance-proxy.prm-samett.workers.dev/?borsa=okx&path=" + encodeURIComponent(okxPath);
   xhr.open("GET", url, true);
   xhr.onload = function() {
     try {
@@ -1229,8 +1231,8 @@ function uzunKisaBybitGetir(sembol, periyot, basarili, hata) {
       if (!veri.result || !veri.result.list || veri.result.list.length === 0) { hata(); return; }
       var son = veri.result.list[0];
       basarili({
-        uzun: Math.round(parseFloat(son.buyRatio) * 1000) / 10,
-        kisa: Math.round(parseFloat(son.sellRatio) * 1000) / 10
+        uzun: Math.round(parseFloat(son.sellRatio) * 1000) / 10,
+        kisa: Math.round(parseFloat(son.buyRatio) * 1000) / 10
       });
     } catch (e) { hata(); }
   };
@@ -1348,18 +1350,6 @@ function portfoyGoster() {
         '<div style="font-size:10px;color:#64748b;margin-top:2px">' + k.zaman + '</div></div>' +
         '<div style="display:flex;align-items:center;gap:10px"><div style="text-align:right">' + durumRozeti + '<div style="margin-top:4px">' + getiriYazi + '</div></div>' +
         '<span onclick="portfoyKayitSil(\'' + k.bot + '\',\'' + k.sembol + '\',\'' + k.zaman + '\')" style="cursor:pointer;color:#f87171;font-size:15px" title="Sil">&#128465;</span></div></div>';
-    }
-  }
-  html += '<div class="section-title" style="margin-top:20px">Fiyat Alarmlarim</div>';
-  if (!sonAlarmlar || sonAlarmlar.length === 0) {
-    html += '<div class="empty">Aktif alarmin yok. Veriler sekmesinde bir karttaki &#128276; ikonuna dokunarak alarm kurabilirsin.</div>';
-  } else {
-    for (var a = 0; a < sonAlarmlar.length; a++) {
-      var al = sonAlarmlar[a];
-      var yonYazi = al.yon === "ustunde" ? "uzerine ciktiginda" : "altina dustugunde";
-      html += '<div class="signal-card" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px">' +
-        '<div style="font-size:13px">#' + al.sembol + ' <span style="color:#94a3b8">' + al.hedef_fiyat + ' ' + yonYazi + '</span></div>' +
-        '<span onclick="alarmSil(' + al.id + ')" style="cursor:pointer;color:#f87171;font-size:12px">Sil</span></div>';
     }
   }
   alan.innerHTML = html;
