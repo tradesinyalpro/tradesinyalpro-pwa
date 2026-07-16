@@ -804,6 +804,21 @@ function sohbetBadgeGuncelle() {
   }
 }
 
+function tarihSaatKisa(tarih) {
+  var d;
+  if (tarih instanceof Date) {
+    d = tarih;
+  } else if (typeof tarih === "string" && tarih) {
+    d = new Date(tarih.replace(" ", "T"));
+  } else {
+    return "";
+  }
+  if (isNaN(d.getTime())) return "";
+  var pad = function(n) { return n < 10 ? "0" + n : String(n); };
+  return pad(d.getDate()) + "." + pad(d.getMonth() + 1) + "." + d.getFullYear() +
+    " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+}
+
 function sohbetGoster() {
   var alan = document.getElementById("sohbet-mesajlari");
   if (!alan) return;
@@ -837,12 +852,13 @@ function sohbetGoster() {
   for (var i = 0; i < sonSohbetMesajlari.length; i++) {
     var m = sonSohbetMesajlari[i];
     var benMi = m.kullanici_adi === girisliKullanici;
-    var silButon = adminMi ? ('<span onclick="sohbetSil(' + m.id + ')" style="cursor:pointer;color:#f87171;font-size:11px;margin-left:8px">Sil</span>') : "";
+    var silButon = adminMi ? ('<span onclick="sohbetSil(' + m.id + ')" style="cursor:pointer;color:#f87171;font-size:11px">Sil</span>') : "";
     html += '<div style="background:' + (benMi ? "#0c1a3d" : "#111827") + ';border-radius:10px;padding:8px 12px">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">' +
-      '<span style="font-size:11px;font-weight:600;color:#93c5fd">' + htmlKacis(m.kullanici_adi) + '</span>' +
-      '<span style="font-size:9px;color:#64748b">' + (m.zaman ? m.zaman.slice(11, 16) : "") + silButon + '</span>' +
-      '</div><div style="font-size:13px;color:#e2e8f0;word-break:break-word">' + htmlKacis(m.metin) + '</div></div>';
+      '<div style="font-size:11px;font-weight:600;color:#93c5fd;margin-bottom:2px">' + htmlKacis(m.kullanici_adi) + '</div>' +
+      '<div style="font-size:13px;color:#e2e8f0;word-break:break-word">' + htmlKacis(m.metin) + '</div>' +
+      '<div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:4px">' + silButon +
+      '<span style="font-size:9px;color:#64748b">' + tarihSaatKisa(m.zaman) + '</span></div>' +
+      '</div>';
   }
   alan.innerHTML = html;
   alan.scrollTop = alan.scrollHeight;
@@ -863,11 +879,15 @@ function coinAnaliziGoster() {
     if (y.tip === "kullanici") {
       html += '<div style="background:#0c1a3d;border-radius:10px;padding:8px 12px">' +
         '<div style="font-size:11px;font-weight:600;color:#93c5fd;margin-bottom:2px">' + htmlKacis(girisliKullanici || "Siz") + '</div>' +
-        '<div style="font-size:13px;color:#e2e8f0;word-break:break-word">' + htmlKacis(y.metin) + '</div></div>';
+        '<div style="font-size:13px;color:#e2e8f0;word-break:break-word">' + htmlKacis(y.metin) + '</div>' +
+        '<div style="text-align:right;margin-top:4px"><span style="font-size:9px;color:#64748b">' + tarihSaatKisa(y.zaman) + '</span></div>' +
+        '</div>';
     } else {
       html += '<div style="background:#1e1b4b;border-radius:10px;padding:8px 12px">' +
         '<div style="font-size:11px;font-weight:600;color:#a5b4fc;margin-bottom:2px">TradeSinyalPro AI</div>' +
-        '<div style="font-size:13px;color:#e2e8f0;word-break:break-word;white-space:pre-wrap">' + htmlKacis(y.metin) + '</div></div>';
+        '<div style="font-size:13px;color:#e2e8f0;word-break:break-word;white-space:pre-wrap">' + htmlKacis(y.metin) + '</div>' +
+        '<div style="text-align:right;margin-top:4px"><span style="font-size:9px;color:#64748b">' + tarihSaatKisa(y.zaman) + '</span></div>' +
+        '</div>';
     }
   }
   alan.innerHTML = html;
@@ -942,7 +962,7 @@ var sohbetYerelIdSayaci = 0;
 
 function sohbetYerelMesajEkle(tip, metin, ozelId) {
   var id = ozelId || ("yerel-" + (++sohbetYerelIdSayaci));
-  sohbetYerelMesajlar.push({ id: id, tip: tip, metin: metin });
+  sohbetYerelMesajlar.push({ id: id, tip: tip, metin: metin, zaman: new Date() });
   coinAnaliziGoster();
   return id;
 }
