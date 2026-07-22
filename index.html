@@ -403,7 +403,7 @@
     <button class="refresh-btn" onclick="sohbetGonder()">Gonder</button>
   </div>
   <div class="sohbet-widget-input-alani" id="analiz-input-alani" style="display:none">
-    <input id="analiz-input" type="text" placeholder="Coin (BTC) ya da /hisse NVDA" maxlength="20"
+    <input id="analiz-input" type="text" placeholder="BTC / /hisse NVDA / /takvim" maxlength="20"
       style="flex:1;background:#0a0f1e;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px"
       onkeypress="if(event.key==='Enter')analizGonder()">
     <button class="refresh-btn" onclick="analizGonder()">Analiz Et</button>
@@ -870,7 +870,7 @@ function coinAnaliziGoster() {
   var alan = document.getElementById("analiz-mesajlari");
   if (!alan) return;
   if (sohbetYerelMesajlar.length === 0) {
-    alan.innerHTML = '<div class="empty">Henuz analiz yapmadiniz. Coin icin sembolu yazip "Analiz Et" (ornek: BTC), ABD hissesi icin basina /hisse yazip gonderin (ornek: /hisse NVDA).</div>';
+    alan.innerHTML = '<div class="empty">Henuz analiz yapmadiniz. Coin icin sembolu yazip "Analiz Et" (ornek: BTC), ABD hissesi icin /hisse NVDA, onumuzdeki haftanin ekonomik takvimi icin /takvim yazip gonderin.</div>';
     return;
   }
   var html = "";
@@ -901,6 +901,10 @@ function analizGonder() {
   input.value = "";
   if (/^\/hisse\b/i.test(deger)) {
     hisseAnaliziBaslat(deger.replace(/^\/hisse\s*/i, ""));
+    return;
+  }
+  if (/^\/takvim\b/i.test(deger)) {
+    takvimAnaliziBaslat();
     return;
   }
   coinAnaliziBaslat(deger);
@@ -1207,6 +1211,37 @@ function hisseAnaliziBaslat(sembolRaw) {
     sohbetYerelMesajGuncelle(yukleniyorId, "⚠️ Sunucuya ulasilamadi.");
   };
   xhr.send(JSON.stringify({ sembol: sembol }));
+}
+
+// ============================================================
+// EKONOMIK TAKVIM - Finnhub'dan onumuzdeki 7 gunun onemli ABD
+// ekonomik olaylari (CPI, NFP, Fed faiz karari). /takvim komutu.
+// ============================================================
+
+function takvimAnaliziBaslat() {
+  if (sohbetPanelSekmesi !== "analiz") sohbetPanelSekmeDegistir("analiz");
+  sohbetYerelMesajEkle("kullanici", "/takvim");
+  var yukleniyorId = sohbetYerelMesajEkle("bot", "⏳ Onumuzdeki haftanin ekonomik takvimi hazirlaniyor...");
+
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/takvim-analiz-yorumla", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    var yanit;
+    try { yanit = JSON.parse(xhr.responseText); } catch (e) { yanit = {}; }
+    if (xhr.status === 200 && yanit.yorum) {
+      sohbetYerelMesajGuncelle(yukleniyorId, yanit.yorum + YASAL_UYARI_METNI);
+    } else if (xhr.status === 429) {
+      sohbetYerelMesajGuncelle(yukleniyorId, "⏳ " + (yanit.hata || "Gunluk analiz hakkiniz doldu."));
+    } else {
+      sohbetYerelMesajGuncelle(yukleniyorId, "⚠️ " + (yanit.hata || "Takvim olusturulamadi."));
+    }
+  };
+  xhr.onerror = function() {
+    sohbetYerelMesajGuncelle(yukleniyorId, "⚠️ Sunucuya ulasilamadi.");
+  };
+  xhr.send("{}");
 }
 
 // ============================================================
