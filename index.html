@@ -403,7 +403,7 @@
     <button class="refresh-btn" onclick="sohbetGonder()">Gonder</button>
   </div>
   <div class="sohbet-widget-input-alani" id="analiz-input-alani" style="display:none">
-    <input id="analiz-input" type="text" placeholder="BTC / /hisse NVDA / /takvim" maxlength="20"
+    <input id="analiz-input" type="text" placeholder="BTC / /hisse NVDA / /piyasa" maxlength="20"
       style="flex:1;background:#0a0f1e;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px"
       onkeypress="if(event.key==='Enter')analizGonder()">
     <button class="refresh-btn" onclick="analizGonder()">Analiz Et</button>
@@ -870,7 +870,7 @@ function coinAnaliziGoster() {
   var alan = document.getElementById("analiz-mesajlari");
   if (!alan) return;
   if (sohbetYerelMesajlar.length === 0) {
-    alan.innerHTML = '<div class="empty">Henuz analiz yapmadiniz. Coin icin sembolu yazip "Analiz Et" (ornek: BTC), ABD hissesi icin /hisse NVDA, onumuzdeki haftanin ekonomik takvimi icin /takvim yazip gonderin.</div>';
+    alan.innerHTML = '<div class="empty">Henuz analiz yapmadiniz. Coin icin sembolu yazip "Analiz Et" (ornek: BTC), ABD hissesi icin /hisse NVDA, NASDAQ acik mi diye sormak icin /piyasa yazip gonderin.</div>';
     return;
   }
   var html = "";
@@ -903,8 +903,8 @@ function analizGonder() {
     hisseAnaliziBaslat(deger.replace(/^\/hisse\s*/i, ""));
     return;
   }
-  if (/^\/takvim\b/i.test(deger)) {
-    takvimAnaliziBaslat();
+  if (/^\/piyasa\b/i.test(deger)) {
+    piyasaDurumuGoster();
     return;
   }
   coinAnaliziBaslat(deger);
@@ -1245,8 +1245,120 @@ function takvimAnaliziBaslat() {
 }
 
 // ============================================================
-// UZUN/KISA (Long/Short) ORANLARI - Binance, OKX, Bybit'ten
-// TARAYICIDA (dogrudan) cekilir - Railway/Binance IP engelinden
+// PIYASA SAATLERI (NASDAQ/NYSE acik mi?) - Hicbir API gerektirmez,
+// tamamen tarayicida hesaplanir. ABD yaz/kis saati (DST) icin sabit
+// saat farki KULLANILMAZ, tarayicinin "America/New_York" zaman dilimi
+// motoru kullanilir - boylece her yil otomatik dogru calisir.
+// Tatiller de sabit tarih listesi yerine KURAL bazli hesaplanir
+// (ornek: "Kasimin 4. Persembesi") - yillar gectikce guncelleme
+// gerektirmez. /piyasa komutuyla calisir.
+// ============================================================
+
+function nyZamanBilgisiAl(tarih) {
+  var parcalar = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    weekday: "short", hour12: false
+  }).formatToParts(tarih);
+  var deger = {};
+  parcalar.forEach(function(p) { deger[p.type] = p.value; });
+  var haftaGunleri = { "Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6 };
+  return {
+    yil: parseInt(deger.year, 10),
+    ay: parseInt(deger.month, 10),
+    gun: parseInt(deger.day, 10),
+    saat: deger.hour === "24" ? 0 : parseInt(deger.hour, 10),
+    dakika: parseInt(deger.minute, 10),
+    haftaGunu: haftaGunleri[deger.weekday]
+  };
+}
+
+function ayinNinciHaftaGunu(yil, ay, haftaGunuHedef, kacinci) {
+  // ay: 1-12, haftaGunuHedef: 0=Pazar..6=Cumartesi, kacinci: 1=ilk, 2=ikinci... -1=son
+  var ilkGun = new Date(Date.UTC(yil, ay - 1, 1));
+  var ilkGunHaftaGunu = ilkGun.getUTCDay();
+  if (kacinci > 0) {
+    var farkGun = (haftaGunuHedef - ilkGunHaftaGunu + 7) % 7;
+    return 1 + farkGun + (kacinci - 1) * 7;
+  } else {
+    var sonGun = new Date(Date.UTC(yil, ay, 0)).getUTCDate();
+    var sonGunTarih = new Date(Date.UTC(yil, ay - 1, sonGun));
+    var sonGunHaftaGunu = sonGunTarih.getUTCDay();
+    var farkGunSon = (sonGunHaftaGunu - haftaGunuHedef + 7) % 7;
+    return sonGun - farkGunSon;
+  }
+}
+
+function paskalyaPazariGunu(yil) {
+  // Meeus/Jones/Butcher Gregoryen Paskalya algoritmasi - Good Friday hesaplamak icin
+  var a = yil % 19, b = Math.floor(yil / 100), c = yil % 100;
+  var d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  var g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  var i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7;
+  var m = Math.floor((a + 11 * h + 22 * l) / 451);
+  var ay = Math.floor((h + l - 7 * m + 114) / 31);
+  var gun = ((h + l - 7 * m + 114) % 31) + 1;
+  return { ay: ay, gun: gun };
+}
+
+function resmiTatilMi(yil, ay, gun) {
+  // Sabit tatiller (hafta sonuna denk gelirse gozlemlenen gune kaydirma dahil)
+  function gozlemlenenGun(y, a, g) {
+    var haftaGunu = new Date(Date.UTC(y, a - 1, g)).getUTCDay();
+    if (haftaGunu === 6) return g - 1; // Cumartesiyse Cuma'ya al
+    if (haftaGunu === 0) return g + 1; // Pazarsa Pazartesi'ye al
+    return g;
+  }
+  var tatiller = [];
+  tatiller.push({ ay: 1, gun: gozlemlenenGun(yil, 1, 1) }); // Yeni Yil
+  tatiller.push({ ay: 1, gun: ayinNinciHaftaGunu(yil, 1, 1, 3) }); // MLK Gunu - 3. Pazartesi
+  tatiller.push({ ay: 2, gun: ayinNinciHaftaGunu(yil, 2, 1, 3) }); // Baskanlar Gunu - 3. Pazartesi
+  var paskalya = paskalyaPazariGunu(yil);
+  var iyiCumaTarih = new Date(Date.UTC(yil, paskalya.ay - 1, paskalya.gun - 2));
+  tatiller.push({ ay: iyiCumaTarih.getUTCMonth() + 1, gun: iyiCumaTarih.getUTCDate() }); // Iyi Cuma
+  tatiller.push({ ay: 5, gun: ayinNinciHaftaGunu(yil, 5, 1, -1) }); // Anma Gunu - son Pazartesi
+  tatiller.push({ ay: 6, gun: gozlemlenenGun(yil, 6, 19) }); // Juneteenth
+  tatiller.push({ ay: 7, gun: gozlemlenenGun(yil, 7, 4) }); // Bagimsizlik Gunu
+  tatiller.push({ ay: 9, gun: ayinNinciHaftaGunu(yil, 9, 1, 1) }); // Emek Gunu - ilk Pazartesi
+  tatiller.push({ ay: 11, gun: ayinNinciHaftaGunu(yil, 11, 4, 4) }); // Sukran Gunu - 4. Persembe
+  tatiller.push({ ay: 12, gun: gozlemlenenGun(yil, 12, 25) }); // Noel
+  return tatiller.some(function(t) { return t.ay === ay && t.gun === gun; });
+}
+
+function nasdaqDurumuHesapla() {
+  var ny = nyZamanBilgisiAl(new Date());
+  var haftaIci = ny.haftaGunu >= 1 && ny.haftaGunu <= 5;
+  var tatil = resmiTatilMi(ny.yil, ny.ay, ny.gun);
+  var dakikaToplam = ny.saat * 60 + ny.dakika;
+  var acilisDakika = 9 * 60 + 30;   // 09:30
+  var kapanisDakika = 16 * 60;      // 16:00
+  var seansIcinde = dakikaToplam >= acilisDakika && dakikaToplam < kapanisDakika;
+  var acik = haftaIci && !tatil && seansIcinde;
+  return {
+    acik: acik,
+    nyZaman: (ny.saat < 10 ? "0" : "") + ny.saat + ":" + (ny.dakika < 10 ? "0" : "") + ny.dakika,
+    tatilMi: tatil,
+    haftaSonuMu: !haftaIci
+  };
+}
+
+function piyasaDurumuGoster() {
+  if (sohbetPanelSekmesi !== "analiz") sohbetPanelSekmeDegistir("analiz");
+  sohbetYerelMesajEkle("kullanici", "/piyasa");
+  var durum = nasdaqDurumuHesapla();
+  var mesaj;
+  if (durum.tatilMi) {
+    mesaj = "🔴 NASDAQ ve NYSE bugun ABD'de resmi tatil oldugu icin KAPALI. Guncel New York saati: " + durum.nyZaman + ".";
+  } else if (durum.haftaSonuMu) {
+    mesaj = "🔴 NASDAQ ve NYSE hafta sonu oldugu icin KAPALI. Guncel New York saati: " + durum.nyZaman + ".";
+  } else if (durum.acik) {
+    mesaj = "🟢 NASDAQ ve NYSE su an ACIK. Normal seans 09:30-16:00 (New York saati) arasinda calisir. Guncel New York saati: " + durum.nyZaman + ".";
+  } else {
+    mesaj = "🔴 NASDAQ ve NYSE su an KAPALI (normal seans disinda). Normal seans 09:30-16:00 (New York saati) arasindadir. Guncel New York saati: " + durum.nyZaman + ".";
+  }
+  sohbetYerelMesajEkle("bot", mesaj);
+}
 // etkilenmez. Sadece bu 3 borsa desteklenir (Coinglass'taki gibi
 // 18 borsa degil) - digerleri bu veriyi ya ucretsiz sunmuyor ya da
 // entegrasyonu ayrica arastirma gerektiriyor.
