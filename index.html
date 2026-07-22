@@ -209,6 +209,7 @@
   <div class="tab" onclick="sekmeAc('gecmis',this)" data-tam-erisim="1">Gecmis</div>
   <div class="tab" onclick="sekmeAc('rapor',this)" data-tam-erisim="1">Gunluk Rapor</div>
   <div class="tab" onclick="sekmeAc('piyasa',this)" data-tam-erisim="1">Piyasa</div>
+  <div class="tab" onclick="sekmeAc('analiz',this)" data-tam-erisim="1">Analiz</div>
   <div class="tab" onclick="sekmeAc('balina',this)" data-tam-erisim="1">Balina Takip</div>
   <div class="tab" onclick="sekmeAc('uzunkisa',this)" data-tam-erisim="1">Uzun/Kisa</div>
   <div class="tab" onclick="sekmeAc('haberler',this)" data-tam-erisim="1">Haberler</div>
@@ -305,8 +306,18 @@
         </script>
       </div>
     </div>
+  </div>
 
-    <div id="abd-borsa-acilis-kapanis" style="margin-top:10px"></div>
+  <div id="analiz" style="display:none">
+    <div style="padding:16px">
+      <div id="analiz-mesajlari" style="display:flex;flex-direction:column;gap:8px;min-height:200px;margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px;position:sticky;bottom:0;background:#0a0f1e;padding:8px 0">
+        <input id="analiz-input" type="text" placeholder="BTC / /hisse NVDA / /piyasa" maxlength="20"
+          style="flex:1;background:#111827;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px"
+          onkeypress="if(event.key==='Enter')analizGonder()">
+        <button class="refresh-btn" onclick="analizGonder()">Analiz Et</button>
+      </div>
+    </div>
   </div>
 
   <div id="balina" style="display:none">
@@ -390,23 +401,13 @@
   <span class="sohbet-widget-badge" id="sohbet-badge">0</span>
 </button>
 <div class="sohbet-widget-panel" id="sohbet-panel">
-  <div class="sohbet-widget-header">
-    <span class="sohbet-widget-tab active" id="sohbet-tab-sohbet" onclick="sohbetPanelSekmeDegistir('sohbet')">Sohbet</span>
-    <span class="sohbet-widget-tab" id="sohbet-tab-analiz" onclick="sohbetPanelSekmeDegistir('analiz')">Coin Analiz</span>
-  </div>
+  <div class="sohbet-widget-header">Sohbet</div>
   <div id="sohbet-mesajlari" class="sohbet-widget-mesajlar"></div>
-  <div id="analiz-mesajlari" class="sohbet-widget-mesajlar" style="display:none"></div>
   <div class="sohbet-widget-input-alani" id="sohbet-input-alani">
     <input id="sohbet-input" type="text" placeholder="Mesajinizi yazin..." maxlength="500"
       style="flex:1;background:#0a0f1e;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px"
       onkeypress="if(event.key==='Enter')sohbetGonder()">
     <button class="refresh-btn" onclick="sohbetGonder()">Gonder</button>
-  </div>
-  <div class="sohbet-widget-input-alani" id="analiz-input-alani" style="display:none">
-    <input id="analiz-input" type="text" placeholder="BTC / /hisse NVDA / /piyasa" maxlength="20"
-      style="flex:1;background:#0a0f1e;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px"
-      onkeypress="if(event.key==='Enter')analizGonder()">
-    <button class="refresh-btn" onclick="analizGonder()">Analiz Et</button>
   </div>
 </div>
 
@@ -536,7 +537,6 @@ function favoriFiltreToggle() {
 }
 var aktifHaberKategori = "hepsi";
 var aktifSekme = "sinyaller";
-var sonAbdBorsa = {};
 var sonSohbetMesajlari = [];
 var sonPortfoy = { kayitlar: [], ozet: {} };
 var takipDurumu = {};
@@ -632,17 +632,6 @@ function veriYukle() {
   };
   xhr6.send();
 
-  var xhr8 = new XMLHttpRequest();
-  xhr8.open("GET", API + "/abd-borsa", true);
-  xhr8.setRequestHeader("X-Auth-Token", authToken || "");
-  xhr8.onload = function() {
-    if (xhr8.status === 200) {
-      sonAbdBorsa = JSON.parse(xhr8.responseText);
-      if (aktifSekme === "piyasa") abdBorsaGoster();
-    }
-  };
-  xhr8.send();
-
   var xhr9 = new XMLHttpRequest();
   xhr9.open("GET", API + "/sohbet/mesajlar", true);
   xhr9.setRequestHeader("X-Auth-Token", authToken || "");
@@ -732,30 +721,6 @@ function alarmSil(id) {
   xhr.send(JSON.stringify({ id: id }));
 }
 
-function abdBorsaGoster() {
-  var alan = document.getElementById("abd-borsa-acilis-kapanis");
-  if (!alan) return;
-  var semboller = ["^DJI", "^GSPC", "^IXIC"];
-  var satirlar = "";
-  var veriVar = false;
-  for (var i = 0; i < semboller.length; i++) {
-    var d = sonAbdBorsa[semboller[i]];
-    if (!d) continue;
-    veriVar = true;
-    var acilisYazi = (d.acilis_yuzde !== null && d.acilis_yuzde !== undefined) ?
-      ('<span style="color:' + (d.acilis_yuzde >= 0 ? "#4ade80" : "#f87171") + '">%' + (d.acilis_yuzde >= 0 ? "+" : "") + d.acilis_yuzde + '</span>') :
-      '<span style="color:#64748b">—</span>';
-    var kapanisYazi = (d.kapanis_yuzde !== null && d.kapanis_yuzde !== undefined) ?
-      ('<span style="color:' + (d.kapanis_yuzde >= 0 ? "#4ade80" : "#f87171") + '">%' + (d.kapanis_yuzde >= 0 ? "+" : "") + d.kapanis_yuzde + '</span>') :
-      '<span style="color:#64748b">—</span>';
-    satirlar += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1e293b">' +
-      '<span style="font-size:13px;color:#e2e8f0">' + (d.isim || semboller[i]) + '</span>' +
-      '<span style="font-size:12px;display:flex;gap:14px"><span>Acilis: ' + acilisYazi + '</span><span>Kapanis: ' + kapanisYazi + '</span></span></div>';
-  }
-  if (!veriVar) { alan.innerHTML = ""; return; }
-  alan.innerHTML = '<div class="stat-card"><div style="font-size:12px;color:#94a3b8;margin-bottom:8px">ABD Borsalari - Sabit Acilis / Kapanis Yuzdeleri</div>' + satirlar + '</div>';
-}
-
 function htmlKacis(metin) {
   var div = document.createElement("div");
   div.textContent = metin || "";
@@ -777,20 +742,7 @@ function sohbetWidgetToggle() {
     sohbetOkunmamisSayisi = 0;
     sohbetBadgeGuncelle();
     sohbetGoster();
-    coinAnaliziGoster();
   }
-}
-
-var sohbetPanelSekmesi = "sohbet";
-
-function sohbetPanelSekmeDegistir(sekme) {
-  sohbetPanelSekmesi = sekme;
-  document.getElementById("sohbet-tab-sohbet").classList.toggle("active", sekme === "sohbet");
-  document.getElementById("sohbet-tab-analiz").classList.toggle("active", sekme === "analiz");
-  document.getElementById("sohbet-mesajlari").style.display = sekme === "sohbet" ? "flex" : "none";
-  document.getElementById("analiz-mesajlari").style.display = sekme === "analiz" ? "flex" : "none";
-  document.getElementById("sohbet-input-alani").style.display = sekme === "sohbet" ? "flex" : "none";
-  document.getElementById("analiz-input-alani").style.display = sekme === "analiz" ? "flex" : "none";
 }
 
 function sohbetBadgeGuncelle() {
@@ -1101,10 +1053,6 @@ function coinAnaliziHataGoster(mesajId, sembol) {
 }
 
 function coinAnaliziBaslat(sembolRaw) {
-  if (sohbetPanelSekmesi !== "analiz") {
-    var sekmeEl = document.getElementById("sohbet-tab-analiz");
-    if (sekmeEl) sohbetPanelSekmeDegistir("analiz");
-  }
   var sembol = coinAnaliziSembolCoz(sembolRaw);
   if (!sembol) {
     sohbetYerelMesajEkle("bot", "Kullanim: BTC gibi bir coin sembolu girin.");
@@ -1183,7 +1131,6 @@ function coinAnaliziYorumIste(sembol, gunlukDegisim, guncelFiyat, zamanDilimVeri
 // ============================================================
 
 function hisseAnaliziBaslat(sembolRaw) {
-  if (sohbetPanelSekmesi !== "analiz") sohbetPanelSekmeDegistir("analiz");
   var sembol = (sembolRaw || "").trim().toUpperCase();
   if (!sembol) {
     sohbetYerelMesajEkle("bot", "Kullanim: /hisse NVDA gibi bir ABD hisse sembolu girin.");
@@ -1219,7 +1166,6 @@ function hisseAnaliziBaslat(sembolRaw) {
 // ============================================================
 
 function takvimAnaliziBaslat() {
-  if (sohbetPanelSekmesi !== "analiz") sohbetPanelSekmeDegistir("analiz");
   sohbetYerelMesajEkle("kullanici", "/takvim");
   var yukleniyorId = sohbetYerelMesajEkle("bot", "⏳ Onumuzdeki haftanin ekonomik takvimi hazirlaniyor...");
 
@@ -1344,7 +1290,6 @@ function nasdaqDurumuHesapla() {
 }
 
 function piyasaDurumuGoster() {
-  if (sohbetPanelSekmesi !== "analiz") sohbetPanelSekmeDegistir("analiz");
   sohbetYerelMesajEkle("kullanici", "/piyasa");
   var durum = nasdaqDurumuHesapla();
   var mesaj;
@@ -1597,7 +1542,6 @@ function guncelle() {
   if (aktifSekme === "balina") balinaGoster();
   if (aktifSekme === "haberler") haberleriGoster();
   if (aktifSekme === "yonetici") yoneticiPaneliGoster();
-  if (aktifSekme === "piyasa") abdBorsaGoster();
   if (aktifSekme === "portfoy") portfoyGoster();
 }
 
@@ -2459,6 +2403,10 @@ function sekmeAc(id, el) {
   // icin 10sn'lik otomatik guncelleme dongusune DAHIL EDILMEZ - sadece sekme
   // acildiginda bir kez cekilir, gerisi kullanicinin coin/periyot secimine baglidir.
   if (id === "uzunkisa") uzunKisaVeriGetir();
+  // Analiz sekmesi (coin/hisse/piyasa analizleri) - onceki mesaj gecmisini
+  // gostermek icin sekme her acildiginda render edilir, otomatik veri
+  // cekmez (sadece kullanicinin kendi sorgusuyla tetiklenir).
+  if (id === "analiz") coinAnaliziGoster();
 }
 
 function botFiltre(bot, el) {
