@@ -309,13 +309,26 @@
   </div>
 
   <div id="analiz" style="display:none">
-    <div style="padding:16px">
-      <div id="analiz-mesajlari" style="display:flex;flex-direction:column;gap:8px;min-height:200px;margin-bottom:12px"></div>
+    <div class="bot-filter" id="analiz-alt-filtre">
+      <button class="bot-btn active" onclick="analizAltSekmeDegistir('kripto',this)">Kripto Analiz</button>
+      <button class="bot-btn" onclick="analizAltSekmeDegistir('hisse',this)">ABD Hisse Analiz</button>
+    </div>
+    <div id="kripto-analiz-bolumu" style="padding:16px">
+      <div id="kripto-analiz-mesajlari" style="display:flex;flex-direction:column;gap:8px;min-height:200px;margin-bottom:12px"></div>
       <div style="display:flex;gap:8px;position:sticky;bottom:0;background:#0a0f1e;padding:8px 0">
-        <input id="analiz-input" type="text" placeholder="BTC / /hisse NVDA / /piyasa" maxlength="20"
+        <input id="kripto-analiz-input" type="text" placeholder="Coin adi (orn: BTC, ETH, SOL)" maxlength="20"
           style="flex:1;background:#111827;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px"
-          onkeypress="if(event.key==='Enter')analizGonder()">
-        <button class="refresh-btn" onclick="analizGonder()">Analiz Et</button>
+          onkeypress="if(event.key==='Enter')kriptoAnalizGonder()">
+        <button class="refresh-btn" onclick="kriptoAnalizGonder()">Analiz Et</button>
+      </div>
+    </div>
+    <div id="hisse-analiz-bolumu" style="padding:16px;display:none">
+      <div id="hisse-analiz-mesajlari" style="display:flex;flex-direction:column;gap:8px;min-height:200px;margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px;position:sticky;bottom:0;background:#0a0f1e;padding:8px 0">
+        <input id="hisse-analiz-input" type="text" placeholder="Hisse kodu (orn: NVDA, AAPL) ya da /piyasa" maxlength="20"
+          style="flex:1;background:#111827;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px"
+          onkeypress="if(event.key==='Enter')hisseAnalizGonder()">
+        <button class="refresh-btn" onclick="hisseAnalizGonder()">Analiz Et</button>
       </div>
     </div>
   </div>
@@ -816,18 +829,18 @@ function sohbetGoster() {
   alan.scrollTop = alan.scrollHeight;
 }
 
-function coinAnaliziGoster() {
-  // Coin analizi komut/yanitlari SADECE bu cihazda/kullanicida gorunur -
-  // sunucudaki paylasimli sohbete hicbir zaman kaydedilmez, baska kullanicilar goremez.
-  var alan = document.getElementById("analiz-mesajlari");
+function analizMesajlariRenderEt(dizi, alanId, bosMesaj) {
+  // Coin/hisse analizi komut ve yanitlari SADECE bu cihazda/kullanicida
+  // gorunur - sunucudaki paylasimli sohbete hicbir zaman kaydedilmez.
+  var alan = document.getElementById(alanId);
   if (!alan) return;
-  if (sohbetYerelMesajlar.length === 0) {
-    alan.innerHTML = '<div class="empty">Henuz analiz yapmadiniz. Coin icin sembolu yazip "Analiz Et" (ornek: BTC), ABD hissesi icin /hisse NVDA, NASDAQ acik mi diye sormak icin /piyasa yazip gonderin.</div>';
+  if (dizi.length === 0) {
+    alan.innerHTML = '<div class="empty">' + bosMesaj + '</div>';
     return;
   }
   var html = "";
-  for (var j = 0; j < sohbetYerelMesajlar.length; j++) {
-    var y = sohbetYerelMesajlar[j];
+  for (var j = 0; j < dizi.length; j++) {
+    var y = dizi[j];
     if (y.tip === "kullanici") {
       html += '<div style="background:#0c1a3d;border-radius:10px;padding:8px 12px">' +
         '<div style="font-size:11px;font-weight:600;color:#93c5fd;margin-bottom:2px">' + htmlKacis(girisliKullanici || "Siz") + '</div>' +
@@ -846,20 +859,42 @@ function coinAnaliziGoster() {
   alan.scrollTop = alan.scrollHeight;
 }
 
-function analizGonder() {
-  var input = document.getElementById("analiz-input");
+function kriptoAnalizGoster() {
+  analizMesajlariRenderEt(kriptoAnalizMesajlari, "kripto-analiz-mesajlari",
+    'Henuz analiz yapmadiniz. Coin adini yazip "Analiz Et" butonuna basin (ornek: BTC).');
+}
+
+function hisseAnalizGoster() {
+  analizMesajlariRenderEt(hisseAnalizMesajlari, "hisse-analiz-mesajlari",
+    'Henuz analiz yapmadiniz. Hisse kodunu yazip "Analiz Et" butonuna basin (ornek: NVDA), NASDAQ acik mi diye sormak icin /piyasa yazip gonderin.');
+}
+
+function analizAltSekmeDegistir(sekme, el) {
+  var btnlar = document.querySelectorAll("#analiz-alt-filtre .bot-btn");
+  for (var i = 0; i < btnlar.length; i++) btnlar[i].classList.remove("active");
+  el.classList.add("active");
+  document.getElementById("kripto-analiz-bolumu").style.display = sekme === "kripto" ? "block" : "none";
+  document.getElementById("hisse-analiz-bolumu").style.display = sekme === "hisse" ? "block" : "none";
+}
+
+function kriptoAnalizGonder() {
+  var input = document.getElementById("kripto-analiz-input");
   var deger = input.value.trim();
   if (!deger) return;
   input.value = "";
-  if (/^\/hisse\b/i.test(deger)) {
-    hisseAnaliziBaslat(deger.replace(/^\/hisse\s*/i, ""));
-    return;
-  }
+  coinAnaliziBaslat(deger);
+}
+
+function hisseAnalizGonder() {
+  var input = document.getElementById("hisse-analiz-input");
+  var deger = input.value.trim();
+  if (!deger) return;
+  input.value = "";
   if (/^\/piyasa\b/i.test(deger)) {
     piyasaDurumuGoster();
     return;
   }
-  coinAnaliziBaslat(deger);
+  hisseAnaliziBaslat(deger);
 }
 
 function sohbetGonder() {
@@ -917,21 +952,22 @@ function sohbetSil(id) {
 // Claude'a gonderilir; Claude hicbir sayi HESAPLAMAZ, sadece anlatir.
 // ============================================================
 
-var sohbetYerelMesajlar = []; // {id, tip: "kullanici"|"bot", metin}
+var kriptoAnalizMesajlari = []; // {id, tip: "kullanici"|"bot", metin, zaman}
+var hisseAnalizMesajlari = [];
 var sohbetYerelIdSayaci = 0;
 
-function sohbetYerelMesajEkle(tip, metin, ozelId) {
+function analizMesajEkle(dizi, renderFn, tip, metin, ozelId) {
   var id = ozelId || ("yerel-" + (++sohbetYerelIdSayaci));
-  sohbetYerelMesajlar.push({ id: id, tip: tip, metin: metin, zaman: new Date() });
-  coinAnaliziGoster();
+  dizi.push({ id: id, tip: tip, metin: metin, zaman: new Date() });
+  renderFn();
   return id;
 }
 
-function sohbetYerelMesajGuncelle(id, yeniMetin) {
-  for (var i = 0; i < sohbetYerelMesajlar.length; i++) {
-    if (sohbetYerelMesajlar[i].id === id) { sohbetYerelMesajlar[i].metin = yeniMetin; break; }
+function analizMesajGuncelle(dizi, renderFn, id, yeniMetin) {
+  for (var i = 0; i < dizi.length; i++) {
+    if (dizi[i].id === id) { dizi[i].metin = yeniMetin; break; }
   }
-  coinAnaliziGoster();
+  renderFn();
 }
 
 function rsiHesapla(kapanislar, periyot) {
@@ -1049,17 +1085,17 @@ function coinAnaliziSembolCoz(girdi) {
 }
 
 function coinAnaliziHataGoster(mesajId, sembol) {
-  sohbetYerelMesajGuncelle(mesajId, "⚠️ " + sembol + " icin veri alinamadi. Sembolu kontrol edip tekrar deneyin (ornek: /analiz BTC).");
+  analizMesajGuncelle(kriptoAnalizMesajlari, kriptoAnalizGoster, mesajId, "⚠️ " + sembol + " icin veri alinamadi. Sembolu kontrol edip tekrar deneyin.");
 }
 
 function coinAnaliziBaslat(sembolRaw) {
   var sembol = coinAnaliziSembolCoz(sembolRaw);
   if (!sembol) {
-    sohbetYerelMesajEkle("bot", "Kullanim: BTC gibi bir coin sembolu girin.");
+    analizMesajEkle(kriptoAnalizMesajlari, kriptoAnalizGoster, "bot", "Kullanim: BTC gibi bir coin sembolu girin.");
     return;
   }
-  sohbetYerelMesajEkle("kullanici", sembolRaw.trim().toUpperCase());
-  var yukleniyorId = sohbetYerelMesajEkle("bot", "⏳ " + sembol + " icin analiz hazirlaniyor...");
+  analizMesajEkle(kriptoAnalizMesajlari, kriptoAnalizGoster, "kullanici", sembolRaw.trim().toUpperCase());
+  var yukleniyorId = analizMesajEkle(kriptoAnalizMesajlari, kriptoAnalizGoster, "bot", "⏳ " + sembol + " icin analiz hazirlaniyor...");
 
   var zamanDilimleri = ["15m", "1h", "4h"];
   var sonuclar = {};
@@ -1107,15 +1143,15 @@ function coinAnaliziYorumIste(sembol, gunlukDegisim, guncelFiyat, zamanDilimVeri
     var yanit;
     try { yanit = JSON.parse(xhr.responseText); } catch (e) { yanit = {}; }
     if (xhr.status === 200 && yanit.yorum) {
-      sohbetYerelMesajGuncelle(mesajId, yanit.yorum + YASAL_UYARI_METNI);
+      analizMesajGuncelle(kriptoAnalizMesajlari, kriptoAnalizGoster, mesajId, yanit.yorum + YASAL_UYARI_METNI);
     } else if (xhr.status === 429) {
-      sohbetYerelMesajGuncelle(mesajId, "⏳ " + (yanit.hata || "Gunluk analiz hakkiniz doldu."));
+      analizMesajGuncelle(kriptoAnalizMesajlari, kriptoAnalizGoster, mesajId, "⏳ " + (yanit.hata || "Gunluk analiz hakkiniz doldu."));
     } else {
-      sohbetYerelMesajGuncelle(mesajId, "⚠️ Analiz olusturulamadi: " + (yanit.hata || "bilinmeyen hata"));
+      analizMesajGuncelle(kriptoAnalizMesajlari, kriptoAnalizGoster, mesajId, "⚠️ Analiz olusturulamadi: " + (yanit.hata || "bilinmeyen hata"));
     }
   };
   xhr.onerror = function() {
-    sohbetYerelMesajGuncelle(mesajId, "⚠️ Sunucuya ulasilamadi.");
+    analizMesajGuncelle(kriptoAnalizMesajlari, kriptoAnalizGoster, mesajId, "⚠️ Sunucuya ulasilamadi.");
   };
   xhr.send(JSON.stringify({
     sembol: sembol,
@@ -1133,11 +1169,11 @@ function coinAnaliziYorumIste(sembol, gunlukDegisim, guncelFiyat, zamanDilimVeri
 function hisseAnaliziBaslat(sembolRaw) {
   var sembol = (sembolRaw || "").trim().toUpperCase();
   if (!sembol) {
-    sohbetYerelMesajEkle("bot", "Kullanim: /hisse NVDA gibi bir ABD hisse sembolu girin.");
+    analizMesajEkle(hisseAnalizMesajlari, hisseAnalizGoster, "bot", "Kullanim: NVDA gibi bir ABD hisse sembolu girin.");
     return;
   }
-  sohbetYerelMesajEkle("kullanici", "/hisse " + sembol);
-  var yukleniyorId = sohbetYerelMesajEkle("bot", "⏳ " + sembol + " icin analiz hazirlaniyor...");
+  analizMesajEkle(hisseAnalizMesajlari, hisseAnalizGoster, "kullanici", sembol);
+  var yukleniyorId = analizMesajEkle(hisseAnalizMesajlari, hisseAnalizGoster, "bot", "⏳ " + sembol + " icin analiz hazirlaniyor...");
 
   var xhr = new XMLHttpRequest();
   xhr.open("POST", API + "/hisse-analiz-yorumla", true);
@@ -1147,15 +1183,15 @@ function hisseAnaliziBaslat(sembolRaw) {
     var yanit;
     try { yanit = JSON.parse(xhr.responseText); } catch (e) { yanit = {}; }
     if (xhr.status === 200 && yanit.yorum) {
-      sohbetYerelMesajGuncelle(yukleniyorId, yanit.yorum + YASAL_UYARI_METNI);
+      analizMesajGuncelle(hisseAnalizMesajlari, hisseAnalizGoster, yukleniyorId, yanit.yorum + YASAL_UYARI_METNI);
     } else if (xhr.status === 429) {
-      sohbetYerelMesajGuncelle(yukleniyorId, "⏳ " + (yanit.hata || "Gunluk analiz hakkiniz doldu."));
+      analizMesajGuncelle(hisseAnalizMesajlari, hisseAnalizGoster, yukleniyorId, "⏳ " + (yanit.hata || "Gunluk analiz hakkiniz doldu."));
     } else {
-      sohbetYerelMesajGuncelle(yukleniyorId, "⚠️ " + (yanit.hata || "Analiz olusturulamadi."));
+      analizMesajGuncelle(hisseAnalizMesajlari, hisseAnalizGoster, yukleniyorId, "⚠️ " + (yanit.hata || "Analiz olusturulamadi."));
     }
   };
   xhr.onerror = function() {
-    sohbetYerelMesajGuncelle(yukleniyorId, "⚠️ Sunucuya ulasilamadi.");
+    analizMesajGuncelle(hisseAnalizMesajlari, hisseAnalizGoster, yukleniyorId, "⚠️ Sunucuya ulasilamadi.");
   };
   xhr.send(JSON.stringify({ sembol: sembol }));
 }
@@ -1166,8 +1202,8 @@ function hisseAnaliziBaslat(sembolRaw) {
 // ============================================================
 
 function takvimAnaliziBaslat() {
-  sohbetYerelMesajEkle("kullanici", "/takvim");
-  var yukleniyorId = sohbetYerelMesajEkle("bot", "⏳ Onumuzdeki haftanin ekonomik takvimi hazirlaniyor...");
+  analizMesajEkle(hisseAnalizMesajlari, hisseAnalizGoster, "kullanici", "/takvim");
+  var yukleniyorId = analizMesajEkle(hisseAnalizMesajlari, hisseAnalizGoster, "bot", "⏳ Onumuzdeki haftanin ekonomik takvimi hazirlaniyor...");
 
   var xhr = new XMLHttpRequest();
   xhr.open("POST", API + "/takvim-analiz-yorumla", true);
@@ -1177,15 +1213,15 @@ function takvimAnaliziBaslat() {
     var yanit;
     try { yanit = JSON.parse(xhr.responseText); } catch (e) { yanit = {}; }
     if (xhr.status === 200 && yanit.yorum) {
-      sohbetYerelMesajGuncelle(yukleniyorId, yanit.yorum + YASAL_UYARI_METNI);
+      analizMesajGuncelle(hisseAnalizMesajlari, hisseAnalizGoster, yukleniyorId, yanit.yorum + YASAL_UYARI_METNI);
     } else if (xhr.status === 429) {
-      sohbetYerelMesajGuncelle(yukleniyorId, "⏳ " + (yanit.hata || "Gunluk analiz hakkiniz doldu."));
+      analizMesajGuncelle(hisseAnalizMesajlari, hisseAnalizGoster, yukleniyorId, "⏳ " + (yanit.hata || "Gunluk analiz hakkiniz doldu."));
     } else {
-      sohbetYerelMesajGuncelle(yukleniyorId, "⚠️ " + (yanit.hata || "Takvim olusturulamadi."));
+      analizMesajGuncelle(hisseAnalizMesajlari, hisseAnalizGoster, yukleniyorId, "⚠️ " + (yanit.hata || "Takvim olusturulamadi."));
     }
   };
   xhr.onerror = function() {
-    sohbetYerelMesajGuncelle(yukleniyorId, "⚠️ Sunucuya ulasilamadi.");
+    analizMesajGuncelle(hisseAnalizMesajlari, hisseAnalizGoster, yukleniyorId, "⚠️ Sunucuya ulasilamadi.");
   };
   xhr.send("{}");
 }
@@ -1290,7 +1326,7 @@ function nasdaqDurumuHesapla() {
 }
 
 function piyasaDurumuGoster() {
-  sohbetYerelMesajEkle("kullanici", "/piyasa");
+  analizMesajEkle(hisseAnalizMesajlari, hisseAnalizGoster, "kullanici", "/piyasa");
   var durum = nasdaqDurumuHesapla();
   var mesaj;
   if (durum.tatilMi) {
@@ -1302,7 +1338,7 @@ function piyasaDurumuGoster() {
   } else {
     mesaj = "🔴 NASDAQ ve NYSE su an KAPALI (normal seans disinda). Normal seans 09:30-16:00 (New York saati) arasindadir. Guncel New York saati: " + durum.nyZaman + ".";
   }
-  sohbetYerelMesajEkle("bot", mesaj);
+  analizMesajEkle(hisseAnalizMesajlari, hisseAnalizGoster, "bot", mesaj);
 }
 // etkilenmez. Sadece bu 3 borsa desteklenir (Coinglass'taki gibi
 // 18 borsa degil) - digerleri bu veriyi ya ucretsiz sunmuyor ya da
@@ -2406,7 +2442,7 @@ function sekmeAc(id, el) {
   // Analiz sekmesi (coin/hisse/piyasa analizleri) - onceki mesaj gecmisini
   // gostermek icin sekme her acildiginda render edilir, otomatik veri
   // cekmez (sadece kullanicinin kendi sorgusuyla tetiklenir).
-  if (id === "analiz") coinAnaliziGoster();
+  if (id === "analiz") { kriptoAnalizGoster(); hisseAnalizGoster(); }
 }
 
 function botFiltre(bot, el) {
