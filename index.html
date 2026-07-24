@@ -493,7 +493,7 @@ function favoriToggle(sembol) {
     yeniDurum = true;
   }
   favoriKaydet();
-  sinyalleriGoster();
+  if (aktifSekme === "gecmis") gecmisGoster(); else sinyalleriGoster();
   // Push bildirimlerinde kullanilmasi icin backend'e de bildir (arka planda, sessizce)
   if (authToken) {
     var xhr = new XMLHttpRequest();
@@ -1055,6 +1055,77 @@ function uyumsuzlukBul(mumlar, rsiDizisi) {
     if (sonD.deger < oncekiD.deger && rsiDizisi[sonD.index] > rsiDizisi[oncekiD.index]) return "pozitif";
   }
   return null;
+}
+
+// --- SINYAL KARTLARINDAKI CANLI MUM GRAFIGI ---
+// Zaman dilimini degistirmek icin sadece bu satiri guncelle: "1m", "5m", "15m", "1h" vb.
+var MUM_GRAFIK_ARALIK = "5m";
+var MUM_GRAFIK_MUM_SAYISI = 20;
+var MUM_GRAFIK_YENILEME_MS = 30000; // sembol basina en fazla bu sıklıkta yeniden veri cekilir
+var mumGrafikOnbellek = {}; // {SEMBOL: {mumlar:[...], zaman: Date.now(), yukleniyor:bool}}
+
+function mumSvgOlustur(mumlar) {
+  if (!mumlar || mumlar.length === 0) {
+    return '<span style="font-size:10px;color:#475569">Veri yok</span>';
+  }
+  var w = 220, h = 78, pad = 4;
+  var n = mumlar.length;
+  var maxY = Math.max.apply(null, mumlar.map(function(m) { return m.yuksek; }));
+  var minY = Math.min.apply(null, mumlar.map(function(m) { return m.dusuk; }));
+  var aralik = (maxY - minY) || (maxY * 0.001) || 1;
+  var hucre = (w - 2 * pad) / n;
+  var candleW = Math.max(2, hucre * 0.62);
+  var svg = '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;height:' + h + 'px" xmlns="http://www.w3.org/2000/svg">';
+  for (var i = 0; i < n; i++) {
+    var m = mumlar[i];
+    var x = pad + i * hucre + (hucre - candleW) / 2;
+    var yAcilis = h - pad - ((m.acilis - minY) / aralik) * (h - 2 * pad);
+    var yKapanis = h - pad - ((m.kapanis - minY) / aralik) * (h - 2 * pad);
+    var yYuksek = h - pad - ((m.yuksek - minY) / aralik) * (h - 2 * pad);
+    var yDusuk = h - pad - ((m.dusuk - minY) / aralik) * (h - 2 * pad);
+    var renk = m.kapanis >= m.acilis ? "#4ade80" : "#f87171";
+    svg += '<line x1="' + (x + candleW / 2) + '" x2="' + (x + candleW / 2) + '" y1="' + yYuksek + '" y2="' + yDusuk + '" stroke="' + renk + '" stroke-width="1"></line>';
+    var govdeY = Math.min(yAcilis, yKapanis);
+    var govdeH = Math.max(1, Math.abs(yKapanis - yAcilis));
+    svg += '<rect x="' + x + '" y="' + govdeY + '" width="' + candleW + '" height="' + govdeH + '" fill="' + renk + '"></rect>';
+  }
+  svg += "</svg>";
+  return svg;
+}
+
+function mumGrafikHucreleriDoldur(sembol) {
+  var hucreler = document.querySelectorAll('.mum-grafik-yer[data-sembol="' + sembol + '"]');
+  var kayit = mumGrafikOnbellek[sembol];
+  var svg = kayit && kayit.mumlar ? mumSvgOlustur(kayit.mumlar) : '<span style="font-size:10px;color:#475569">Grafik alinamadi</span>';
+  for (var i = 0; i < hucreler.length; i++) hucreler[i].innerHTML = svg;
+}
+
+function mumGrafikSembolGuncelle(sembol) {
+  var kayit = mumGrafikOnbellek[sembol];
+  var simdi = Date.now();
+  if (kayit && kayit.yukleniyor) return;
+  if (kayit && kayit.zaman && (simdi - kayit.zaman) < MUM_GRAFIK_YENILEME_MS) return;
+  mumGrafikOnbellek[sembol] = { mumlar: kayit ? kayit.mumlar : null, zaman: kayit ? kayit.zaman : 0, yukleniyor: true };
+  binanceKlineGetir(sembol, MUM_GRAFIK_ARALIK, MUM_GRAFIK_MUM_SAYISI, function(mumlar) {
+    mumGrafikOnbellek[sembol] = { mumlar: mumlar, zaman: Date.now(), yukleniyor: false };
+    mumGrafikHucreleriDoldur(sembol);
+  }, function() {
+    mumGrafikOnbellek[sembol] = { mumlar: kayit ? kayit.mumlar : null, zaman: Date.now(), yukleniyor: false };
+    mumGrafikHucreleriDoldur(sembol);
+  });
+}
+
+function mumGrafikleriYukle() {
+  var hucreler = document.querySelectorAll(".mum-grafik-yer");
+  var gorulen = {};
+  for (var i = 0; i < hucreler.length; i++) {
+    var sembol = hucreler[i].getAttribute("data-sembol");
+    if (!sembol || gorulen[sembol]) continue;
+    gorulen[sembol] = true;
+    var kayit = mumGrafikOnbellek[sembol];
+    if (kayit && kayit.mumlar) mumGrafikHucreleriDoldur(sembol);
+    mumGrafikSembolGuncelle(sembol);
+  }
 }
 
 function binanceKlineGetir(sembol, interval, limit, basarili, hata) {
@@ -1641,22 +1712,12 @@ function sinyalleriGoster() {
     hepsi = hepsi.filter(function(item) { return favoriCoinler[item.s.sembol]; });
   }
 
-  function eSeviyeHtml(etiket, deger, seviyeNo, asamaSayisi) {
-    if (!deger) return "";
-    var kullanildiMi = asamaSayisi >= seviyeNo;
-    var stil = kullanildiMi ? "text-decoration:line-through;opacity:0.65" : "";
-    return '<div class="sig-row"><span class="sig-key">' + etiket + '</span><span class="sig-val blue kopyalanabilir" style="' + stil + '" onclick="fiyatKopyala(\'' + deger + '\', this)">' + deger + '</span></div>';
-  }
-
   for (var k = 0; k < hepsi.length; k++) {
     var s = hepsi[k].s;
     var bot = hepsi[k].bot;
     var yon = s.yon || "";
     var cls = yon === "LONG" ? "long" : "short";
     var asamaSayisi = s.asama || 0;
-    var e1html = eSeviyeHtml("E1", s.e1, 1, asamaSayisi);
-    var e2html = eSeviyeHtml("E2", s.e2, 2, asamaSayisi);
-    var e3html = eSeviyeHtml("E3", s.e3, 3, asamaSayisi);
     var kademehtml = '<div style="display:flex;gap:4px;align-items:center;margin:6px 0">' +
       '<div style="display:flex;gap:3px;flex:1">' +
       '<div style="flex:1;height:5px;border-radius:3px;background:' + (asamaSayisi >= 1 ? "#3b82f6" : "#1e293b") + '"></div>' +
@@ -1679,14 +1740,37 @@ function sinyalleriGoster() {
     html += '<div class="sig-badges"><span class="badge ' + cls + '">' + yon + '</span>';
     html += '<span class="badge bot">' + botAdi(bot) + '</span></div></div>';
     html += canliFiyatHtml;
-    html += '<div class="sig-row"><span class="sig-key">Giris</span><span class="sig-val kopyalanabilir" onclick="fiyatKopyala(\'' + (s.giris || s.maliyet || "-") + '\', this)">' + (s.giris || s.maliyet || "-") + '</span></div>';
-    html += '<div class="sig-row"><span class="sig-key">Hedef</span><span class="sig-val green kopyalanabilir" onclick="fiyatKopyala(\'' + (s.hedef || "-") + '\', this)">' + (s.hedef || "-") + '</span></div>';
-    html += '<div class="sig-row"><span class="sig-key">Stop</span><span class="sig-val red kopyalanabilir" onclick="fiyatKopyala(\'' + (s.stop || "-") + '\', this)">' + (s.stop || "-") + '</span></div>';
-    html += e1html + e2html + e3html + kademehtml;
+
+    var satirlar = [
+      { etiket: "Giris", deger: (s.giris || s.maliyet || "-"), renk: "" },
+      { etiket: "Hedef", deger: (s.hedef || "-"), renk: "green" },
+      { etiket: "Stop", deger: (s.stop || "-"), renk: "red" }
+    ];
+    if (s.e1) satirlar.push({ etiket: "E1", deger: s.e1, renk: "blue", cizgi: asamaSayisi >= 1 });
+    if (s.e2) satirlar.push({ etiket: "E2", deger: s.e2, renk: "blue", cizgi: asamaSayisi >= 2 });
+    if (s.e3) satirlar.push({ etiket: "E3", deger: s.e3, renk: "blue", cizgi: asamaSayisi >= 3 });
+
+    var etiketSutunu = "", degerSutunu = "";
+    for (var r = 0; r < satirlar.length; r++) {
+      var sr = satirlar[r];
+      var stil = sr.cizgi ? "text-decoration:line-through;opacity:0.65" : "";
+      etiketSutunu += '<div style="font-size:12px;color:#64748b;line-height:22px">' + sr.etiket + '</div>';
+      degerSutunu += '<div class="sig-val ' + sr.renk + ' kopyalanabilir" style="line-height:22px;' + stil + '" onclick="fiyatKopyala(\'' + sr.deger + '\', this)">' + sr.deger + '</div>';
+    }
+
+    html += '<div style="display:flex;gap:6px;margin:8px 0">';
+    html += '<div style="flex:0.85;min-width:56px">' + etiketSutunu + '</div>';
+    html += '<div style="flex:1.7;display:flex;align-items:center;justify-content:center">';
+    html += '<div class="mum-grafik-yer" data-sembol="' + s.sembol + '" style="width:100%;height:78px;display:flex;align-items:center;justify-content:center"><span style="font-size:10px;color:#475569">Grafik yukleniyor...</span></div>';
+    html += '</div>';
+    html += '<div style="flex:0.85;min-width:56px;text-align:right">' + degerSutunu + '</div>';
+    html += '</div>';
+    html += kademehtml;
     html += '<div class="sig-time">' + (s.zaman || "") + '</div></div>';
   }
   if (hepsi.length === 0) html = '<div class="empty">Su an aktif veri yok</div>';
   document.getElementById("sinyal-listesi").innerHTML = html;
+  mumGrafikleriYukle();
 }
 
 function trendGrafigiHtml() {
@@ -1885,8 +1969,10 @@ function gecmisGoster() {
     var sonucYazi = s.durum === "tp" ? "TP" : "Stop";
     var yon = s.yon || "";
     var yonCls = yon === "LONG" ? "long" : "short";
+    var favoriMi = favoriCoinler[s.sembol];
+    var yildizHtml = '<span onclick="favoriToggle(\'' + s.sembol + '\')" style="cursor:pointer;font-size:16px;margin-left:6px" title="Favorilere ekle/cikar">' + (favoriMi ? '<span style="color:#fbbf24">&#9733;</span>' : '<span style="color:#475569">&#9734;</span>') + '</span>';
     html += '<div class="signal-card ' + sonuc + '">';
-    html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + '</div>';
+    html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + yildizHtml + '</div>';
     html += '<div class="sig-badges"><span class="badge ' + sonuc + '">' + sonucYazi + '</span>';
     html += '<span class="badge bot">' + botAdi(bot) + '</span></div></div>';
     html += '<div class="sig-row"><span class="sig-key">Yon</span><span class="badge ' + yonCls + '">' + yon + '</span></div>';
