@@ -1641,15 +1641,22 @@ function sinyalleriGoster() {
     hepsi = hepsi.filter(function(item) { return favoriCoinler[item.s.sembol]; });
   }
 
+  function eSeviyeHtml(etiket, deger, seviyeNo, asamaSayisi) {
+    if (!deger) return "";
+    var kullanildiMi = asamaSayisi >= seviyeNo;
+    var stil = kullanildiMi ? "text-decoration:line-through;opacity:0.65" : "";
+    return '<div class="sig-row"><span class="sig-key">' + etiket + '</span><span class="sig-val blue kopyalanabilir" style="' + stil + '" onclick="fiyatKopyala(\'' + deger + '\', this)">' + deger + '</span></div>';
+  }
+
   for (var k = 0; k < hepsi.length; k++) {
     var s = hepsi[k].s;
     var bot = hepsi[k].bot;
     var yon = s.yon || "";
     var cls = yon === "LONG" ? "long" : "short";
-    var e1html = s.e1 ? '<div class="sig-row"><span class="sig-key">E1</span><span class="sig-val blue kopyalanabilir" onclick="fiyatKopyala(\'' + s.e1 + '\', this)">' + s.e1 + '</span></div>' : "";
-    var e2html = s.e2 ? '<div class="sig-row"><span class="sig-key">E2</span><span class="sig-val blue kopyalanabilir" onclick="fiyatKopyala(\'' + s.e2 + '\', this)">' + s.e2 + '</span></div>' : "";
-    var e3html = s.e3 ? '<div class="sig-row"><span class="sig-key">E3</span><span class="sig-val blue kopyalanabilir" onclick="fiyatKopyala(\'' + s.e3 + '\', this)">' + s.e3 + '</span></div>' : "";
     var asamaSayisi = s.asama || 0;
+    var e1html = eSeviyeHtml("E1", s.e1, 1, asamaSayisi);
+    var e2html = eSeviyeHtml("E2", s.e2, 2, asamaSayisi);
+    var e3html = eSeviyeHtml("E3", s.e3, 3, asamaSayisi);
     var kademehtml = '<div style="display:flex;gap:4px;align-items:center;margin:6px 0">' +
       '<div style="display:flex;gap:3px;flex:1">' +
       '<div style="flex:1;height:5px;border-radius:3px;background:' + (asamaSayisi >= 1 ? "#3b82f6" : "#1e293b") + '"></div>' +
