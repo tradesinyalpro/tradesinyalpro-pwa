@@ -1870,20 +1870,21 @@ function sinyalleriGoster() {
     if (s.e2) satirlar.push({ etiket: "E2", deger: s.e2, renk: "blue", cizgi: asamaSayisi >= 2 });
     if (s.e3) satirlar.push({ etiket: "E3", deger: s.e3, renk: "blue", cizgi: asamaSayisi >= 3 });
 
-    var etiketSutunu = "", degerSutunu = "";
+    var satirlarHtml = "";
     for (var r = 0; r < satirlar.length; r++) {
       var sr = satirlar[r];
       var stil = sr.cizgi ? "text-decoration:line-through;opacity:0.65" : "";
-      etiketSutunu += '<div style="font-size:12px;color:#64748b;line-height:22px">' + sr.etiket + '</div>';
-      degerSutunu += '<div class="sig-val ' + sr.renk + ' kopyalanabilir" style="line-height:22px;' + stil + '" onclick="fiyatKopyala(\'' + sr.deger + '\', this)">' + sr.deger + '</div>';
+      satirlarHtml += '<div style="display:flex;justify-content:space-between;align-items:baseline;line-height:22px">';
+      satirlarHtml += '<span style="font-size:12px;color:#64748b">' + sr.etiket + '</span>';
+      satirlarHtml += '<span class="sig-val ' + sr.renk + ' kopyalanabilir" style="' + stil + '" onclick="fiyatKopyala(\'' + sr.deger + '\', this)">' + sr.deger + '</span>';
+      satirlarHtml += '</div>';
     }
 
-    html += '<div style="display:flex;gap:6px;margin:8px 0">';
-    html += '<div style="flex:0.85;min-width:56px">' + etiketSutunu + '</div>';
-    html += '<div style="flex:1.7;display:flex;align-items:center;justify-content:center">';
+    html += '<div style="display:flex;gap:14px;margin:8px 0;align-items:center">';
+    html += '<div style="flex:0 0 150px;min-width:130px">' + satirlarHtml + '</div>';
+    html += '<div style="flex:1;min-width:0">';
     html += '<div class="mum-grafik-yer" data-sembol="' + s.sembol + '" style="width:100%;min-height:40px;text-align:center"><span style="font-size:10px;color:#475569">Grafik yukleniyor...</span></div>';
     html += '</div>';
-    html += '<div style="flex:0.85;min-width:56px;text-align:right">' + degerSutunu + '</div>';
     html += '</div>';
     html += kademehtml;
     html += '<div class="sig-time">' + (s.zaman || "") + '</div></div>';
