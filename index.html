@@ -1057,38 +1057,64 @@ function uyumsuzlukBul(mumlar, rsiDizisi) {
   return null;
 }
 
-// --- SINYAL KARTLARINDAKI CANLI MUM GRAFIGI ---
-// Zaman dilimini degistirmek icin sadece bu satiri guncelle: "1m", "5m", "15m", "1h" vb.
-var MUM_GRAFIK_ARALIK = "5m";
-var MUM_GRAFIK_MUM_SAYISI = 20;
-var MUM_GRAFIK_YENILEME_MS = 30000; // sembol basina en fazla bu sıklıkta yeniden veri cekilir
+// --- SINYAL KARTLARINDAKI CANLI MUM GRAFIGI (destek/direnc cizgileriyle) ---
+// Zaman dilimini/mum sayisini degistirmek icin sadece bu iki satiri guncelle.
+var MUM_GRAFIK_ARALIK = "15m";
+var MUM_GRAFIK_MUM_SAYISI = 96; // 15m x 96 = son 24 saat
+var MUM_GRAFIK_YENILEME_MS = 60000; // sembol basina en fazla bu sıklıkta yeniden veri cekilir
 var mumGrafikOnbellek = {}; // {SEMBOL: {mumlar:[...], zaman: Date.now(), yukleniyor:bool}}
 
-function mumSvgOlustur(mumlar) {
+function fiyatEtiketFormatla(v) {
+  if (v === null || v === undefined || isNaN(v)) return "-";
+  var ondalik = v >= 100 ? 2 : v >= 1 ? 4 : v >= 0.01 ? 5 : 8;
+  var s = v.toFixed(ondalik);
+  if (s.indexOf(".") !== -1) s = s.replace(/0+$/, "").replace(/\.$/, "");
+  return s;
+}
+
+function mumSvgOlustur(mumlar, guncelFiyat) {
   if (!mumlar || mumlar.length === 0) {
     return '<span style="font-size:10px;color:#475569">Veri yok</span>';
   }
   var w = 220, h = 78, pad = 4;
   var n = mumlar.length;
+  var sr = destekDirencBul(mumlar, guncelFiyat || mumlar[n - 1].kapanis);
   var maxY = Math.max.apply(null, mumlar.map(function(m) { return m.yuksek; }));
   var minY = Math.min.apply(null, mumlar.map(function(m) { return m.dusuk; }));
+  if (sr.direnc !== null) maxY = Math.max(maxY, sr.direnc);
+  if (sr.destek !== null) minY = Math.min(minY, sr.destek);
   var aralik = (maxY - minY) || (maxY * 0.001) || 1;
   var hucre = (w - 2 * pad) / n;
-  var candleW = Math.max(2, hucre * 0.62);
+  var candleW = Math.max(1, hucre * 0.62);
+
+  function yHesapla(deger) { return h - pad - ((deger - minY) / aralik) * (h - 2 * pad); }
+
   var svg = '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;height:' + h + 'px" xmlns="http://www.w3.org/2000/svg">';
   for (var i = 0; i < n; i++) {
     var m = mumlar[i];
     var x = pad + i * hucre + (hucre - candleW) / 2;
-    var yAcilis = h - pad - ((m.acilis - minY) / aralik) * (h - 2 * pad);
-    var yKapanis = h - pad - ((m.kapanis - minY) / aralik) * (h - 2 * pad);
-    var yYuksek = h - pad - ((m.yuksek - minY) / aralik) * (h - 2 * pad);
-    var yDusuk = h - pad - ((m.dusuk - minY) / aralik) * (h - 2 * pad);
+    var yAcilis = yHesapla(m.acilis);
+    var yKapanis = yHesapla(m.kapanis);
+    var yYuksek = yHesapla(m.yuksek);
+    var yDusuk = yHesapla(m.dusuk);
     var renk = m.kapanis >= m.acilis ? "#4ade80" : "#f87171";
     svg += '<line x1="' + (x + candleW / 2) + '" x2="' + (x + candleW / 2) + '" y1="' + yYuksek + '" y2="' + yDusuk + '" stroke="' + renk + '" stroke-width="1"></line>';
     var govdeY = Math.min(yAcilis, yKapanis);
     var govdeH = Math.max(1, Math.abs(yKapanis - yAcilis));
     svg += '<rect x="' + x + '" y="' + govdeY + '" width="' + candleW + '" height="' + govdeH + '" fill="' + renk + '"></rect>';
   }
+
+  if (sr.direnc !== null) {
+    var yDirenc = yHesapla(sr.direnc);
+    svg += '<line x1="0" x2="' + w + '" y1="' + yDirenc + '" y2="' + yDirenc + '" stroke="#fbbf24" stroke-width="1" stroke-dasharray="3,2"></line>';
+    svg += '<text x="2" y="' + Math.max(8, yDirenc - 2) + '" font-size="8" fill="#fbbf24">' + fiyatEtiketFormatla(sr.direnc) + '</text>';
+  }
+  if (sr.destek !== null) {
+    var yDestek = yHesapla(sr.destek);
+    svg += '<line x1="0" x2="' + w + '" y1="' + yDestek + '" y2="' + yDestek + '" stroke="#22d3ee" stroke-width="1" stroke-dasharray="3,2"></line>';
+    svg += '<text x="2" y="' + Math.min(h - 2, yDestek + 9) + '" font-size="8" fill="#22d3ee">' + fiyatEtiketFormatla(sr.destek) + '</text>';
+  }
+
   svg += "</svg>";
   return svg;
 }
@@ -1096,7 +1122,8 @@ function mumSvgOlustur(mumlar) {
 function mumGrafikHucreleriDoldur(sembol) {
   var hucreler = document.querySelectorAll('.mum-grafik-yer[data-sembol="' + sembol + '"]');
   var kayit = mumGrafikOnbellek[sembol];
-  var svg = kayit && kayit.mumlar ? mumSvgOlustur(kayit.mumlar) : '<span style="font-size:10px;color:#475569">Grafik alinamadi</span>';
+  var guncelFiyat = parseFloat(canliFiyatlar[sembol]) || null;
+  var svg = kayit && kayit.mumlar ? mumSvgOlustur(kayit.mumlar, guncelFiyat) : '<span style="font-size:10px;color:#475569">Grafik alinamadi</span>';
   for (var i = 0; i < hucreler.length; i++) hucreler[i].innerHTML = svg;
 }
 
