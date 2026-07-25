@@ -35,6 +35,9 @@
   .sig-stats-row { display: flex; gap: 14px; margin: 8px 0; align-items: center; }
   .sig-stats-left { flex: 0 0 300px; min-width: 200px; }
   .sig-stats-chart { flex: 1; min-width: 0; }
+  @media (min-width: 701px) {
+    .sig-stats-chart { max-width: 620px; }
+  }
   @media (max-width: 700px) {
     .sig-stats-row { flex-direction: column; align-items: stretch; gap: 8px; }
     .sig-stats-left { flex: 0 0 auto; min-width: 0; width: 100%; }
@@ -1138,7 +1141,7 @@ document.addEventListener("click", function(e) {
 function rsiSvgOlustur(mumlar, sembol) {
   var kapanislar = mumlar.map(function(m) { return m.kapanis; });
   var rsiDizisi = rsiHesapla(kapanislar, 14);
-  var w = 220, h = 56, pad = 3;
+  var w = 220, h = 38, pad = 3;
   var n = mumlar.length;
   var hucre = (w - 2 * pad) / n;
   function yHesapla(v) { return h - pad - (v / 100) * (h - 2 * pad); }
@@ -1168,7 +1171,7 @@ function mumSvgOlustur(mumlar, guncelFiyat, sembol) {
   if (!mumlar || mumlar.length === 0) {
     return '<span style="font-size:10px;color:#475569">Veri yok</span>';
   }
-  var w = 220, h = 130, pad = 6;
+  var w = 220, h = 92, pad = 5;
   var n = mumlar.length;
   var sr = destekDirencBul(mumlar, guncelFiyat || mumlar[n - 1].kapanis);
   var maxY = Math.max.apply(null, mumlar.map(function(m) { return m.yuksek; }));
