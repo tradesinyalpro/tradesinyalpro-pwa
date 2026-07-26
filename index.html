@@ -233,6 +233,12 @@
       ⚠️ Burada paylaşılan veriler yatırım tavsiyesi değildir, bilgilendirme amaçlıdır.
     </div>
     <div id="genel-basari-ozet" style="margin-bottom:10px"></div>
+    <div style="position:relative;margin-bottom:10px">
+      <input type="text" id="sinyal-arama" placeholder="Coin ara (orn: SOL veya SOLUSDT)" autocomplete="off"
+        oninput="sinyalAramaGuncelle(this.value)"
+        style="width:100%;box-sizing:border-box;background:#0c1424;border:1px solid #1e293b;border-radius:8px;padding:10px 34px 10px 12px;color:#e2e8f0;font-size:13px;outline:none">
+      <span id="sinyal-arama-temizle" onclick="sinyalAramaTemizle()" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:#64748b;font-size:16px">&times;</span>
+    </div>
     <div class="bot-filter">
       <button class="bot-btn active" onclick="botFiltre('hepsi',this)">Tumu</button>
       <button class="bot-btn" onclick="botFiltre('SINYAL_ODA_1',this)">Oda 1</button>
@@ -479,6 +485,7 @@ var piyasaSonGuncelleme = 0;
 var aktifBot = "hepsi";
 var favoriCoinler = {};
 var sadeceFavoriler = false;
+var sinyalAramaMetni = "";
 
 function favoriYukle() {
   try {
@@ -1841,6 +1848,10 @@ function sinyalleriGoster() {
   if (sadeceFavoriler) {
     hepsi = hepsi.filter(function(item) { return favoriCoinler[item.s.sembol]; });
   }
+  if (sinyalAramaMetni) {
+    var aramaBuyuk = sinyalAramaMetni.toUpperCase();
+    hepsi = hepsi.filter(function(item) { return item.s.sembol.toUpperCase().indexOf(aramaBuyuk) !== -1; });
+  }
 
   for (var k = 0; k < hepsi.length; k++) {
     var s = hepsi[k].s;
@@ -2667,6 +2678,22 @@ function sekmeAc(id, el) {
   // gostermek icin sekme her acildiginda render edilir, otomatik veri
   // cekmez (sadece kullanicinin kendi sorgusuyla tetiklenir).
   if (id === "analiz") { kriptoAnalizGoster(); hisseAnalizGoster(); }
+}
+
+function sinyalAramaGuncelle(deger) {
+  sinyalAramaMetni = deger.trim();
+  var temizleBtn = document.getElementById("sinyal-arama-temizle");
+  if (temizleBtn) temizleBtn.style.display = sinyalAramaMetni ? "block" : "none";
+  sinyalleriGoster();
+}
+
+function sinyalAramaTemizle() {
+  sinyalAramaMetni = "";
+  var kutu = document.getElementById("sinyal-arama");
+  if (kutu) kutu.value = "";
+  var temizleBtn = document.getElementById("sinyal-arama-temizle");
+  if (temizleBtn) temizleBtn.style.display = "none";
+  sinyalleriGoster();
 }
 
 function botFiltre(bot, el) {
