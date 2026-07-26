@@ -274,9 +274,19 @@
   </div>
 
   <div id="piyasa" style="display:none;padding:8px 12px">
-    <div class="signal-card" style="margin-bottom:10px">
-      <div style="font-size:13px;color:#94a3b8;margin-bottom:10px">BTC Dominansi / Piyasa Egilimi</div>
-      <div id="btc-dominans-icerik"><div class="loading">Yukleniyor...</div></div>
+    <div class="signal-card" style="padding:4px 8px;margin-bottom:10px">
+      <div class="tradingview-widget-container" style="height:70px">
+        <div class="tradingview-widget-container__widget"></div>
+        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-info.js" async>
+        {
+          "symbol": "CRYPTOCAP:BTC.D",
+          "colorTheme": "dark",
+          "isTransparent": true,
+          "locale": "tr",
+          "width": "100%"
+        }
+        </script>
+      </div>
     </div>
     <div class="signal-card" style="padding:12px 8px 4px">
       <div class="tradingview-widget-container" style="height:820px">
@@ -1910,14 +1920,22 @@ function haftalikOzetGorseliOlustur(basariYuzde, tp, stop) {
   ctx.lineWidth = 2;
   ctx.strokeRect(10, 10, w - 20, h - 20);
 
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#e2e8f0";
+  ctx.textAlign = "left";
   ctx.font = "bold 26px sans-serif";
-  ctx.fillText("Trade", w / 2 - 55, 90);
-  ctx.fillStyle = "#60a5fa";
-  ctx.fillText("Sinyal", w / 2 - 8, 90);
-  ctx.fillStyle = "#e2e8f0";
-  ctx.fillText("Pro", w / 2 + 48, 90);
+  var logoParcalari = [
+    { metin: "Trade", renk: "#e2e8f0" },
+    { metin: "Sinyal", renk: "#60a5fa" },
+    { metin: "Pro", renk: "#e2e8f0" }
+  ];
+  var logoToplamGenislik = 0;
+  for (var lp = 0; lp < logoParcalari.length; lp++) logoToplamGenislik += ctx.measureText(logoParcalari[lp].metin).width;
+  var logoX = w / 2 - logoToplamGenislik / 2;
+  for (var lp2 = 0; lp2 < logoParcalari.length; lp2++) {
+    ctx.fillStyle = logoParcalari[lp2].renk;
+    ctx.fillText(logoParcalari[lp2].metin, logoX, 90);
+    logoX += ctx.measureText(logoParcalari[lp2].metin).width;
+  }
+  ctx.textAlign = "center";
 
   ctx.fillStyle = "#4ade80";
   ctx.font = "bold 90px sans-serif";
@@ -2095,25 +2113,13 @@ function sinyalleriGoster() {
     var takipliMi = !!takipDurumu[takipAnahtari];
     var takipHtml = '<span onclick="takipToggle(\'' + bot + '\',\'' + s.sembol + '\',\'' + s.zaman + '\')" style="cursor:pointer;font-size:14px;margin-left:6px" title="Sanal Portfoyde Takip Et">' + (takipliMi ? "📌" : "📍") + '</span>';
 
-    var rrGirisNum = parseFloat(s.giris || s.maliyet);
-    var rrHedefNum = parseFloat(s.hedef);
-    var rrStopNum = parseFloat(s.stop);
-    var rrHtml = "";
-    if (rrGirisNum && rrHedefNum && rrStopNum) {
-      var rrRisk = Math.abs(rrGirisNum - rrStopNum);
-      var rrOdul = Math.abs(rrHedefNum - rrGirisNum);
-      if (rrRisk > 0) {
-        var rrOran = (rrOdul / rrRisk).toFixed(1);
-        rrHtml = '<span class="badge" style="background:#1e293b;color:#fbbf24;border:1px solid rgba(251,191,36,0.35)">R:R 1:' + rrOran + '</span>';
-      }
-    }
     var gorselBtnHtml = hesapDurumu === "admin"
       ? '<span onclick="sinyalGorseliOlustur(\'' + s.sembol + '\',\'' + yon + '\',\'' + (s.giris || s.maliyet || "-") + '\',\'' + (s.hedef || "-") + '\',\'' + (s.stop || "-") + '\')" style="cursor:pointer;font-size:14px;margin-left:6px" title="Tanitim gorseli olustur (sadece yonetici)">🖼️</span>'
       : "";
 
     html += '<div class="signal-card ' + cls + '">';
     html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + yildizHtml + takipHtml + gorselBtnHtml + '</div>';
-    html += '<div class="sig-badges">' + rrHtml + '<span class="badge ' + cls + '">' + yon + '</span>';
+    html += '<div class="sig-badges"><span class="badge ' + cls + '">' + yon + '</span>';
     html += '<span class="badge bot">' + botAdi(bot) + '</span></div></div>';
     html += canliFiyatHtml;
 
@@ -2535,7 +2541,6 @@ function piyasaGoster() {
 
   html += '<div class="section-title">Dominans</div>';
   html += '<div class="stats-grid">';
-  html += '<div class="stat-card"><div class="stat-label">BTC.D</div><div class="stat-val" style="color:#f59e0b">' + (btcD != null ? "%" + btcD.toFixed(1) : "-") + '</div>' + domBar(btcD, "#f59e0b") + '</div>';
   html += '<div class="stat-card"><div class="stat-label">ETH.D</div><div class="stat-val blue">' + (ethD != null ? "%" + ethD.toFixed(1) : "-") + '</div>' + domBar(ethD, "#60a5fa") + '</div>';
   html += '<div class="stat-card"><div class="stat-label">OTHERS.D</div><div class="stat-val" style="color:#a78bfa">' + (othersD != null ? "%" + othersD.toFixed(1) : "-") + '</div>' + domBar(othersD, "#a78bfa") + '</div>';
   html += '<div class="stat-card"><div class="stat-label">USDT.D</div><div class="stat-val green">' + (usdtD != null ? "%" + usdtD.toFixed(1) : "-") + '</div>' + domBar(usdtD, "#4ade80") + '</div>';
@@ -2937,42 +2942,7 @@ function sekmeAc(id, el) {
   // gostermek icin sekme her acildiginda render edilir, otomatik veri
   // cekmez (sadece kullanicinin kendi sorgusuyla tetiklenir).
   if (id === "analiz") { kriptoAnalizGoster(); hisseAnalizGoster(); }
-  if (id === "piyasa") btcDominansGetir();
 }
-
-var oncekiBtcDominans = null;
-function btcDominansGetir() {
-  var xhrBtcD = new XMLHttpRequest();
-  xhrBtcD.open("GET", "https://api.coingecko.com/api/v3/global", true);
-  xhrBtcD.onload = function() {
-    var hedef = document.getElementById("btc-dominans-icerik");
-    if (!hedef) return;
-    try {
-      var veri = JSON.parse(xhrBtcD.responseText);
-      var deger = veri.data.market_cap_percentage.btc;
-      var yon = oncekiBtcDominans !== null ? (deger > oncekiBtcDominans ? "yukari" : deger < oncekiBtcDominans ? "asagi" : "sabit") : "sabit";
-      oncekiBtcDominans = deger;
-      var yonYazi = yon === "yukari" ? "Yukseliyor (risk-off, altcoinler zorlanabilir)" : yon === "asagi" ? "Dusuyor (risk-on, altcoinlere alan acilabilir)" : "Yatay seyrediyor";
-      var yonRenk = yon === "yukari" ? "#f87171" : yon === "asagi" ? "#4ade80" : "#60a5fa";
-      var min = 40, max = 65;
-      var yuzdePoz = Math.max(0, Math.min(100, ((deger - min) / (max - min)) * 100));
-      var html = '<div class="sig-row"><span class="sig-key">BTC.D</span><span class="sig-val" style="color:' + yonRenk + '">%' + deger.toFixed(1) + " &middot; " + yonYazi + '</span></div>';
-      html += '<div style="position:relative;height:8px;border-radius:4px;background:linear-gradient(90deg,#4ade80,#334155 45%,#334155 55%,#f87171);margin:14px 0 4px">';
-      html += '<div style="position:absolute;top:-5px;left:' + yuzdePoz + '%;width:18px;height:18px;border-radius:50%;background:#e2e8f0;border:3px solid #0a0f1e;transform:translateX(-50%)"></div>';
-      html += '</div>';
-      html += '<div style="display:flex;justify-content:space-between;color:#475569;font-size:10px"><span>Altcoin lehine</span><span>BTC lehine</span></div>';
-      hedef.innerHTML = html;
-    } catch (e) {
-      hedef.innerHTML = '<div class="empty">Veri alinamadi</div>';
-    }
-  };
-  xhrBtcD.onerror = function() {
-    var hedef = document.getElementById("btc-dominans-icerik");
-    if (hedef) hedef.innerHTML = '<div class="empty">Veri alinamadi</div>';
-  };
-  xhrBtcD.send();
-}
-setInterval(function() { if (aktifSekme === "piyasa") btcDominansGetir(); }, 300000);
 
 function sinyalAramaGuncelle(deger) {
   sinyalAramaMetni = deger.trim();
