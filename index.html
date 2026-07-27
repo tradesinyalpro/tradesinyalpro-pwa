@@ -2269,12 +2269,32 @@ function gecmisGoster() {
     var yonCls = yon === "LONG" ? "long" : "short";
     var favoriMi = favoriCoinler[s.sembol];
     var yildizHtml = '<span onclick="favoriToggle(\'' + s.sembol + '\')" style="cursor:pointer;font-size:16px;margin-left:6px" title="Favorilere ekle/cikar">' + (favoriMi ? '<span style="color:#fbbf24">&#9733;</span>' : '<span style="color:#475569">&#9734;</span>') + '</span>';
+
+    var kapanisGirisNum = parseFloat(s.giris || s.maliyet);
+    var cikisFiyatNum = parseFloat(sonuc === "tp" ? s.hedef : s.stop);
+    var kapanisPnlHtml = "";
+    if (kapanisGirisNum && cikisFiyatNum) {
+      var kapanisHamYuzde = yon === "LONG"
+        ? (cikisFiyatNum - kapanisGirisNum) / kapanisGirisNum * 100
+        : (kapanisGirisNum - cikisFiyatNum) / kapanisGirisNum * 100;
+      var kapanisPnlYuzde = kapanisHamYuzde * 8;
+      var kapanisPozitif = kapanisPnlYuzde >= 0;
+      var kapanisRenk = kapanisPozitif ? "#4ade80" : "#f87171";
+      var kapanisBg = kapanisPozitif ? "#052e1a" : "#2d0a0a";
+      var kapanisBorder = kapanisPozitif ? "rgba(74,222,128,0.35)" : "rgba(248,113,113,0.35)";
+      kapanisPnlHtml = '<span class="badge" style="background:' + kapanisBg + ';color:' + kapanisRenk + ';border:1px solid ' + kapanisBorder + ';text-align:center;display:inline-flex;align-items:center;justify-content:center;line-height:1">' +
+        (kapanisPozitif ? "+" : "") + "%" + kapanisPnlYuzde.toFixed(1) + '</span>';
+    }
+    var eklemeHtml = s.asama > 0
+      ? '<span style="font-size:10px;color:#60a5fa;margin-left:8px">(Ekleme oldu &middot; Kademe ' + s.asama + '/3)</span>'
+      : "";
+
     html += '<div class="signal-card ' + sonuc + '">';
     html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + yildizHtml + '</div>';
-    html += '<div class="sig-badges"><span class="badge ' + sonuc + '">' + sonucYazi + '</span>';
+    html += '<div class="sig-badges">' + kapanisPnlHtml + '<span class="badge ' + sonuc + '">' + sonucYazi + '</span>';
     html += '<span class="badge bot">' + botAdi(bot) + '</span></div></div>';
     html += '<div class="sig-row"><span class="sig-key">Yon</span><span class="badge ' + yonCls + '">' + yon + '</span></div>';
-    html += '<div class="sig-row"><span class="sig-key">Giris</span><span class="sig-val">' + (s.giris || s.maliyet || "-") + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">Giris</span><span class="sig-val">' + (s.giris || s.maliyet || "-") + eklemeHtml + '</span></div>';
     html += '<div class="sig-time">' + (s.sonuc_zamani || s.zaman || "") + '</div></div>';
   }
   if (hepsi.length === 0) {
