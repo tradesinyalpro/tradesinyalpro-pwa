@@ -1601,9 +1601,32 @@ function portfoyGoster() {
       var durumRozeti = k.durum === "tp" ? '<span class="badge long">TP</span>' :
         k.durum === "stop" ? '<span class="badge short">STOP</span>' :
         '<span class="badge bot">Takipte</span>';
-      var getiriYazi = (k.getiri_yuzde !== null && k.getiri_yuzde !== undefined) ?
-        ('<span style="color:' + (k.getiri_yuzde >= 0 ? "#4ade80" : "#f87171") + ';font-weight:600">%' + (k.getiri_yuzde >= 0 ? "+" : "") + k.getiri_yuzde + '</span>') :
-        '<span style="color:#64748b">—</span>';
+      var getiriYazi;
+      if (k.getiri_yuzde !== null && k.getiri_yuzde !== undefined) {
+        getiriYazi = '<span style="color:' + (k.getiri_yuzde >= 0 ? "#4ade80" : "#f87171") + ';font-weight:600">%' + (k.getiri_yuzde >= 0 ? "+" : "") + k.getiri_yuzde + '</span>';
+      } else {
+        getiriYazi = '<span style="color:#64748b">—</span>';
+        var eslesenSinyal = null;
+        var botVerisi = tumVeriler[k.bot];
+        if (botVerisi && botVerisi.sinyaller) {
+          for (var si = 0; si < botVerisi.sinyaller.length; si++) {
+            var aday = botVerisi.sinyaller[si];
+            if (aday.sembol === k.sembol && aday.zaman === k.zaman) { eslesenSinyal = aday; break; }
+          }
+        }
+        if (eslesenSinyal) {
+          var canliK = canliFiyatlar[k.sembol];
+          var girisK = parseFloat(eslesenSinyal.giris || eslesenSinyal.maliyet);
+          if (canliK && girisK) {
+            var canliKNum = parseFloat(canliK);
+            var hamYuzdeK = k.yon === "LONG"
+              ? (canliKNum - girisK) / girisK * 100
+              : (girisK - canliKNum) / girisK * 100;
+            var yuzdeK = hamYuzdeK * 8;
+            getiriYazi = '<span style="color:' + (yuzdeK >= 0 ? "#4ade80" : "#f87171") + ';font-weight:600">%' + (yuzdeK >= 0 ? "+" : "") + yuzdeK.toFixed(1) + '</span>';
+          }
+        }
+      }
       html += '<div class="signal-card" style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px">' +
         '<div><div style="font-size:13px;font-weight:600">#' + k.sembol + ' <span style="font-size:10px;color:#64748b">(' + k.yon + ')</span></div>' +
         '<div style="font-size:10px;color:#64748b;margin-top:2px">' + k.zaman + '</div></div>' +
