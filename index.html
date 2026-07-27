@@ -1937,6 +1937,7 @@ function haftalikOzetGorseliOlustur(basariYuzde, tp, stop) {
 }
 
 var pozisyonHesapAcik = {};
+var pozisyonHesapSonuclari = {};
 
 function pozisyonHesapAcKapa(id) {
   var kutu = document.getElementById(id);
@@ -1967,7 +1968,9 @@ function pozisyonHesapla(btn, giris, stop) {
   var riskYuzde = parseFloat(kutu.querySelector(".hesap-risk").value);
   var sonucEl = kutu.querySelector(".hesap-sonuc");
   if (!bakiye || !riskYuzde || bakiye <= 0 || riskYuzde <= 0) {
-    sonucEl.innerHTML = '<span style="color:#f87171">Bakiye ve risk yuzdesini girin</span>';
+    var hataHtml = '<span style="color:#f87171">Bakiye ve risk yuzdesini girin</span>';
+    sonucEl.innerHTML = hataHtml;
+    pozisyonHesapSonuclari[kutu.id] = hataHtml;
     return;
   }
   try {
@@ -1979,11 +1982,13 @@ function pozisyonHesapla(btn, giris, stop) {
   var mesafeYuzde = mesafe / giris;
   var pozisyonBuyuklugu = riskTutari / mesafeYuzde;
   var gerekliKaldirac = pozisyonBuyuklugu / bakiye;
-  sonucEl.innerHTML =
+  var sonucHtml =
     'Riske attigin tutar: <b style="color:#f87171">' + riskTutari.toFixed(2) + ' USDT</b><br>' +
     'Onerilen pozisyon buyuklugu: <b style="color:#4ade80">' + pozisyonBuyuklugu.toFixed(2) + ' USDT</b><br>' +
     'Yaklasik gerekli kaldirac: <b style="color:#60a5fa">' + gerekliKaldirac.toFixed(1) + 'x</b>' +
     '<div style="color:#475569;font-size:10.5px;margin-top:6px">Bu hesap bilgilendirme amaclidir, borsanizin kaldirac/marjin kurallarina gore degisebilir.</div>';
+  sonucEl.innerHTML = sonucHtml;
+  pozisyonHesapSonuclari[kutu.id] = sonucHtml;
 }
 
 function sessizSaatPaneliAcKapa() {
@@ -2184,7 +2189,7 @@ function sinyalleriGoster() {
       html += '<input class="hesap-risk" type="number" placeholder="Risk % (orn: 2)" value="' + kayitliRiskVal + '" oninput="pozisyonDegerKaydet(this)" style="flex:1;min-width:100px;background:#111827;border:1px solid #1e293b;border-radius:6px;padding:7px;color:#e2e8f0;font-size:12px">';
       html += '<button class="bot-btn" onclick="pozisyonHesapla(this,' + girisNum + ',' + stopNum + ')">Hesapla</button>';
       html += '</div>';
-      html += '<div class="hesap-sonuc" style="font-size:12px;color:#94a3b8"></div>';
+      html += '<div class="hesap-sonuc" style="font-size:12px;color:#94a3b8">' + (pozisyonHesapSonuclari[hesapId] || "") + '</div>';
       html += '</div>';
       html += '</div>';
     }
