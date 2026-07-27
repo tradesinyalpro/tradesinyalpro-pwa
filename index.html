@@ -1936,11 +1936,14 @@ function haftalikOzetGorseliOlustur(basariYuzde, tp, stop) {
   link.click();
 }
 
+var pozisyonHesapAcik = {};
+
 function pozisyonHesapAcKapa(id) {
   var kutu = document.getElementById(id);
   if (!kutu) return;
   var acikMi = kutu.style.display !== "none";
   kutu.style.display = acikMi ? "none" : "block";
+  pozisyonHesapAcik[id] = !acikMi;
   if (!acikMi) {
     try {
       var kayitliBakiye = localStorage.getItem("ts_hesap_bakiye");
@@ -1949,6 +1952,13 @@ function pozisyonHesapAcKapa(id) {
       if (kayitliRisk) kutu.querySelector(".hesap-risk").value = kayitliRisk;
     } catch (e) {}
   }
+}
+
+function pozisyonDegerKaydet(input) {
+  try {
+    if (input.classList.contains("hesap-bakiye")) localStorage.setItem("ts_hesap_bakiye", input.value);
+    else localStorage.setItem("ts_hesap_risk", input.value);
+  } catch (e) {}
 }
 
 function pozisyonHesapla(btn, giris, stop) {
@@ -2054,37 +2064,6 @@ function fiyatKopyala(deger, el) {
   }, 800);
 }
 
-var COIN_KATEGORI = {
-  BTC: "Bitcoin", ETH: "Ethereum",
-  SOL: "L1", AVAX: "L1", ADA: "L1", DOT: "L1", NEAR: "L1", APT: "L1", SUI: "L1", TON: "L1", ATOM: "L1", ETC: "L1", TRX: "L1", XRP: "L1", BNB: "L1", ICP: "L1", HBAR: "L1", ALGO: "L1", SEI: "L1", INJ: "L1", TIA: "L1",
-  ARB: "L2", OP: "L2", MATIC: "L2", POL: "L2", STRK: "L2", MANTA: "L2", ZK: "L2",
-  UNI: "DeFi", AAVE: "DeFi", LINK: "DeFi", MKR: "DeFi", CRV: "DeFi", COMP: "DeFi", SNX: "DeFi", LDO: "DeFi", GMX: "DeFi", DYDX: "DeFi", CAKE: "DeFi", YFI: "DeFi", ZEC: "DeFi",
-  DOGE: "Meme", SHIB: "Meme", PEPE: "Meme", WIF: "Meme", FLOKI: "Meme", BONK: "Meme",
-  FET: "AI", RNDR: "AI", TAO: "AI", AGIX: "AI", WLD: "AI",
-  OKB: "Borsa Token", BGB: "Borsa Token", CRO: "Borsa Token"
-};
-
-function coinKategoriBul(sembol) {
-  var kok = (sembol || "").replace(/USDT$|USDC$|BUSD$/i, "");
-  return COIN_KATEGORI[kok] || "Diger";
-}
-
-function korelasyonUyarisiOlustur(hepsi) {
-  var kategoriSayaci = {};
-  for (var i = 0; i < hepsi.length; i++) {
-    var kat = coinKategoriBul(hepsi[i].s.sembol);
-    kategoriSayaci[kat] = (kategoriSayaci[kat] || 0) + 1;
-  }
-  var uyarilar = [];
-  for (var k in kategoriSayaci) {
-    if (k !== "Diger" && kategoriSayaci[k] >= 3) uyarilar.push(k + " (" + kategoriSayaci[k] + " sinyal)");
-  }
-  if (uyarilar.length === 0) return "";
-  return '<div class="signal-card" style="border-left:3px solid #fbbf24;margin-bottom:10px">' +
-    '<div style="font-size:12.5px;color:#fbbf24">&#9888; Yuksek korelasyon uyarisi: ' + uyarilar.join(", ") +
-    ' kategorisinde aynı anda coklu acik sinyal var. Bu coinler genelde birlikte hareket eder, risk yogunlasmis olabilir.</div></div>';
-}
-
 function sinyalleriGoster() {
   var toplamTp = 0, toplamStop = 0;
   var tumBotlar = Object.keys(tumVeriler);
@@ -2125,8 +2104,7 @@ function sinyalleriGoster() {
     hepsi = hepsi.filter(function(item) { return item.s.sembol.toUpperCase().indexOf(aramaBuyuk) !== -1; });
   }
 
-  var korelasyonHtml = korelasyonUyarisiOlustur(hepsi);
-  var html = korelasyonHtml;
+  var html = "";
 
   for (var k = 0; k < hepsi.length; k++) {
     var s = hepsi[k].s;
@@ -2192,12 +2170,18 @@ function sinyalleriGoster() {
     var stopNum = parseFloat(s.stop);
     if (girisNum && stopNum) {
       var hesapId = "hesap_" + bot + "_" + s.sembol + "_" + (s.zaman || "").replace(/[^0-9]/g, "");
+      var acikMi = !!pozisyonHesapAcik[hesapId];
+      var kayitliBakiyeVal = "", kayitliRiskVal = "";
+      try {
+        kayitliBakiyeVal = localStorage.getItem("ts_hesap_bakiye") || "";
+        kayitliRiskVal = localStorage.getItem("ts_hesap_risk") || "";
+      } catch (e) {}
       html += '<div style="margin-top:6px">';
       html += '<span onclick="pozisyonHesapAcKapa(\'' + hesapId + '\')" style="cursor:pointer;font-size:11.5px;color:#64748b;text-decoration:underline dotted">📐 Pozisyon buyuklugu hesapla</span>';
-      html += '<div id="' + hesapId + '" style="display:none;margin-top:8px;background:#0c1424;border:1px solid #1e293b;border-radius:8px;padding:10px">';
+      html += '<div id="' + hesapId + '" style="display:' + (acikMi ? "block" : "none") + ';margin-top:8px;background:#0c1424;border:1px solid #1e293b;border-radius:8px;padding:10px">';
       html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">';
-      html += '<input class="hesap-bakiye" type="number" placeholder="Bakiye (USDT)" style="flex:1;min-width:100px;background:#111827;border:1px solid #1e293b;border-radius:6px;padding:7px;color:#e2e8f0;font-size:12px">';
-      html += '<input class="hesap-risk" type="number" placeholder="Risk % (orn: 2)" style="flex:1;min-width:100px;background:#111827;border:1px solid #1e293b;border-radius:6px;padding:7px;color:#e2e8f0;font-size:12px">';
+      html += '<input class="hesap-bakiye" type="number" placeholder="Bakiye (USDT)" value="' + kayitliBakiyeVal + '" oninput="pozisyonDegerKaydet(this)" style="flex:1;min-width:100px;background:#111827;border:1px solid #1e293b;border-radius:6px;padding:7px;color:#e2e8f0;font-size:12px">';
+      html += '<input class="hesap-risk" type="number" placeholder="Risk % (orn: 2)" value="' + kayitliRiskVal + '" oninput="pozisyonDegerKaydet(this)" style="flex:1;min-width:100px;background:#111827;border:1px solid #1e293b;border-radius:6px;padding:7px;color:#e2e8f0;font-size:12px">';
       html += '<button class="bot-btn" onclick="pozisyonHesapla(this,' + girisNum + ',' + stopNum + ')">Hesapla</button>';
       html += '</div>';
       html += '<div class="hesap-sonuc" style="font-size:12px;color:#94a3b8"></div>';
