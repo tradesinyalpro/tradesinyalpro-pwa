@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TradeSinyalPro - Sistem Durumu</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    background: #05070f;
+    color: #e2e8f0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    margin: 0;
+    padding: 0 0 60px;
+  }
+  .top { padding: 20px 16px 14px; text-align: center; border-bottom: 1px solid #1e293b; }
+  .logo { font-size: 20px; font-weight: 700; }
+  .logo .mid { color: #60a5fa; }
+  .wrap { max-width: 520px; margin: 0 auto; padding: 20px 14px; }
+  .genel-durum {
+    display: flex; align-items: center; gap: 10px; justify-content: center;
+    background: #111827; border: 1px solid #1e293b; border-radius: 14px; padding: 20px; margin-bottom: 16px;
+  }
+  .nokta { width: 12px; height: 12px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 10px #4ade80; }
+  .nokta.kirmizi { background: #f87171; box-shadow: 0 0 10px #f87171; }
+  .genel-durum .metin { font-size: 15px; font-weight: 600; }
+  .card { background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
+  .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #1e293b; font-size: 13px; }
+  .row:last-child { border-bottom: none; }
+  .row .k { color: #94a3b8; }
+  .loading { text-align: center; color: #475569; padding: 30px; font-size: 13px; }
+  .yenile { text-align: center; margin-top: 14px; font-size: 11px; color: #475569; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="logo">Trade<span class="mid">Sinyal</span>Pro</div>
+  </div>
+  <div class="wrap">
+    <div id="icerik"><div class="loading">Yukleniyor...</div></div>
+    <div class="yenile">Bu sayfa 30 saniyede bir otomatik yenilenir</div>
+  </div>
+
+<script>
+var API = "https://abundant-light-production-fb25.up.railway.app";
+var ODA_ADLARI = { SINYAL_ODA_1: "Oda 1", SINYAL_ODA_2: "Oda 2", SINYAL_ODA_3: "Oda 3", SINYAL_ODA_4: "Oda 4" };
+
+function zamanFarkiYazi(zamanStr) {
+  if (!zamanStr) return "-";
+  try {
+    var simdi = new Date();
+    var hedef = new Date(zamanStr.replace(" ", "T"));
+    var farkDk = Math.round((simdi - hedef) / 60000);
+    if (farkDk < 1) return "az once";
+    if (farkDk < 60) return farkDk + " dakika once";
+    var farkSaat = Math.round(farkDk / 60);
+    if (farkSaat < 24) return farkSaat + " saat once";
+    return Math.round(farkSaat / 24) + " gun once";
+  } catch (e) {
+    return zamanStr;
+  }
+}
+
+function durumGetir() {
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/durum", true);
+  xhr.timeout = 8000;
+  xhr.onload = function() {
+    if (xhr.status !== 200) { hataGoster(); return; }
+    goster(JSON.parse(xhr.responseText));
+  };
+  xhr.onerror = hataGoster;
+  xhr.ontimeout = hataGoster;
+  xhr.send();
+}
+
+function hataGoster() {
+  document.getElementById("icerik").innerHTML =
+    '<div class="genel-durum"><div class="nokta kirmizi"></div><div class="metin">API su an yanit vermiyor</div></div>';
+}
+
+function goster(v) {
+  var html = '<div class="genel-durum"><div class="nokta"></div><div class="metin">Sistem calisiyor</div></div>';
+  html += '<div class="card">';
+  html += '<div class="row"><span class="k">Sunucu Zamani</span><span>' + v.sunucu_zamani + '</span></div>';
+  html += '<div class="row"><span class="k">Son Sinyal</span><span>' + zamanFarkiYazi(v.son_sinyal_zamani) + '</span></div>';
+  html += '</div>';
+  html += '<div class="card"><div style="font-size:12.5px;color:#94a3b8;margin-bottom:8px">Aktif Sinyal Sayisi</div>';
+  var odalar = Object.keys(v.aktif_sinyal_sayisi || {});
+  for (var i = 0; i < odalar.length; i++) {
+    html += '<div class="row"><span class="k">' + (ODA_ADLARI[odalar[i]] || odalar[i]) + '</span><span>' + v.aktif_sinyal_sayisi[odalar[i]] + '</span></div>';
+  }
+  html += '</div>';
+  document.getElementById("icerik").innerHTML = html;
+}
+
+durumGetir();
+setInterval(durumGetir, 30000);
+</script>
+</body>
+</html>

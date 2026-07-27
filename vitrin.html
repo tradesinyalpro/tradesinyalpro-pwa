@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TradeSinyalPro - Performans Vitrini</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    background: #05070f;
+    color: #e2e8f0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    margin: 0;
+    padding: 0 0 60px;
+  }
+  .top {
+    padding: 20px 16px 14px;
+    text-align: center;
+    border-bottom: 1px solid #1e293b;
+  }
+  .logo { font-size: 20px; font-weight: 700; }
+  .logo .mid { color: #60a5fa; }
+  .uyari {
+    max-width: 640px; margin: 14px auto 0; background: #0c1424; border: 1px solid #1e293b;
+    border-radius: 10px; padding: 10px 14px; font-size: 12px; color: #94a3b8; text-align: center;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 18px 14px; }
+  .filtreler { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  select {
+    background: #0c1424; border: 1px solid #1e293b; color: #e2e8f0; border-radius: 8px;
+    padding: 8px 10px; font-size: 12.5px;
+  }
+  .genel-kart {
+    background: #111827; border: 1px solid #1e293b; border-radius: 14px; padding: 22px;
+    text-align: center; margin-bottom: 16px;
+  }
+  .genel-kart .pct { font-size: 46px; font-weight: 800; color: #4ade80; }
+  .genel-kart .cap { font-size: 11px; color: #64748b; letter-spacing: 0.06em; margin-top: 2px; }
+  .genel-kart .alt { font-size: 12.5px; color: #94a3b8; margin-top: 10px; }
+  .card { background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
+  .card h3 { font-size: 13px; color: #94a3b8; margin: 0 0 12px; font-weight: 500; }
+  .oda-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px dashed #1e293b; font-size: 12.5px; }
+  .oda-row:last-child { border-bottom: none; }
+  svg text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .loading { text-align: center; color: #475569; padding: 30px; font-size: 13px; }
+  .disclaimer { text-align: center; font-size: 10px; color: #475569; line-height: 1.6; margin-top: 20px; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="logo">Trade<span class="mid">Sinyal</span>Pro</div>
+    <div class="uyari">Burada paylaşılan veriler yatırım tavsiyesi değildir, bilgilendirme amaçlıdır. Geçmiş performans gelecekteki sonuçların garantisi değildir.</div>
+  </div>
+
+  <div class="wrap">
+    <div class="filtreler">
+      <select id="gun-filtre" onchange="veriGetir()">
+        <option value="7">Son 7 gun</option>
+        <option value="30">Son 30 gun</option>
+        <option value="90" selected>Son 90 gun</option>
+        <option value="365">Son 1 yil</option>
+      </select>
+      <select id="oda-filtre" onchange="veriGetir()">
+        <option value="tumu">Tum Odalar</option>
+        <option value="SINYAL_ODA_1">Oda 1</option>
+        <option value="SINYAL_ODA_2">Oda 2</option>
+        <option value="SINYAL_ODA_3">Oda 3</option>
+        <option value="SINYAL_ODA_4">Oda 4</option>
+      </select>
+      <select id="yon-filtre" onchange="veriGetir()">
+        <option value="tumu">LONG + SHORT</option>
+        <option value="LONG">Sadece LONG</option>
+        <option value="SHORT">Sadece SHORT</option>
+      </select>
+    </div>
+
+    <div id="icerik"><div class="loading">Yukleniyor...</div></div>
+
+    <div class="disclaimer">
+      Bu sayfadaki tüm istatistikler TradeSinyalPro'nun kendi kayıtlarından otomatik hesaplanır.
+      Kripto para işlemleri yüksek risk içerir, yatırım kararlarınızın sorumluluğu tamamen size aittir.
+    </div>
+  </div>
+
+<script>
+var API = "https://abundant-light-production-fb25.up.railway.app";
+var ODA_ADLARI = { SINYAL_ODA_1: "Oda 1", SINYAL_ODA_2: "Oda 2", SINYAL_ODA_3: "Oda 3", SINYAL_ODA_4: "Oda 4" };
+
+function veriGetir() {
+  var gun = document.getElementById("gun-filtre").value;
+  var oda = document.getElementById("oda-filtre").value;
+  var yon = document.getElementById("yon-filtre").value;
+  document.getElementById("icerik").innerHTML = '<div class="loading">Yukleniyor...</div>';
+
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/vitrin/performans?gun=" + gun + "&oda=" + oda + "&yon=" + yon, true);
+  xhr.onload = function() {
+    if (xhr.status !== 200) {
+      document.getElementById("icerik").innerHTML = '<div class="loading">Veri alinamadi</div>';
+      return;
+    }
+    goster(JSON.parse(xhr.responseText));
+  };
+  xhr.onerror = function() {
+    document.getElementById("icerik").innerHTML = '<div class="loading">Baglanti hatasi</div>';
+  };
+  xhr.send();
+}
+
+function trendSvgOlustur(trend) {
+  if (!trend || trend.length < 2) return '<div style="color:#475569;font-size:12px;text-align:center;padding:20px">Bu aralikta yeterli veri yok</div>';
+  var w = 600, h = 140, pad = 8;
+  var n = trend.length;
+  var degerler = trend.filter(function(t) { return t.basari_yuzde !== null; }).map(function(t) { return t.basari_yuzde; });
+  var minY = Math.min.apply(null, degerler.concat([50]));
+  var maxY = Math.max.apply(null, degerler.concat([100]));
+  var aralik = (maxY - minY) || 1;
+  function yHesapla(v) { return h - pad - ((v - minY) / aralik) * (h - 2 * pad); }
+  var hucre = (w - 2 * pad) / (n - 1);
+  var pts = [];
+  for (var i = 0; i < n; i++) {
+    if (trend[i].basari_yuzde === null) continue;
+    pts.push((pad + i * hucre) + "," + yHesapla(trend[i].basari_yuzde));
+  }
+  var svg = '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;height:140px" xmlns="http://www.w3.org/2000/svg">';
+  svg += '<polyline points="' + pts.join(" ") + '" fill="none" stroke="#4ade80" stroke-width="2"></polyline>';
+  svg += '</svg>';
+  return svg;
+}
+
+function goster(v) {
+  var html = '<div class="genel-kart">';
+  html += '<div class="pct">' + (v.genel.basari_yuzde !== null ? "%" + v.genel.basari_yuzde : "-") + '</div>';
+  html += '<div class="cap">GENEL BASARI ORANI</div>';
+  html += '<div class="alt">' + v.genel.toplam + ' islem &middot; ' + v.genel.tp + ' TP &middot; ' + v.genel.stop + ' Stop</div>';
+  html += '</div>';
+
+  html += '<div class="card"><h3>Zaman Icinde Basari Orani</h3>' + trendSvgOlustur(v.gunluk_trend) + '</div>';
+
+  html += '<div class="card"><h3>Oda Bazli Basari</h3>';
+  var odalar = Object.keys(v.oda_ozet);
+  if (odalar.length === 0) html += '<div style="color:#475569;font-size:12px">Veri yok</div>';
+  for (var i = 0; i < odalar.length; i++) {
+    var o = v.oda_ozet[odalar[i]];
+    var toplam = o.tp + o.stop;
+    html += '<div class="oda-row"><span>' + (ODA_ADLARI[odalar[i]] || odalar[i]) + '</span>';
+    html += '<span style="color:' + (o.basari_yuzde >= 90 ? "#4ade80" : o.basari_yuzde >= 70 ? "#fbbf24" : "#f87171") + ';font-weight:600">' +
+      (o.basari_yuzde !== null ? "%" + o.basari_yuzde : "-") + ' (' + toplam + ' islem)</span></div>';
+  }
+  html += '</div>';
+
+  document.getElementById("icerik").innerHTML = html;
+}
+
+veriGetir();
+</script>
+</body>
+</html>
