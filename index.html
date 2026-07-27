@@ -191,8 +191,31 @@
       <input class="auth-input" id="kayit-sifre" type="password" placeholder="Sifre (en az 6 karakter)" autocomplete="new-password">
       <input class="auth-input" id="kayit-telegram" type="text" placeholder="Telegram kullanici adi (@ornek)">
       <input class="auth-input" id="kayit-email" type="email" placeholder="E-posta (istege bagli)">
-      <button class="auth-btn" onclick="kayitOl()">Kayit Ol</button>
+      <div style="display:flex;align-items:center;gap:8px;margin:10px 0;font-size:12.5px;color:#94a3b8">
+        <input type="checkbox" id="sozlesme-onay-tik" disabled style="width:16px;height:16px">
+        <span onclick="yasalUyariAc()" style="cursor:pointer;text-decoration:underline">Yasal Uyariyi Oku ve Onayla</span>
+      </div>
+      <button class="auth-btn" id="uye-ol-btn" onclick="kayitOl()" disabled style="opacity:0.5;cursor:not-allowed">Kayit Ol</button>
       <div class="auth-toggle" onclick="formDegistir('giris')">Zaten hesabin var mi? Giris Yap</div>
+    </div>
+  </div>
+</div>
+
+<div id="yasal-uyari-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:5000;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#111827;border:1px solid #1e293b;border-radius:14px;max-width:520px;width:100%;max-height:80vh;display:flex;flex-direction:column">
+    <div style="padding:16px 18px;border-bottom:1px solid #1e293b;font-weight:600">Yasal Uyari</div>
+    <div id="yasal-uyari-metin" onscroll="yasalUyariKaydirmaKontrol()" style="padding:16px 18px;overflow-y:auto;font-size:13px;line-height:1.7;color:#cbd5e1;flex:1">
+      <p>Bu hesapta paylaştığım analizler, grafikler, yorumlar ve diğer tüm içerikler kesinlikle yatırım tavsiyesi değildir. Burada yer alan bilgiler, kişisel oluşturmuş olduğum datalar ve piyasa hakkındaki kendi görüşlerimden ibarettir.</p>
+      <p>Sermaye Piyasası Kurulu'nun (SPK) ilgili düzenlemeleri gereği, yatırım danışmanlığı hizmeti ancak yetkili aracı kurumlar, portföy yönetim şirketleri, yatırım danışmanlığı yetkisine sahip kuruluşlar ve lisanslı yatırım danışmanları tarafından verilebilir. Bu nedenle, burada paylaştıklarım herhangi bir şekilde yatırım danışmanlığı kapsamında değerlendirilmemelidir.</p>
+      <p>Finansal kararlarınızı almadan önce, kendi araştırmanızı yapmanız ve yetkili finansal danışmanlardan destek almanız önemlidir. Piyasalarda yatırım yapmak risk içerir ve her yatırımcı kendi risklerini yönetmekten sorumludur.</p>
+      <p>Kaldıraçlı işlemler, yatırılan anaparanın tamamının veya fazlasının kaybedilmesine yol açabilecek yüksek risk içerir.</p>
+      <p>Geçmiş performans verileri gelecekteki sonuçların garantisi niteliğinde değildir.</p>
+      <p>TradeSinyalPro, paylaşılan veri, analiz veya sinyallerin kullanılması sonucu doğabilecek doğrudan veya dolaylı hiçbir kayıp veya zarardan sorumlu tutulamaz.</p>
+      <p>Platforma kayıt olarak, 18 yaşından büyük olduğunuzu ve yukarıdaki şartları okuyup kabul ettiğinizi beyan etmiş olursunuz.</p>
+    </div>
+    <div style="padding:14px 18px;border-top:1px solid #1e293b;display:flex;gap:10px;justify-content:flex-end">
+      <button class="bot-btn" onclick="yasalUyariKapat()">Vazgec</button>
+      <button class="auth-btn" id="yasal-uyari-onayla-btn" onclick="yasalUyariOnayla()" disabled style="opacity:0.5;cursor:not-allowed;width:auto;padding:8px 16px">Okudum, Onayliyorum</button>
     </div>
   </div>
 </div>
@@ -251,9 +274,9 @@
       <span class="oda-sessiz-btn" data-oda="SINYAL_ODA_4" onclick="odaSessizToggle('SINYAL_ODA_4')">&#128276;</span>
       <button class="bot-btn" id="favori-filtre-btn" onclick="favoriFiltreToggle()">&#9733; Favoriler</button>
       <span class="oda-sessiz-btn" id="favori-bildirim-btn" onclick="favoriBildirimToggle()">&#128276;</span>
-      <button class="bot-btn" onclick="alarmPaneliAcKapa()">&#128276; Alarmlarim</button>
+      <button class="bot-btn" onclick="sessizSaatPaneliAcKapa()">&#128564; Sessiz Saatler</button>
     </div>
-    <div id="alarm-paneli" style="display:none;margin-bottom:10px"></div>
+    <div id="sessiz-saat-paneli" style="display:none;margin-bottom:10px"></div>
     <div id="sinyal-listesi"><div class="loading">Yukleniyor...</div></div>
   </div>
 
@@ -274,10 +297,10 @@
   </div>
 
   <div id="piyasa" style="display:none;padding:8px 12px">
-    <div class="signal-card" style="padding:4px 8px;margin-bottom:10px">
-      <div class="tradingview-widget-container" style="height:70px">
+    <div class="signal-card" style="padding:8px 12px;margin-bottom:10px">
+      <div class="tradingview-widget-container" style="height:46px">
         <div class="tradingview-widget-container__widget"></div>
-        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-info.js" async>
+        <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker.js" async>
         {
           "symbol": "CRYPTOCAP:BTC.D",
           "colorTheme": "dark",
@@ -418,6 +441,7 @@
   </div>
 
   <div id="yonetici" style="display:none">
+    <div id="yonetici-buyume-icerik"></div>
     <div id="yonetici-ziyaret-icerik"></div>
     <div id="yonetici-icerik"><div class="loading">Yukleniyor...</div></div>
   </div>
@@ -462,6 +486,8 @@
 var API = "https://abundant-light-production-fb25.up.railway.app";
 var authToken = null;
 var hesapDurumu = null;
+var sessizSaatBaslangic = null;
+var sessizSaatBitis = null;
 var hesapKalanGun = null;
 var girisliKullanici = null;
 var tumVeriler = {};
@@ -586,7 +612,6 @@ var aktifSekme = "sinyaller";
 var sonSohbetMesajlari = [];
 var sonPortfoy = { kayitlar: [], ozet: {} };
 var takipDurumu = {};
-var sonAlarmlar = [];
 
 var BOT_ADLARI = {
   "SINYAL_ODA_1": "Oda 1",
@@ -705,72 +730,6 @@ function veriYukle() {
     }
   };
   xhr10.send();
-
-  var xhr11 = new XMLHttpRequest();
-  xhr11.open("GET", API + "/alarm/listele", true);
-  xhr11.setRequestHeader("X-Auth-Token", authToken || "");
-  xhr11.onload = function() {
-    if (xhr11.status === 200) {
-      sonAlarmlar = JSON.parse(xhr11.responseText);
-      if (aktifSekme === "portfoy") portfoyGoster();
-    }
-  };
-  xhr11.send();
-}
-
-function alarmlariYukle() {
-  var xhr = new XMLHttpRequest();
-  xhr.open("GET", API + "/alarm/listele", true);
-  xhr.setRequestHeader("X-Auth-Token", authToken || "");
-  xhr.onload = function() {
-    if (xhr.status === 200) {
-      sonAlarmlar = JSON.parse(xhr.responseText);
-      if (aktifSekme === "portfoy") portfoyGoster();
-      alarmlariGoster(sonAlarmlar);
-    }
-  };
-  xhr.send();
-}
-
-function alarmKur(sembol) {
-  var hedefStr = prompt("#" + sembol + " icin hedef fiyat girin:");
-  if (!hedefStr) return;
-  var hedef = parseFloat(hedefStr.replace(",", "."));
-  if (isNaN(hedef) || hedef <= 0) {
-    alert("Gecerli bir fiyat girin.");
-    return;
-  }
-  var guncelFiyat = parseFloat(canliFiyatlar[sembol]);
-  var yon = (!isNaN(guncelFiyat) && hedef < guncelFiyat) ? "altinda" : "ustunde";
-  var xhr = new XMLHttpRequest();
-  xhr.open("POST", API + "/alarm/ekle", true);
-  xhr.setRequestHeader("Content-Type", "application/json");
-  xhr.setRequestHeader("X-Auth-Token", authToken || "");
-  xhr.onload = function() {
-    var yanit;
-    try { yanit = JSON.parse(xhr.responseText); } catch (e) { yanit = {}; }
-    if (xhr.status === 200) {
-      alert("Alarm kuruldu: #" + sembol + " " + hedef + " seviyesine " + (yon === "ustunde" ? "ulasinca" : "dusunce") + " bildirim alacaksiniz.");
-      alarmlariYukle();
-    } else {
-      alert(yanit.hata || "Alarm kurulamadi");
-    }
-  };
-  xhr.send(JSON.stringify({ sembol: sembol, hedef_fiyat: hedef, yon: yon }));
-}
-
-function alarmSil(id) {
-  var xhr = new XMLHttpRequest();
-  xhr.open("POST", API + "/alarm/sil", true);
-  xhr.setRequestHeader("Content-Type", "application/json");
-  xhr.setRequestHeader("X-Auth-Token", authToken || "");
-  xhr.onload = function() {
-    if (xhr.status === 200) {
-      sonAlarmlar = JSON.parse(xhr.responseText).fiyat_alarmlari;
-      alarmlariGoster(sonAlarmlar);
-    }
-  };
-  xhr.send(JSON.stringify({ id: id }));
 }
 
 function htmlKacis(metin) {
@@ -1962,67 +1921,98 @@ function haftalikOzetGorseliOlustur(basariYuzde, tp, stop) {
   link.click();
 }
 
-function alarmPaneliAcKapa() {
-  var panel = document.getElementById("alarm-paneli");
-  if (!panel) return;
-  var acikMi = panel.style.display !== "none";
-  panel.style.display = acikMi ? "none" : "block";
+function pozisyonHesapAcKapa(id) {
+  var kutu = document.getElementById(id);
+  if (!kutu) return;
+  var acikMi = kutu.style.display !== "none";
+  kutu.style.display = acikMi ? "none" : "block";
   if (!acikMi) {
-    panel.innerHTML = '<div class="loading">Yukleniyor...</div>';
-    alarmlariYukle();
+    try {
+      var kayitliBakiye = localStorage.getItem("ts_hesap_bakiye");
+      var kayitliRisk = localStorage.getItem("ts_hesap_risk");
+      if (kayitliBakiye) kutu.querySelector(".hesap-bakiye").value = kayitliBakiye;
+      if (kayitliRisk) kutu.querySelector(".hesap-risk").value = kayitliRisk;
+    } catch (e) {}
   }
 }
 
-function alarmlariGoster(liste) {
-  var panel = document.getElementById("alarm-paneli");
-  if (!panel || panel.style.display === "none") return;
+function pozisyonHesapla(btn, giris, stop) {
+  var kutu = btn.closest("div").parentElement;
+  var bakiye = parseFloat(kutu.querySelector(".hesap-bakiye").value);
+  var riskYuzde = parseFloat(kutu.querySelector(".hesap-risk").value);
+  var sonucEl = kutu.querySelector(".hesap-sonuc");
+  if (!bakiye || !riskYuzde || bakiye <= 0 || riskYuzde <= 0) {
+    sonucEl.innerHTML = '<span style="color:#f87171">Bakiye ve risk yuzdesini girin</span>';
+    return;
+  }
+  try {
+    localStorage.setItem("ts_hesap_bakiye", bakiye);
+    localStorage.setItem("ts_hesap_risk", riskYuzde);
+  } catch (e) {}
+  var riskTutari = bakiye * (riskYuzde / 100);
+  var mesafe = Math.abs(giris - stop);
+  var mesafeYuzde = mesafe / giris;
+  var pozisyonBuyuklugu = riskTutari / mesafeYuzde;
+  var gerekliKaldirac = pozisyonBuyuklugu / bakiye;
+  sonucEl.innerHTML =
+    'Riske attigin tutar: <b style="color:#f87171">' + riskTutari.toFixed(2) + ' USDT</b><br>' +
+    'Onerilen pozisyon buyuklugu: <b style="color:#4ade80">' + pozisyonBuyuklugu.toFixed(2) + ' USDT</b><br>' +
+    'Yaklasik gerekli kaldirac: <b style="color:#60a5fa">' + gerekliKaldirac.toFixed(1) + 'x</b>' +
+    '<div style="color:#475569;font-size:10.5px;margin-top:6px">Bu hesap bilgilendirme amaclidir, borsanizin kaldirac/marjin kurallarina gore degisebilir.</div>';
+}
+
+function sessizSaatPaneliAcKapa() {
+  var panel = document.getElementById("sessiz-saat-paneli");
+  if (!panel) return;
+  var acikMi = panel.style.display !== "none";
+  panel.style.display = acikMi ? "none" : "block";
+  if (acikMi) return;
   var html = '<div class="signal-card">';
-  html += '<div style="font-size:13px;color:#94a3b8;margin-bottom:10px">Fiyat Alarmlarim (en fazla 20)</div>';
-  if (liste.length === 0) {
-    html += '<div class="empty" style="margin-bottom:10px">Henuz alarm yok</div>';
-  }
-  for (var i = 0; i < liste.length; i++) {
-    var a = liste[i];
-    var yonYazi = a.yon === "ustunde" ? "&#8593; ustune ciktiginda" : "&#8595; altina indiginde";
-    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed #1e293b">';
-    html += '<span style="font-size:12.5px">#' + a.sembol + ' ' + a.hedef_fiyat + ' ' + yonYazi + '</span>';
-    html += '<span onclick="alarmSil(' + a.id + ')" style="cursor:pointer;color:#f87171;font-size:16px">&times;</span>';
-    html += '</div>';
-  }
-  html += '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">';
-  html += '<input id="alarm-sembol" placeholder="Sembol (SOLUSDT)" style="flex:1;min-width:110px;background:#0c1424;border:1px solid #1e293b;border-radius:8px;padding:8px;color:#e2e8f0;font-size:12px">';
-  html += '<input id="alarm-fiyat" type="number" step="any" placeholder="Hedef fiyat" style="flex:1;min-width:100px;background:#0c1424;border:1px solid #1e293b;border-radius:8px;padding:8px;color:#e2e8f0;font-size:12px">';
-  html += '<select id="alarm-yon" style="background:#0c1424;border:1px solid #1e293b;border-radius:8px;padding:8px;color:#e2e8f0;font-size:12px">';
-  html += '<option value="ustunde">Ustune ciktiginda</option><option value="altinda">Altina indiginde</option>';
-  html += '</select>';
-  html += '<button class="bot-btn" onclick="alarmEkle()">+ Ekle</button>';
-  html += '</div><div id="alarm-hata" style="color:#f87171;font-size:11px;margin-top:6px"></div>';
+  html += '<div style="font-size:13px;color:#94a3b8;margin-bottom:10px">Bu saatler arasinda bildirim almak istemiyorsan doldur (bos birakirsan 7/24 bildirim alirsin)</div>';
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
+  html += '<input id="sessiz-baslangic" type="time" value="' + (sessizSaatBaslangic || "") + '" style="background:#0c1424;border:1px solid #1e293b;border-radius:8px;padding:8px;color:#e2e8f0;font-size:12px">';
+  html += '<span style="color:#64748b;font-size:12px">-</span>';
+  html += '<input id="sessiz-bitis" type="time" value="' + (sessizSaatBitis || "") + '" style="background:#0c1424;border:1px solid #1e293b;border-radius:8px;padding:8px;color:#e2e8f0;font-size:12px">';
+  html += '<button class="bot-btn" onclick="sessizSaatKaydet()">Kaydet</button>';
+  html += '<button class="bot-btn" onclick="sessizSaatTemizle()">Kapat (7/24)</button>';
+  html += '</div><div id="sessiz-saat-durum" style="font-size:11.5px;margin-top:8px"></div>';
   html += '</div>';
   panel.innerHTML = html;
 }
 
-function alarmEkle() {
-  var sembol = (document.getElementById("alarm-sembol").value || "").trim().toUpperCase();
-  var hedefFiyat = document.getElementById("alarm-fiyat").value;
-  var yon = document.getElementById("alarm-yon").value;
-  var hataEl = document.getElementById("alarm-hata");
-  if (!sembol || !hedefFiyat) {
-    hataEl.textContent = "Sembol ve hedef fiyat gerekli";
-    return;
-  }
+function sessizSaatGonder(baslangic, bitis) {
   var xhr = new XMLHttpRequest();
-  xhr.open("POST", API + "/alarm/ekle", true);
+  xhr.open("POST", API + "/sessiz-saat", true);
   xhr.setRequestHeader("Content-Type", "application/json");
   xhr.setRequestHeader("X-Auth-Token", authToken || "");
   xhr.onload = function() {
+    var durumEl = document.getElementById("sessiz-saat-durum");
     if (xhr.status === 200) {
-      sonAlarmlar = JSON.parse(xhr.responseText).fiyat_alarmlari;
-      alarmlariGoster(sonAlarmlar);
-    } else {
-      try { hataEl.textContent = JSON.parse(xhr.responseText).hata || "Eklenemedi"; } catch (e) { hataEl.textContent = "Eklenemedi"; }
+      var yanit = JSON.parse(xhr.responseText);
+      sessizSaatBaslangic = yanit.sessiz_saat_baslangic;
+      sessizSaatBitis = yanit.sessiz_saat_bitis;
+      if (durumEl) durumEl.innerHTML = '<span style="color:#4ade80">Kaydedildi</span>';
+    } else if (durumEl) {
+      durumEl.innerHTML = '<span style="color:#f87171">Kaydedilemedi</span>';
     }
   };
-  xhr.send(JSON.stringify({ sembol: sembol, hedef_fiyat: hedefFiyat, yon: yon }));
+  xhr.send(JSON.stringify({ baslangic: baslangic, bitis: bitis }));
+}
+
+function sessizSaatKaydet() {
+  var b = document.getElementById("sessiz-baslangic").value;
+  var bi = document.getElementById("sessiz-bitis").value;
+  if (!b || !bi) {
+    document.getElementById("sessiz-saat-durum").innerHTML = '<span style="color:#f87171">Iki saati de sec</span>';
+    return;
+  }
+  sessizSaatGonder(b, bi);
+}
+
+function sessizSaatTemizle() {
+  document.getElementById("sessiz-baslangic").value = "";
+  document.getElementById("sessiz-bitis").value = "";
+  sessizSaatGonder(null, null);
 }
 
 function fiyatKopyala(deger, el) {
@@ -2047,6 +2037,37 @@ function fiyatKopyala(deger, el) {
     el.textContent = eskiMetin;
     el.style.opacity = "1";
   }, 800);
+}
+
+var COIN_KATEGORI = {
+  BTC: "Bitcoin", ETH: "Ethereum",
+  SOL: "L1", AVAX: "L1", ADA: "L1", DOT: "L1", NEAR: "L1", APT: "L1", SUI: "L1", TON: "L1", ATOM: "L1", ETC: "L1", TRX: "L1", XRP: "L1", BNB: "L1", ICP: "L1", HBAR: "L1", ALGO: "L1", SEI: "L1", INJ: "L1", TIA: "L1",
+  ARB: "L2", OP: "L2", MATIC: "L2", POL: "L2", STRK: "L2", MANTA: "L2", ZK: "L2",
+  UNI: "DeFi", AAVE: "DeFi", LINK: "DeFi", MKR: "DeFi", CRV: "DeFi", COMP: "DeFi", SNX: "DeFi", LDO: "DeFi", GMX: "DeFi", DYDX: "DeFi", CAKE: "DeFi", YFI: "DeFi", ZEC: "DeFi",
+  DOGE: "Meme", SHIB: "Meme", PEPE: "Meme", WIF: "Meme", FLOKI: "Meme", BONK: "Meme",
+  FET: "AI", RNDR: "AI", TAO: "AI", AGIX: "AI", WLD: "AI",
+  OKB: "Borsa Token", BGB: "Borsa Token", CRO: "Borsa Token"
+};
+
+function coinKategoriBul(sembol) {
+  var kok = (sembol || "").replace(/USDT$|USDC$|BUSD$/i, "");
+  return COIN_KATEGORI[kok] || "Diger";
+}
+
+function korelasyonUyarisiOlustur(hepsi) {
+  var kategoriSayaci = {};
+  for (var i = 0; i < hepsi.length; i++) {
+    var kat = coinKategoriBul(hepsi[i].s.sembol);
+    kategoriSayaci[kat] = (kategoriSayaci[kat] || 0) + 1;
+  }
+  var uyarilar = [];
+  for (var k in kategoriSayaci) {
+    if (k !== "Diger" && kategoriSayaci[k] >= 3) uyarilar.push(k + " (" + kategoriSayaci[k] + " sinyal)");
+  }
+  if (uyarilar.length === 0) return "";
+  return '<div class="signal-card" style="border-left:3px solid #fbbf24;margin-bottom:10px">' +
+    '<div style="font-size:12.5px;color:#fbbf24">&#9888; Yuksek korelasyon uyarisi: ' + uyarilar.join(", ") +
+    ' kategorisinde aynı anda coklu acik sinyal var. Bu coinler genelde birlikte hareket eder, risk yogunlasmis olabilir.</div></div>';
 }
 
 function sinyalleriGoster() {
@@ -2088,6 +2109,9 @@ function sinyalleriGoster() {
     var aramaBuyuk = sinyalAramaMetni.toUpperCase();
     hepsi = hepsi.filter(function(item) { return item.s.sembol.toUpperCase().indexOf(aramaBuyuk) !== -1; });
   }
+
+  var korelasyonHtml = korelasyonUyarisiOlustur(hepsi);
+  var html = korelasyonHtml;
 
   for (var k = 0; k < hepsi.length; k++) {
     var s = hepsi[k].s;
@@ -2149,6 +2173,22 @@ function sinyalleriGoster() {
     html += '</div>';
     html += '</div>';
     html += kademehtml;
+    var girisNum = parseFloat(s.giris || s.maliyet);
+    var stopNum = parseFloat(s.stop);
+    if (girisNum && stopNum) {
+      var hesapId = "hesap_" + bot + "_" + s.sembol + "_" + (s.zaman || "").replace(/[^0-9]/g, "");
+      html += '<div style="margin-top:6px">';
+      html += '<span onclick="pozisyonHesapAcKapa(\'' + hesapId + '\')" style="cursor:pointer;font-size:11.5px;color:#64748b;text-decoration:underline dotted">📐 Pozisyon buyuklugu hesapla</span>';
+      html += '<div id="' + hesapId + '" style="display:none;margin-top:8px;background:#0c1424;border:1px solid #1e293b;border-radius:8px;padding:10px">';
+      html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">';
+      html += '<input class="hesap-bakiye" type="number" placeholder="Bakiye (USDT)" style="flex:1;min-width:100px;background:#111827;border:1px solid #1e293b;border-radius:6px;padding:7px;color:#e2e8f0;font-size:12px">';
+      html += '<input class="hesap-risk" type="number" placeholder="Risk % (orn: 2)" style="flex:1;min-width:100px;background:#111827;border:1px solid #1e293b;border-radius:6px;padding:7px;color:#e2e8f0;font-size:12px">';
+      html += '<button class="bot-btn" onclick="pozisyonHesapla(this,' + girisNum + ',' + stopNum + ')">Hesapla</button>';
+      html += '</div>';
+      html += '<div class="hesap-sonuc" style="font-size:12px;color:#94a3b8"></div>';
+      html += '</div>';
+      html += '</div>';
+    }
     html += '<div class="sig-time">' + (s.zaman || "") + '</div></div>';
   }
   if (hepsi.length === 0) html = '<div class="empty">Su an aktif veri yok</div>';
@@ -2942,6 +2982,40 @@ function sekmeAc(id, el) {
   // gostermek icin sekme her acildiginda render edilir, otomatik veri
   // cekmez (sadece kullanicinin kendi sorgusuyla tetiklenir).
   if (id === "analiz") { kriptoAnalizGoster(); hisseAnalizGoster(); }
+  if (id === "yonetici") buyumePaneliGoster();
+}
+
+function buyumePaneliGoster() {
+  var kutu = document.getElementById("yonetici-buyume-icerik");
+  if (!kutu || hesapDurumu !== "admin") return;
+  kutu.innerHTML = '<div class="loading">Yukleniyor...</div>';
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/yonetici/buyume", true);
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status !== 200) { kutu.innerHTML = ""; return; }
+    var v = JSON.parse(xhr.responseText);
+    var html = '<div class="signal-card" style="margin-bottom:12px">';
+    html += '<div style="font-size:13px;color:#94a3b8;margin-bottom:10px">Buyume Ozeti</div>';
+    html += '<div class="stats-grid">';
+    html += '<div class="stat-card"><div class="stat-label">Toplam Uye</div><div class="stat-val">' + v.toplam_uye + '</div></div>';
+    html += '<div class="stat-card"><div class="stat-label">Onayli</div><div class="stat-val green">' + v.onayli + '</div></div>';
+    html += '<div class="stat-card"><div class="stat-label">Bekleyen</div><div class="stat-val" style="color:#fbbf24">' + v.bekleyen + '</div></div>';
+    html += '<div class="stat-card"><div class="stat-label">Bu Hafta Yeni</div><div class="stat-val blue">' + v.bu_hafta_yeni_kayit + '</div></div>';
+    html += '</div>';
+    if (v.referans_liderlik && v.referans_liderlik.length > 0) {
+      html += '<div style="font-size:12.5px;color:#94a3b8;margin:14px 0 8px">Referans Liderlik Tablosu</div>';
+      for (var i = 0; i < v.referans_liderlik.length; i++) {
+        var r = v.referans_liderlik[i];
+        html += '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed #1e293b;font-size:12.5px">';
+        html += '<span>' + (i + 1) + '. ' + r.kullanici + '</span><span style="color:#60a5fa;font-weight:600">' + r.davet_sayisi + ' davet</span>';
+        html += '</div>';
+      }
+    }
+    html += '</div>';
+    kutu.innerHTML = html;
+  };
+  xhr.send();
 }
 
 function sinyalAramaGuncelle(deger) {
@@ -3005,6 +3079,8 @@ function girisYap() {
       hesapDurumu = yanit.hesap_durumu;
       hesapKalanGun = yanit.kalan_gun;
       girisliKullanici = yanit.kullanici_adi;
+      sessizSaatBaslangic = yanit.sessiz_saat_baslangic;
+      sessizSaatBitis = yanit.sessiz_saat_bitis;
       localStorage.setItem("ts_token", authToken);
       girisBasarili();
     } else {
@@ -3029,6 +3105,12 @@ function kayitOl() {
   hataEl.style.display = "none";
   basariEl.style.display = "none";
 
+  if (!document.getElementById("sozlesme-onay-tik").checked) {
+    hataEl.textContent = "Devam etmeden once Yasal Uyariyi okuyup onaylamaniz gerekiyor";
+    hataEl.style.display = "block";
+    return;
+  }
+
   var xhr = new XMLHttpRequest();
   xhr.open("POST", API + "/kayit", true);
   xhr.setRequestHeader("Content-Type", "application/json");
@@ -3042,6 +3124,11 @@ function kayitOl() {
       document.getElementById("kayit-sifre").value = "";
       document.getElementById("kayit-telegram").value = "";
       document.getElementById("kayit-email").value = "";
+      document.getElementById("sozlesme-onay-tik").checked = false;
+      var btn = document.getElementById("uye-ol-btn");
+      btn.disabled = true;
+      btn.style.opacity = "0.5";
+      btn.style.cursor = "not-allowed";
     } else {
       hataEl.textContent = yanit.hata || "Kayit basarisiz";
       hataEl.style.display = "block";
@@ -3056,7 +3143,45 @@ function kayitOl() {
     var parametreler = new URLSearchParams(window.location.search);
     referansKodu = parametreler.get("ref") || "";
   } catch (e) {}
-  xhr.send(JSON.stringify({ kullanici_adi: kadi, sifre: sifre, telegram: telegram, email: email, referans: referansKodu }));
+  xhr.send(JSON.stringify({ kullanici_adi: kadi, sifre: sifre, telegram: telegram, email: email, referans: referansKodu, sozlesme_onay: true }));
+}
+
+function yasalUyariAc() {
+  document.getElementById("yasal-uyari-modal").style.display = "flex";
+  var metinEl = document.getElementById("yasal-uyari-metin");
+  metinEl.scrollTop = 0;
+  var btn = document.getElementById("yasal-uyari-onayla-btn");
+  btn.disabled = true;
+  btn.style.opacity = "0.5";
+  btn.style.cursor = "not-allowed";
+  // Metin zaten tek ekrana sigiyorsa (kaydirma gerekmiyorsa) butonu aninda ac
+  setTimeout(function() {
+    if (metinEl.scrollHeight <= metinEl.clientHeight + 4) yasalUyariKaydirmaKontrol();
+  }, 50);
+}
+
+function yasalUyariKapat() {
+  document.getElementById("yasal-uyari-modal").style.display = "none";
+}
+
+function yasalUyariKaydirmaKontrol() {
+  var metinEl = document.getElementById("yasal-uyari-metin");
+  var sonaGeldiMi = metinEl.scrollTop + metinEl.clientHeight >= metinEl.scrollHeight - 4;
+  var btn = document.getElementById("yasal-uyari-onayla-btn");
+  if (sonaGeldiMi) {
+    btn.disabled = false;
+    btn.style.opacity = "1";
+    btn.style.cursor = "pointer";
+  }
+}
+
+function yasalUyariOnayla() {
+  document.getElementById("sozlesme-onay-tik").checked = true;
+  var kayitBtn = document.getElementById("uye-ol-btn");
+  kayitBtn.disabled = false;
+  kayitBtn.style.opacity = "1";
+  kayitBtn.style.cursor = "pointer";
+  yasalUyariKapat();
 }
 
 function sifreFormAcKapat() {
@@ -3516,6 +3641,8 @@ function sayfaBaslat() {
       hesapDurumu = yanit.hesap_durumu;
       hesapKalanGun = yanit.kalan_gun;
       girisliKullanici = yanit.kullanici_adi;
+      sessizSaatBaslangic = yanit.sessiz_saat_baslangic;
+      sessizSaatBitis = yanit.sessiz_saat_bitis;
       girisBasarili();
     } else {
       localStorage.removeItem("ts_token");
