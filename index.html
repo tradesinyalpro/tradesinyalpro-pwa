@@ -220,6 +220,17 @@
   </div>
 </div>
 
+<div id="genelbakis-genel" class="auth-screen" style="display:none;flex-direction:column;overflow-y:auto;padding:24px 16px">
+  <div style="text-align:center;margin-bottom:16px">
+    <div class="auth-logo" style="margin-bottom:6px">Trade<span>Sinyal</span>Pro</div>
+    <div style="font-size:12px;color:#94a3b8;max-width:480px;margin:0 auto">Burada paylaşılan veriler yatırım tavsiyesi değildir, bilgilendirme amaçlıdır.</div>
+  </div>
+  <div id="genelbakis-genel-icerik" style="max-width:480px;width:100%;margin:0 auto"><div class="loading">Yukleniyor...</div></div>
+  <div style="max-width:480px;width:100%;margin:20px auto 0;text-align:center">
+    <button class="auth-btn" onclick="genelBakisGirisGoster()" style="width:auto;padding:10px 26px">Giris Yap / Uye Ol</button>
+  </div>
+</div>
+
 <div id="app-icerik" style="display:none">
 
 <div class="header">
@@ -236,6 +247,7 @@
 <div id="pwa-kurulum-banner-alani"></div>
 
 <div class="tabs" id="tabs-alani">
+  <div class="tab" onclick="sekmeAc('genelbakis',this)">Genel Bakis</div>
   <div class="tab active" onclick="sekmeAc('sinyaller',this)" data-tam-erisim="1">Veriler</div>
   <div class="tab" onclick="sekmeAc('portfoy',this)" data-tam-erisim="1">Portfoyum</div>
   <div class="tab" onclick="sekmeAc('performans',this)" data-tam-erisim="1">Performans</div>
@@ -251,6 +263,9 @@
 </div>
 
 <div class="content">
+  <div id="genelbakis" style="display:none;padding:8px 12px">
+    <div id="genelbakis-icerik"><div class="loading">Yukleniyor...</div></div>
+  </div>
   <div id="sinyaller">
     <div style="text-align:center;font-size:11px;color:#94a3b8;background:#0c1a3d;padding:8px 12px;border-radius:8px;margin-bottom:10px">
       ⚠️ Burada paylaşılan veriler yatırım tavsiyesi değildir, bilgilendirme amaçlıdır.
@@ -2983,6 +2998,7 @@ function sekmeAc(id, el) {
   // cekmez (sadece kullanicinin kendi sorgusuyla tetiklenir).
   if (id === "analiz") { kriptoAnalizGoster(); hisseAnalizGoster(); }
   if (id === "yonetici") buyumePaneliGoster();
+  if (id === "genelbakis") genelBakisDoldur("genelbakis-icerik");
 }
 
 function buyumePaneliGoster() {
@@ -3016,6 +3032,66 @@ function buyumePaneliGoster() {
     kutu.innerHTML = html;
   };
   xhr.send();
+}
+
+function genelBakisDoldur(hedefId) {
+  var kutu = document.getElementById(hedefId);
+  if (!kutu) return;
+  kutu.innerHTML = '<div class="loading">Yukleniyor...</div>';
+
+  var durumVerisi = null, vitrinVerisi = null;
+
+  function birlestirVeGoster() {
+    if (!durumVerisi || !vitrinVerisi) return;
+    var calisiyorMu = durumVerisi.api === "ok";
+    var html = '<div class="signal-card" style="text-align:center;margin-bottom:12px">';
+    html += '<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:4px">';
+    html += '<span style="width:10px;height:10px;border-radius:50%;background:' + (calisiyorMu ? "#4ade80" : "#f87171") + '"></span>';
+    html += '<span style="font-size:13px;font-weight:600">' + (calisiyorMu ? "Sistem calisiyor" : "Sistem yanit vermiyor") + '</span></div>';
+    html += '<div style="font-size:44px;font-weight:800;color:#4ade80;margin-top:10px">' + (vitrinVerisi.genel.basari_yuzde !== null ? "%" + vitrinVerisi.genel.basari_yuzde : "-") + '</div>';
+    html += '<div style="font-size:10.5px;color:#64748b;letter-spacing:0.06em">SON 90 GUN GENEL BASARI ORANI</div>';
+    html += '<div style="font-size:12px;color:#94a3b8;margin-top:6px">' + vitrinVerisi.genel.toplam + ' islem &middot; ' + vitrinVerisi.genel.tp + ' TP &middot; ' + vitrinVerisi.genel.stop + ' Stop</div>';
+    html += '</div>';
+
+    html += '<div class="signal-card" style="margin-bottom:12px">';
+    html += '<div style="font-size:12.5px;color:#94a3b8;margin-bottom:8px">Oda Bazli Basari</div>';
+    var odalar = Object.keys(vitrinVerisi.oda_ozet);
+    for (var i = 0; i < odalar.length; i++) {
+      var o = vitrinVerisi.oda_ozet[odalar[i]];
+      var toplam = o.tp + o.stop;
+      html += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #1e293b;font-size:12.5px">';
+      html += '<span>' + (BOT_ADLARI[odalar[i]] || odalar[i]) + '</span>';
+      html += '<span style="color:' + (o.basari_yuzde >= 90 ? "#4ade80" : o.basari_yuzde >= 70 ? "#fbbf24" : "#f87171") + ';font-weight:600">' +
+        (o.basari_yuzde !== null ? "%" + o.basari_yuzde : "-") + ' (' + toplam + ' islem)</span></div>';
+    }
+    html += '</div>';
+
+    html += '<div class="signal-card">';
+    html += '<div style="font-size:12.5px;color:#94a3b8;margin-bottom:8px">Aktif Sinyal Sayisi</div>';
+    var aktifOdalar = Object.keys(durumVerisi.aktif_sinyal_sayisi || {});
+    for (var j = 0; j < aktifOdalar.length; j++) {
+      html += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #1e293b;font-size:12.5px">';
+      html += '<span>' + (BOT_ADLARI[aktifOdalar[j]] || aktifOdalar[j]) + '</span><span>' + durumVerisi.aktif_sinyal_sayisi[aktifOdalar[j]] + '</span></div>';
+    }
+    html += '</div>';
+
+    kutu.innerHTML = html;
+  }
+
+  var xhr1 = new XMLHttpRequest();
+  xhr1.open("GET", API + "/durum", true);
+  xhr1.onload = function() { if (xhr1.status === 200) { durumVerisi = JSON.parse(xhr1.responseText); birlestirVeGoster(); } };
+  xhr1.send();
+
+  var xhr2 = new XMLHttpRequest();
+  xhr2.open("GET", API + "/vitrin/performans?gun=90&oda=tumu&yon=tumu", true);
+  xhr2.onload = function() { if (xhr2.status === 200) { vitrinVerisi = JSON.parse(xhr2.responseText); birlestirVeGoster(); } };
+  xhr2.send();
+}
+
+function genelBakisGirisGoster() {
+  document.getElementById("genelbakis-genel").style.display = "none";
+  document.getElementById("auth-ekrani").style.display = "flex";
 }
 
 function sinyalAramaGuncelle(deger) {
@@ -3626,7 +3702,8 @@ function sayfaBaslat() {
   var kayitliToken = localStorage.getItem("ts_token");
   if (!kayitliToken) {
     document.getElementById("yukleniyor-ekrani").style.display = "none";
-    document.getElementById("auth-ekrani").style.display = "flex";
+    document.getElementById("genelbakis-genel").style.display = "flex";
+    genelBakisDoldur("genelbakis-genel-icerik");
     if (localStorage.getItem("ts_admin_cihazi") !== "1") ziyaretKaydet("misafir");
     return;
   }
@@ -3646,13 +3723,15 @@ function sayfaBaslat() {
       girisBasarili();
     } else {
       localStorage.removeItem("ts_token");
-      document.getElementById("auth-ekrani").style.display = "flex";
+      document.getElementById("genelbakis-genel").style.display = "flex";
+      genelBakisDoldur("genelbakis-genel-icerik");
       if (localStorage.getItem("ts_admin_cihazi") !== "1") ziyaretKaydet("misafir");
     }
   };
   xhr.onerror = function() {
     document.getElementById("yukleniyor-ekrani").style.display = "none";
-    document.getElementById("auth-ekrani").style.display = "flex";
+    document.getElementById("genelbakis-genel").style.display = "flex";
+    genelBakisDoldur("genelbakis-genel-icerik");
     if (localStorage.getItem("ts_admin_cihazi") !== "1") ziyaretKaydet("misafir");
   };
   xhr.send();
