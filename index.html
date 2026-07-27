@@ -1966,13 +1966,29 @@ function sinyalleriGoster() {
     var takipliMi = !!takipDurumu[takipAnahtari];
     var takipHtml = '<span onclick="takipToggle(\'' + bot + '\',\'' + s.sembol + '\',\'' + s.zaman + '\')" style="cursor:pointer;font-size:14px;margin-left:6px" title="Sanal Portfoyde Takip Et">' + (takipliMi ? "📌" : "📍") + '</span>';
 
+    var girisNumPnl = parseFloat(s.giris || s.maliyet);
+    var pnlHtml = "";
+    if (canliFiyat && girisNumPnl) {
+      var canliFiyatNum = parseFloat(canliFiyat);
+      var hamYuzde = yon === "LONG"
+        ? (canliFiyatNum - girisNumPnl) / girisNumPnl * 100
+        : (girisNumPnl - canliFiyatNum) / girisNumPnl * 100;
+      var pnlYuzde = hamYuzde * 8;
+      var pnlPozitif = pnlYuzde >= 0;
+      var pnlRenk = pnlPozitif ? "#4ade80" : "#f87171";
+      var pnlBg = pnlPozitif ? "#052e1a" : "#2d0a0a";
+      var pnlBorder = pnlPozitif ? "rgba(74,222,128,0.35)" : "rgba(248,113,113,0.35)";
+      pnlHtml = '<span class="badge" style="background:' + pnlBg + ';color:' + pnlRenk + ';border:1px solid ' + pnlBorder + ';text-align:center;display:inline-flex;align-items:center;justify-content:center;line-height:1">' +
+        (pnlPozitif ? "+" : "") + "%" + pnlYuzde.toFixed(1) + '</span>';
+    }
+
     var gorselBtnHtml = hesapDurumu === "admin"
       ? '<span onclick="sinyalGorseliOlustur(\'' + s.sembol + '\',\'' + yon + '\',\'' + (s.giris || s.maliyet || "-") + '\',\'' + (s.hedef || "-") + '\',\'' + (s.stop || "-") + '\')" style="cursor:pointer;font-size:14px;margin-left:6px" title="Tanitim gorseli olustur (sadece yonetici)">🖼️</span>'
       : "";
 
     html += '<div class="signal-card ' + cls + '">';
     html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + yildizHtml + takipHtml + gorselBtnHtml + '</div>';
-    html += '<div class="sig-badges"><span class="badge ' + cls + '">' + yon + '</span>';
+    html += '<div class="sig-badges">' + pnlHtml + '<span class="badge ' + cls + '">' + yon + '</span>';
     html += '<span class="badge bot">' + botAdi(bot) + '</span></div></div>';
     html += canliFiyatHtml;
 
