@@ -1086,8 +1086,20 @@ function mumBilgiGuncelle(el) {
   var kayit = mumGrafikOnbellek[sembol];
   if (!kayit || !kayit.mumlar || !kayit.mumlar[idx]) return;
   var kart = el.closest(".mum-grafik-yer");
-  var bilgiEl = kart ? kart.querySelector(".mum-bilgi") : null;
+  if (!kart) return;
+  var bilgiEl = kart.querySelector(".mum-bilgi");
   if (bilgiEl) bilgiEl.innerHTML = mumBilgiFormatla(kayit.mumlar[idx]);
+
+  var crosshair = kart.querySelector(".mum-crosshair");
+  if (crosshair) {
+    var w = 220, pad = 5;
+    var n = kayit.mumlar.length;
+    var hucre = (w - 2 * pad) / n;
+    var cx = pad + idx * hucre + hucre / 2;
+    crosshair.setAttribute("x1", cx);
+    crosshair.setAttribute("x2", cx);
+    crosshair.style.display = "block";
+  }
 }
 
 document.addEventListener("mouseover", function(e) {
@@ -1196,6 +1208,8 @@ function mumSvgOlustur(mumlar, guncelFiyat, sembol) {
     svg += '<line x1="0" x2="' + w + '" y1="' + yDestek + '" y2="' + yDestek + '" stroke="#22d3ee" stroke-width="1" stroke-dasharray="3,2" vector-effect="non-scaling-stroke"></line>';
     svg += '<text x="2" y="' + Math.min(h - 3, yDestek + 11) + '" font-size="9" fill="#22d3ee">' + fiyatEtiketFormatla(sr.destek) + '</text>';
   }
+
+  svg += '<line class="mum-crosshair" x1="0" x2="0" y1="0" y2="' + h + '" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3,2" vector-effect="non-scaling-stroke" style="display:none;pointer-events:none"></line>';
 
   // Fare/parmak icin seffaf dokunma alanlari (her mum icin tam yukseklikte)
   for (var j = 0; j < n; j++) {
