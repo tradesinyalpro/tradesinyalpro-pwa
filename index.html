@@ -311,6 +311,10 @@
   </div>
 
   <div id="piyasa" style="display:none;padding:8px 12px">
+    <div class="signal-card" style="padding:12px 14px;margin-bottom:10px">
+      <div style="font-size:13px;color:#94a3b8;margin-bottom:10px;display:flex;align-items:center;gap:6px">&#9878; Altin &amp; Gumus (TL)</div>
+      <div id="altin-icerik"><div class="loading">Yukleniyor...</div></div>
+    </div>
     <div class="signal-card" style="padding:8px 12px;margin-bottom:10px">
       <div class="tradingview-widget-container" style="height:46px">
         <div class="tradingview-widget-container__widget"></div>
@@ -2873,7 +2877,47 @@ function sekmeAc(id, el) {
   // cekmez (sadece kullanicinin kendi sorgusuyla tetiklenir).
   if (id === "analiz") { kriptoAnalizGoster(); hisseAnalizGoster(); }
   if (id === "yonetici") buyumePaneliGoster();
+  if (id === "piyasa") altinFiyatlariGoster();
   if (id === "genelbakis") genelBakisDoldur("genelbakis-icerik");
+}
+
+function altinFiyatFormatla(v) {
+  return v.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function altinFiyatSatiri(etiket, kalem) {
+  if (!kalem) {
+    return '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed #1e293b;font-size:13px">' +
+      '<span style="color:#94a3b8">' + etiket + '</span><span style="color:#475569">Veri alinamadi</span></div>';
+  }
+  var degisimHtml = "";
+  if (kalem.degisim_yuzde !== null && kalem.degisim_yuzde !== undefined) {
+    var pozitif = kalem.degisim_yuzde >= 0;
+    degisimHtml = '<span style="margin-left:8px;font-size:12px;color:' + (pozitif ? "#4ade80" : "#f87171") + '">' +
+      (pozitif ? "+" : "") + kalem.degisim_yuzde.toFixed(2) + "%</span>";
+  }
+  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px dashed #1e293b;font-size:13px">' +
+    '<span style="color:#94a3b8">' + etiket + '</span>' +
+    '<span><span style="font-weight:600">' + altinFiyatFormatla(kalem.fiyat) + '</span>' + degisimHtml + '</span></div>';
+}
+
+function altinFiyatlariGoster() {
+  var kutu = document.getElementById("altin-icerik");
+  if (!kutu) return;
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/altin/fiyatlar", true);
+  xhr.onload = function() {
+    if (xhr.status !== 200) { kutu.innerHTML = '<div class="empty">Veri alinamadi</div>'; return; }
+    var v = JSON.parse(xhr.responseText);
+    var html = "";
+    html += altinFiyatSatiri("Gram Altın", v.gram_altin);
+    html += altinFiyatSatiri("Çeyrek Altın", v.ceyrek_altin);
+    html += altinFiyatSatiri("22 Ayar Altın", v["22_ayar_altin"]);
+    html += altinFiyatSatiri("Gram Gümüş", v.gram_gumus);
+    kutu.innerHTML = html;
+  };
+  xhr.onerror = function() { kutu.innerHTML = '<div class="empty">Veri alinamadi</div>'; };
+  xhr.send();
 }
 
 function buyumePaneliGoster() {
