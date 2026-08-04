@@ -256,6 +256,7 @@
   <div class="tab" onclick="sekmeAc('piyasa',this)" data-tam-erisim="1">Piyasa</div>
   <div class="tab" onclick="sekmeAc('analiz',this)" data-tam-erisim="1">Analiz</div>
   <div class="tab" onclick="sekmeAc('balina',this)" data-tam-erisim="1">Balina Takip</div>
+  <div class="tab" onclick="sekmeAc('coinperformans',this)" data-tam-erisim="1">Coin Performans</div>
   <div class="tab" onclick="sekmeAc('haberler',this)" data-tam-erisim="1">Haberler</div>
   <div class="tab" onclick="sekmeAc('iletisim',this)">Iletisim</div>
   <div class="tab" onclick="sekmeAc('yonetici',this)" id="yonetici-tab" style="display:none">Yonetici</div>
@@ -304,6 +305,14 @@
         style="width:100%;background:#111827;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px;box-sizing:border-box">
     </div>
     <div id="gecmis-icerik"><div class="loading">Yukleniyor...</div></div>
+  </div>
+
+  <div id="coinperformans" style="display:none">
+    <div style="margin-bottom:10px">
+      <input id="coinperformans-arama" type="text" placeholder="Coin ara (ornegin BTC, ORDI)..." oninput="coinPerformansGoster()"
+        style="width:100%;background:#111827;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px;box-sizing:border-box">
+    </div>
+    <div id="coinperformans-icerik"><div class="loading">Yukleniyor...</div></div>
   </div>
 
   <div id="rapor" style="display:none">
@@ -1689,6 +1698,7 @@ function guncelle() {
   }
   if (aktifSekme === "performans") performansGoster();
   if (aktifSekme === "gecmis") gecmisGoster();
+  if (aktifSekme === "coinperformans") coinPerformansGoster();
   if (aktifSekme === "rapor") raporGoster();
   if (aktifSekme === "balina") balinaGoster();
   if (aktifSekme === "haberler") haberleriGoster();
@@ -2256,6 +2266,107 @@ function performansDetayHtml(bot) {
     html += '</div>';
   }
   return html;
+}
+
+function coinPerformansGoster() {
+  var kutu = document.getElementById("coinperformans-icerik");
+  if (!kutu) return;
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/coin-performans", true);
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status !== 200) { kutu.innerHTML = '<div class="empty">Veri alinamadi</div>'; return; }
+    var veri = JSON.parse(xhr.responseText);
+    var odaSirasi = ["SINYAL_ODA_1", "SINYAL_ODA_2", "SINYAL_ODA_3", "SINYAL_ODA_4"];
+    var AZ_VERI_ESIK = 3;
+    var aramaEl = document.getElementById("coinperformans-arama");
+    var arama = aramaEl ? aramaEl.value.trim().toUpperCase() : "";
+
+    var coinler = Object.keys(veri);
+    if (arama) coinler = coinler.filter(function(c) { return c.toUpperCase().indexOf(arama) !== -1; });
+
+    coinler.sort(function(a, b) {
+      function toplamHacim(sembol) {
+        var t = 0;
+        for (var bot in veri[sembol]) t += veri[sembol][bot].acilan || 0;
+        return t;
+      }
+      return toplamHacim(b) - toplamHacim(a);
+    });
+
+    if (coinler.length === 0) {
+      kutu.innerHTML = '<div class="empty">' + (arama ? "Eslesen coin bulunamadi" : "Henuz veri yok") + '</div>';
+      return;
+    }
+
+    var html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:560px">';
+    html += '<tr style="border-bottom:1px solid #1e293b">';
+    html += '<th style="text-align:left;padding:8px 6px;color:#94a3b8;font-weight:600">Coin</th>';
+    for (var h = 0; h < odaSirasi.length; h++) {
+      html += '<th style="text-align:center;padding:8px 4px;color:#94a3b8;font-weight:600">' + botAdi(odaSirasi[h]) + '</th>';
+    }
+    html += '<th style="text-align:center;padding:8px 4px;color:#94a3b8;font-weight:600;border-left:1px solid #1e293b">Toplam</th>';
+    html += '</tr>';
+
+    for (var i = 0; i < coinler.length; i++) {
+      var sembol = coinler[i];
+      var odalar = veri[sembol];
+
+      var enIyiOda = null, enIyiOran = -1;
+      for (var o = 0; o < odaSirasi.length; o++) {
+        var d0 = odalar[odaSirasi[o]];
+        if (d0 && (d0.tp + d0.stop) > 0) {
+          var oran0 = d0.tp / (d0.tp + d0.stop);
+          if (oran0 > enIyiOran) { enIyiOran = oran0; enIyiOda = odaSirasi[o]; }
+        }
+      }
+
+      html += '<tr style="border-bottom:1px solid #1e293b">';
+      html += '<td style="padding:8px 6px;font-weight:600">' + sembol + '</td>';
+
+      var toplamTp = 0, toplamStop = 0;
+      for (var j = 0; j < odaSirasi.length; j++) {
+        var oda = odaSirasi[j];
+        var d = odalar[oda];
+        var vurgu = (oda === enIyiOda) ? "background:rgba(74,222,128,0.10)" : "";
+        html += '<td style="text-align:center;padding:6px 4px;' + vurgu + '">';
+        if (!d) {
+          html += '<span style="color:#475569">-</span>';
+        } else {
+          toplamTp += d.tp; toplamStop += d.stop;
+          var azVeri = (d.tp + d.stop) > 0 && (d.tp + d.stop) < AZ_VERI_ESIK;
+          html += '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">';
+          html += '<span style="color:#60a5fa;font-weight:600">&#10003; ' + d.acilan + '</span>';
+          if (d.tp > 0 || d.stop > 0) {
+            html += '<div style="display:flex;gap:6px">';
+            if (d.tp > 0) html += '<span style="color:#4ade80">&#10003; ' + d.tp + '</span>';
+            if (d.stop > 0) html += '<span style="color:#f87171">&#10007; ' + d.stop + '</span>';
+            html += '</div>';
+          }
+          if (azVeri) html += '<span style="font-size:9.5px;color:#64748b">az veri</span>';
+          html += '</div>';
+        }
+        html += '</td>';
+      }
+
+      var toplamIslem = toplamTp + toplamStop;
+      var basariYuzde = toplamIslem > 0 ? Math.round(toplamTp / toplamIslem * 100) : null;
+      var yuzdeRenk = basariYuzde === null ? "#64748b" : basariYuzde >= 66 ? "#4ade80" : basariYuzde >= 40 ? "#fbbf24" : "#f87171";
+      html += '<td style="text-align:center;padding:6px 4px;border-left:1px solid #1e293b">';
+      html += '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">';
+      html += '<div style="display:flex;gap:8px">';
+      html += '<span style="color:#4ade80;font-weight:600">' + toplamTp + '</span>';
+      html += '<span style="color:#f87171;font-weight:600">' + toplamStop + '</span>';
+      html += '</div>';
+      if (basariYuzde !== null) html += '<span style="font-size:11px;color:' + yuzdeRenk + ';font-weight:600">%' + basariYuzde + '</span>';
+      html += '</div></td>';
+      html += '</tr>';
+    }
+    html += '</table></div>';
+    kutu.innerHTML = html;
+  };
+  xhr.onerror = function() { kutu.innerHTML = '<div class="empty">Veri alinamadi</div>'; };
+  xhr.send();
 }
 
 function gecmisGoster() {
@@ -2895,6 +3006,7 @@ function sekmeAc(id, el) {
   if (id === "yonetici") buyumePaneliGoster();
   if (id === "piyasa") altinFiyatlariGoster();
   if (id === "genelbakis") genelBakisDoldur("genelbakis-icerik");
+  if (id === "coinperformans") coinPerformansGoster();
 }
 
 function altinFiyatFormatla(v) {
