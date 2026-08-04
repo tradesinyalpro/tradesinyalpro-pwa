@@ -3004,7 +3004,7 @@ function genelBakisDoldur(hedefId) {
     html += '<span style="width:10px;height:10px;border-radius:50%;background:' + (calisiyorMu ? "#4ade80" : "#f87171") + '"></span>';
     html += '<span style="font-size:13px;font-weight:600">' + (calisiyorMu ? "Sistem calisiyor" : "Sistem yanit vermiyor") + '</span></div>';
     html += '<div style="font-size:44px;font-weight:800;color:#4ade80;margin-top:10px">' + (vitrinVerisi.genel.basari_yuzde !== null ? "%" + vitrinVerisi.genel.basari_yuzde : "-") + '</div>';
-    html += '<div style="font-size:10.5px;color:#64748b;letter-spacing:0.06em">SON 90 GUN GENEL BASARI ORANI</div>';
+    html += '<div style="font-size:10.5px;color:#64748b;letter-spacing:0.06em">GENEL BASARI ORANI</div>';
     html += '<div style="font-size:12px;color:#94a3b8;margin-top:6px">' + vitrinVerisi.genel.toplam + ' islem &middot; ' + vitrinVerisi.genel.tp + ' TP &middot; ' + vitrinVerisi.genel.stop + ' Stop</div>';
     html += '</div>';
 
@@ -3039,7 +3039,7 @@ function genelBakisDoldur(hedefId) {
   xhr1.send();
 
   var xhr2 = new XMLHttpRequest();
-  xhr2.open("GET", API + "/vitrin/performans?gun=90&oda=tumu&yon=tumu", true);
+  xhr2.open("GET", API + "/genel-bakis/basari", true);
   xhr2.onload = function() { if (xhr2.status === 200) { vitrinVerisi = JSON.parse(xhr2.responseText); birlestirVeGoster(); } };
   xhr2.send();
 }
