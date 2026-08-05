@@ -2300,13 +2300,14 @@ function coinPerformansGoster() {
       return;
     }
 
-    var html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:560px">';
+    var html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:660px">';
     html += '<tr style="border-bottom:1px solid #1e293b">';
     html += '<th style="text-align:left;padding:8px 6px;color:#94a3b8;font-weight:600">Coin</th>';
     for (var h = 0; h < odaSirasi.length; h++) {
       html += '<th style="text-align:center;padding:8px 4px;color:#94a3b8;font-weight:600">' + botAdi(odaSirasi[h]) + '</th>';
     }
     html += '<th style="text-align:center;padding:8px 4px;color:#94a3b8;font-weight:600;border-left:1px solid #1e293b">Toplam</th>';
+    html += '<th style="text-align:center;padding:8px 4px;color:#94a3b8;font-weight:600;border-left:1px solid #1e293b">Long / Short</th>';
     html += '</tr>';
 
     for (var i = 0; i < coinler.length; i++) {
@@ -2359,20 +2360,22 @@ function coinPerformansGoster() {
       html += '</div>';
       if (basariYuzde !== null) html += '<span style="font-size:11px;color:' + yuzdeRenk + ';font-weight:600">%' + basariYuzde + '</span>';
       html += '</div></td>';
-      html += '</tr>';
 
       var yon = yonVerisi[sembol];
       var longIslem = yon ? (yon.LONG.tp + yon.LONG.stop) : 0;
       var shortIslem = yon ? (yon.SHORT.tp + yon.SHORT.stop) : 0;
-      if (longIslem > 0 || shortIslem > 0) {
-        var longYuzde = longIslem > 0 ? Math.round(yon.LONG.tp / longIslem * 100) : null;
-        var shortYuzde = shortIslem > 0 ? Math.round(yon.SHORT.tp / shortIslem * 100) : null;
-        html += '<tr style="border-bottom:1px solid #1e293b">';
-        html += '<td colspan="' + (odaSirasi.length + 2) + '" style="padding:4px 6px 8px;font-size:11.5px;color:#64748b">';
-        html += 'Long: ' + (longYuzde !== null ? '<span style="color:#e2e8f0;font-weight:600">%' + longYuzde + '</span> (' + longIslem + ' islem)' : '-');
-        html += ' &nbsp;&middot;&nbsp; Short: ' + (shortYuzde !== null ? '<span style="color:#e2e8f0;font-weight:600">%' + shortYuzde + '</span> (' + shortIslem + ' islem)' : '-');
-        html += '</td></tr>';
-      }
+      var longYuzde = longIslem > 0 ? Math.round(yon.LONG.tp / longIslem * 100) : null;
+      var shortYuzde = shortIslem > 0 ? Math.round(yon.SHORT.tp / shortIslem * 100) : null;
+      html += '<td style="text-align:center;padding:6px 4px;border-left:1px solid #1e293b">';
+      html += '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px">';
+      html += longYuzde !== null
+        ? '<span style="color:#4ade80"><b>Long %' + longYuzde + '</b> (' + longIslem + ')</span>'
+        : '<span style="color:#475569">Long -</span>';
+      html += shortYuzde !== null
+        ? '<span style="color:#f87171"><b>Short %' + shortYuzde + '</b> (' + shortIslem + ')</span>'
+        : '<span style="color:#475569">Short -</span>';
+      html += '</div></td>';
+      html += '</tr>';
     }
     html += '</table></div>';
     kutu.innerHTML = html;
