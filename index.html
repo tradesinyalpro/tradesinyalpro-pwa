@@ -251,12 +251,12 @@
   <div class="tab active" onclick="sekmeAc('sinyaller',this)" data-tam-erisim="1">Veriler</div>
   <div class="tab" onclick="sekmeAc('portfoy',this)" data-tam-erisim="1">Portfoyum</div>
   <div class="tab" onclick="sekmeAc('performans',this)" data-tam-erisim="1">Performans</div>
+  <div class="tab" onclick="sekmeAc('coinperformans',this)" data-tam-erisim="1">Coin Performans</div>
   <div class="tab" onclick="sekmeAc('gecmis',this)" data-tam-erisim="1">Gecmis</div>
   <div class="tab" onclick="sekmeAc('rapor',this)" data-tam-erisim="1">Gunluk Rapor</div>
   <div class="tab" onclick="sekmeAc('piyasa',this)" data-tam-erisim="1">Piyasa</div>
   <div class="tab" onclick="sekmeAc('analiz',this)" data-tam-erisim="1">Analiz</div>
   <div class="tab" onclick="sekmeAc('balina',this)" data-tam-erisim="1">Balina Takip</div>
-  <div class="tab" onclick="sekmeAc('coinperformans',this)" data-tam-erisim="1">Coin Performans</div>
   <div class="tab" onclick="sekmeAc('haberler',this)" data-tam-erisim="1">Haberler</div>
   <div class="tab" onclick="sekmeAc('iletisim',this)">Iletisim</div>
   <div class="tab" onclick="sekmeAc('yonetici',this)" id="yonetici-tab" style="display:none">Yonetici</div>
@@ -2276,9 +2276,10 @@ function coinPerformansGoster() {
   xhr.setRequestHeader("X-Auth-Token", authToken || "");
   xhr.onload = function() {
     if (xhr.status !== 200) { kutu.innerHTML = '<div class="empty">Veri alinamadi</div>'; return; }
-    var veri = JSON.parse(xhr.responseText);
+    var yanit = JSON.parse(xhr.responseText);
+    var veri = yanit.coin_oda || {};
+    var yonVerisi = yanit.coin_yon || {};
     var odaSirasi = ["SINYAL_ODA_1", "SINYAL_ODA_2", "SINYAL_ODA_3", "SINYAL_ODA_4"];
-    var AZ_VERI_ESIK = 3;
     var aramaEl = document.getElementById("coinperformans-arama");
     var arama = aramaEl ? aramaEl.value.trim().toUpperCase() : "";
 
@@ -2334,7 +2335,6 @@ function coinPerformansGoster() {
           html += '<span style="color:#475569">-</span>';
         } else {
           toplamTp += d.tp; toplamStop += d.stop;
-          var azVeri = (d.tp + d.stop) > 0 && (d.tp + d.stop) < AZ_VERI_ESIK;
           html += '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">';
           html += '<span style="color:#60a5fa;font-weight:600">&#10003; ' + d.acilan + '</span>';
           if (d.tp > 0 || d.stop > 0) {
@@ -2343,7 +2343,6 @@ function coinPerformansGoster() {
             if (d.stop > 0) html += '<span style="color:#f87171">&#10007; ' + d.stop + '</span>';
             html += '</div>';
           }
-          if (azVeri) html += '<span style="font-size:9.5px;color:#64748b">az veri</span>';
           html += '</div>';
         }
         html += '</td>';
@@ -2361,6 +2360,19 @@ function coinPerformansGoster() {
       if (basariYuzde !== null) html += '<span style="font-size:11px;color:' + yuzdeRenk + ';font-weight:600">%' + basariYuzde + '</span>';
       html += '</div></td>';
       html += '</tr>';
+
+      var yon = yonVerisi[sembol];
+      var longIslem = yon ? (yon.LONG.tp + yon.LONG.stop) : 0;
+      var shortIslem = yon ? (yon.SHORT.tp + yon.SHORT.stop) : 0;
+      if (longIslem > 0 || shortIslem > 0) {
+        var longYuzde = longIslem > 0 ? Math.round(yon.LONG.tp / longIslem * 100) : null;
+        var shortYuzde = shortIslem > 0 ? Math.round(yon.SHORT.tp / shortIslem * 100) : null;
+        html += '<tr style="border-bottom:1px solid #1e293b">';
+        html += '<td colspan="' + (odaSirasi.length + 2) + '" style="padding:4px 6px 8px;font-size:11.5px;color:#64748b">';
+        html += 'Long: ' + (longYuzde !== null ? '<span style="color:#e2e8f0;font-weight:600">%' + longYuzde + '</span> (' + longIslem + ' islem)' : '-');
+        html += ' &nbsp;&middot;&nbsp; Short: ' + (shortYuzde !== null ? '<span style="color:#e2e8f0;font-weight:600">%' + shortYuzde + '</span> (' + shortIslem + ' islem)' : '-');
+        html += '</td></tr>';
+      }
     }
     html += '</table></div>';
     kutu.innerHTML = html;
