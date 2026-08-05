@@ -312,6 +312,13 @@
       <input id="coinperformans-arama" type="text" placeholder="Coin ara (ornegin BTC, ORDI)..." oninput="coinPerformansGoster()"
         style="width:100%;background:#111827;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px;box-sizing:border-box">
     </div>
+    <div style="display:flex;gap:8px;overflow-x:auto;margin-bottom:14px">
+      <button class="bot-btn active" onclick="coinPerformansOdaFiltre('hepsi',this)">Tumu</button>
+      <button class="bot-btn" onclick="coinPerformansOdaFiltre('SINYAL_ODA_1',this)">Oda 1</button>
+      <button class="bot-btn" onclick="coinPerformansOdaFiltre('SINYAL_ODA_2',this)">Oda 2</button>
+      <button class="bot-btn" onclick="coinPerformansOdaFiltre('SINYAL_ODA_3',this)">Oda 3</button>
+      <button class="bot-btn" onclick="coinPerformansOdaFiltre('SINYAL_ODA_4',this)">Oda 4</button>
+    </div>
     <div id="coinperformans-icerik"><div class="loading">Yukleniyor...</div></div>
   </div>
 
@@ -533,6 +540,7 @@ var balinaKategori = "kripto";
 var piyasaVerisi = null;
 var piyasaSonGuncelleme = 0;
 var aktifBot = "hepsi";
+var coinPerformansOdaFiltresi = "hepsi";
 var favoriCoinler = {};
 var sadeceFavoriler = false;
 var sinyalAramaMetni = "";
@@ -2268,6 +2276,14 @@ function performansDetayHtml(bot) {
   return html;
 }
 
+function coinPerformansOdaFiltre(oda, btn) {
+  coinPerformansOdaFiltresi = oda;
+  var btnlar = btn.parentElement.querySelectorAll(".bot-btn");
+  for (var i = 0; i < btnlar.length; i++) btnlar[i].classList.remove("active");
+  btn.classList.add("active");
+  coinPerformansGoster();
+}
+
 function coinPerformansGoster() {
   var kutu = document.getElementById("coinperformans-icerik");
   if (!kutu) return;
@@ -2280,10 +2296,14 @@ function coinPerformansGoster() {
     var veri = yanit.coin_oda || {};
     var yonVerisi = yanit.coin_yon || {};
     var odaSirasi = ["SINYAL_ODA_1", "SINYAL_ODA_2", "SINYAL_ODA_3", "SINYAL_ODA_4"];
+    var gosterilecekOdalar = coinPerformansOdaFiltresi === "hepsi" ? odaSirasi : [coinPerformansOdaFiltresi];
     var aramaEl = document.getElementById("coinperformans-arama");
     var arama = aramaEl ? aramaEl.value.trim().toUpperCase() : "";
 
     var coinler = Object.keys(veri);
+    if (coinPerformansOdaFiltresi !== "hepsi") {
+      coinler = coinler.filter(function(c) { return !!veri[c][coinPerformansOdaFiltresi]; });
+    }
     if (arama) coinler = coinler.filter(function(c) { return c.toUpperCase().indexOf(arama) !== -1; });
 
     coinler.sort(function(a, b) {
@@ -2303,8 +2323,8 @@ function coinPerformansGoster() {
     var html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:660px">';
     html += '<tr style="border-bottom:1px solid #1e293b">';
     html += '<th style="text-align:left;padding:8px 6px;color:#94a3b8;font-weight:600">Coin</th>';
-    for (var h = 0; h < odaSirasi.length; h++) {
-      html += '<th style="text-align:center;padding:8px 4px;color:#94a3b8;font-weight:600;border-left:1px solid #1e293b">' + botAdi(odaSirasi[h]) + '</th>';
+    for (var h = 0; h < gosterilecekOdalar.length; h++) {
+      html += '<th style="text-align:center;padding:8px 4px;color:#94a3b8;font-weight:600;border-left:1px solid #1e293b">' + botAdi(gosterilecekOdalar[h]) + '</th>';
     }
     html += '<th style="text-align:center;padding:8px 4px;color:#94a3b8;font-weight:600;border-left:1px solid #1e293b">Toplam</th>';
     html += '<th style="text-align:center;padding:8px 4px;color:#94a3b8;font-weight:600;border-left:1px solid #1e293b">Long / Short</th>';
@@ -2315,11 +2335,13 @@ function coinPerformansGoster() {
       var odalar = veri[sembol];
 
       var enIyiOda = null, enIyiOran = -1;
-      for (var o = 0; o < odaSirasi.length; o++) {
-        var d0 = odalar[odaSirasi[o]];
-        if (d0 && (d0.tp + d0.stop) > 0) {
-          var oran0 = d0.tp / (d0.tp + d0.stop);
-          if (oran0 > enIyiOran) { enIyiOran = oran0; enIyiOda = odaSirasi[o]; }
+      if (coinPerformansOdaFiltresi === "hepsi") {
+        for (var o = 0; o < odaSirasi.length; o++) {
+          var d0 = odalar[odaSirasi[o]];
+          if (d0 && (d0.tp + d0.stop) > 0) {
+            var oran0 = d0.tp / (d0.tp + d0.stop);
+            if (oran0 > enIyiOran) { enIyiOran = oran0; enIyiOda = odaSirasi[o]; }
+          }
         }
       }
 
@@ -2327,8 +2349,8 @@ function coinPerformansGoster() {
       html += '<td style="padding:8px 6px;font-weight:600">' + sembol + '</td>';
 
       var toplamTp = 0, toplamStop = 0;
-      for (var j = 0; j < odaSirasi.length; j++) {
-        var oda = odaSirasi[j];
+      for (var j = 0; j < gosterilecekOdalar.length; j++) {
+        var oda = gosterilecekOdalar[j];
         var d = odalar[oda];
         var vurgu = (oda === enIyiOda) ? "background:rgba(74,222,128,0.10)" : "";
         html += '<td style="text-align:center;padding:6px 4px;border-left:1px solid #1e293b;' + vurgu + '">';
