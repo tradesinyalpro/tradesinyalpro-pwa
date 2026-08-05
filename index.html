@@ -1190,25 +1190,111 @@ function cizimlerSvg(sembol, olcek) {
   for (var i = 0; i < liste.length; i++) {
     var c = liste[i];
     if (c.tip === "trend") {
-      svg += '<line x1="' + c.x1 + '" y1="' + c.y1 + '" x2="' + c.x2 + '" y2="' + c.y2 + '" stroke="#e2e8f0" stroke-width="1.4" vector-effect="non-scaling-stroke"></line>';
+      svg += '<line class="cizim-gorunen" data-sembol="' + sembol + '" data-index="' + i + '" x1="' + c.x1 + '" y1="' + c.y1 + '" x2="' + c.x2 + '" y2="' + c.y2 + '" stroke="#e2e8f0" stroke-width="1.4" vector-effect="non-scaling-stroke" style="pointer-events:none"></line>';
     } else if (c.tip === "yatay") {
-      svg += '<line x1="0" y1="' + c.y + '" x2="' + olcek.w + '" y2="' + c.y + '" stroke="#38bdf8" stroke-width="1.4" stroke-dasharray="4,2" vector-effect="non-scaling-stroke"></line>';
+      svg += '<line class="cizim-gorunen" data-sembol="' + sembol + '" data-index="' + i + '" x1="0" y1="' + c.y + '" x2="' + olcek.w + '" y2="' + c.y + '" stroke="#38bdf8" stroke-width="1.4" stroke-dasharray="4,2" vector-effect="non-scaling-stroke" style="pointer-events:none"></line>';
     } else if (c.tip === "olcum") {
       var bilgi = cizimOlcumBilgisi(olcek, c.x1, c.y1, c.x2, c.y2);
-      svg += '<line x1="' + c.x1 + '" y1="' + c.y1 + '" x2="' + c.x2 + '" y2="' + c.y2 + '" stroke="#818cf8" stroke-width="1" stroke-dasharray="2,2" vector-effect="non-scaling-stroke"></line>';
+      svg += '<line x1="' + c.x1 + '" y1="' + c.y1 + '" x2="' + c.x2 + '" y2="' + c.y2 + '" stroke="#818cf8" stroke-width="1" stroke-dasharray="2,2" vector-effect="non-scaling-stroke" style="pointer-events:none"></line>';
       var minX = Math.min(c.x1, c.x2), maxX = Math.max(c.x1, c.x2);
       var kutuX = (minX + maxX) / 2 - 44;
       if (kutuX < 1) kutuX = 1;
       if (kutuX > olcek.w - 89) kutuX = olcek.w - 89;
       var kutuY = Math.min(c.y1, c.y2) - 24;
       if (kutuY < 1) kutuY = 1;
-      svg += '<rect x="' + kutuX + '" y="' + kutuY + '" width="88" height="20" rx="3" fill="#0f172a" fill-opacity="0.92" stroke="' + bilgi.renk + '" stroke-width="0.6"></rect>';
-      svg += '<text x="' + (kutuX + 44) + '" y="' + (kutuY + 9) + '" font-size="7" fill="' + bilgi.renk + '" text-anchor="middle" font-weight="600">' + bilgi.satir1 + '</text>';
-      svg += '<text x="' + (kutuX + 44) + '" y="' + (kutuY + 17) + '" font-size="6.5" fill="#94a3b8" text-anchor="middle">' + bilgi.satir2 + '</text>';
+      svg += '<rect x="' + kutuX + '" y="' + kutuY + '" width="88" height="20" rx="3" fill="#0f172a" fill-opacity="0.92" stroke="' + bilgi.renk + '" stroke-width="0.6" style="pointer-events:none"></rect>';
+      svg += '<text x="' + (kutuX + 44) + '" y="' + (kutuY + 9) + '" font-size="7" fill="' + bilgi.renk + '" text-anchor="middle" font-weight="600" style="pointer-events:none">' + bilgi.satir1 + '</text>';
+      svg += '<text x="' + (kutuX + 44) + '" y="' + (kutuY + 17) + '" font-size="6.5" fill="#94a3b8" text-anchor="middle" style="pointer-events:none">' + bilgi.satir2 + '</text>';
     }
   }
   return svg;
 }
+
+// Cizilmis trend/yatay cizgileri fare ile "tutup" tasiyabilmek icin, gorunmez ama
+// genis tiklama alanina sahip "tutamac" cizgileri - gorunen cizginin tam ustune, mum-el
+// katmanindan SONRA (yani z-sirasinda ustte) ciziliyor ki fare cizginin uzerine geldiginde
+// mum-hover yerine tasima onceligi kazansin.
+function cizimTutamaclarSvg(sembol, olcek) {
+  var liste = cizimler[sembol] || [];
+  if (!olcek || liste.length === 0) return "";
+  var svg = "";
+  for (var i = 0; i < liste.length; i++) {
+    var c = liste[i];
+    if (c.tip === "trend") {
+      svg += '<line class="cizim-tutamac" data-sembol="' + sembol + '" data-index="' + i + '" data-tip="trend" x1="' + c.x1 + '" y1="' + c.y1 + '" x2="' + c.x2 + '" y2="' + c.y2 + '" stroke="transparent" stroke-width="9" style="pointer-events:stroke;cursor:move;touch-action:none"></line>';
+    } else if (c.tip === "yatay") {
+      svg += '<line class="cizim-tutamac" data-sembol="' + sembol + '" data-index="' + i + '" data-tip="yatay" x1="0" y1="' + c.y + '" x2="' + olcek.w + '" y2="' + c.y + '" stroke="transparent" stroke-width="9" style="pointer-events:stroke;cursor:move;touch-action:none"></line>';
+    }
+  }
+  return svg;
+}
+
+var cizimTasima = null; // { sembol, index, tip, baslangic:{...kayit}, baslangicNokta:{x,y}, svg }
+
+function cizimTasimaGuncelle(sembol, index, dx, dy, olcek) {
+  var kayit = cizimler[sembol] && cizimler[sembol][index];
+  if (!kayit) return;
+  if (kayit.tip === "yatay") {
+    var yeniY = cizimTasima.baslangic.y + dy;
+    if (yeniY < 0) yeniY = 0; if (yeniY > olcek.h) yeniY = olcek.h;
+    kayit.y = yeniY;
+  } else if (kayit.tip === "trend") {
+    var yeniX1 = cizimTasima.baslangic.x1 + dx, yeniY1 = cizimTasima.baslangic.y1 + dy;
+    var yeniX2 = cizimTasima.baslangic.x2 + dx, yeniY2 = cizimTasima.baslangic.y2 + dy;
+    if (yeniX1 < 0) yeniX1 = 0; if (yeniX1 > olcek.w) yeniX1 = olcek.w;
+    if (yeniX2 < 0) yeniX2 = 0; if (yeniX2 > olcek.w) yeniX2 = olcek.w;
+    if (yeniY1 < 0) yeniY1 = 0; if (yeniY1 > olcek.h) yeniY1 = olcek.h;
+    if (yeniY2 < 0) yeniY2 = 0; if (yeniY2 > olcek.h) yeniY2 = olcek.h;
+    kayit.x1 = yeniX1; kayit.y1 = yeniY1; kayit.x2 = yeniX2; kayit.y2 = yeniY2;
+  }
+  // ekrandaki gorunen + tutamac cizgilerini aninda guncelle (yeniden render beklemeden)
+  var svgEl = cizimTasima.svg;
+  var esler = svgEl.querySelectorAll('[data-sembol="' + sembol + '"][data-index="' + index + '"]');
+  for (var i = 0; i < esler.length; i++) {
+    var el = esler[i];
+    if (kayit.tip === "yatay") {
+      el.setAttribute("y1", kayit.y); el.setAttribute("y2", kayit.y);
+    } else {
+      el.setAttribute("x1", kayit.x1); el.setAttribute("y1", kayit.y1);
+      el.setAttribute("x2", kayit.x2); el.setAttribute("y2", kayit.y2);
+    }
+  }
+}
+
+document.addEventListener("pointerdown", function(e) {
+  var tutamac = e.target.closest ? e.target.closest(".cizim-tutamac") : null;
+  if (!tutamac) return;
+  var sembol = tutamac.getAttribute("data-sembol");
+  var index = parseInt(tutamac.getAttribute("data-index"), 10);
+  var olcek = cizimOlcek[sembol];
+  var svgEl = tutamac.ownerSVGElement || tutamac.closest("svg");
+  var kayit = cizimler[sembol] && cizimler[sembol][index];
+  if (!olcek || !svgEl || isNaN(index) || !kayit) return;
+  var nokta = svgKoordCoz(svgEl, e.clientX, e.clientY, olcek);
+  cizimTasima = {
+    sembol: sembol, index: index, tip: kayit.tip,
+    baslangic: kayit.tip === "yatay" ? { y: kayit.y } : { x1: kayit.x1, y1: kayit.y1, x2: kayit.x2, y2: kayit.y2 },
+    baslangicNokta: nokta, svg: svgEl
+  };
+  if (tutamac.setPointerCapture) { try { tutamac.setPointerCapture(e.pointerId); } catch (err) {} }
+});
+
+document.addEventListener("pointermove", function(e) {
+  if (!cizimTasima) return;
+  var olcek = cizimOlcek[cizimTasima.sembol];
+  if (!olcek) return;
+  var nokta = svgKoordCoz(cizimTasima.svg, e.clientX, e.clientY, olcek);
+  var dx = nokta.x - cizimTasima.baslangicNokta.x;
+  var dy = nokta.y - cizimTasima.baslangicNokta.y;
+  cizimTasimaGuncelle(cizimTasima.sembol, cizimTasima.index, dx, dy, olcek);
+});
+
+document.addEventListener("pointerup", function(e) {
+  if (!cizimTasima) return;
+  var sembol = cizimTasima.sembol;
+  cizimTasima = null;
+  mumGrafikHucreleriDoldur(sembol);
+});
 
 function cizimSuruklemeyiTemizle() {
   if (cizimSurukleme && cizimSurukleme.onizlemeEls) {
@@ -1499,6 +1585,7 @@ function mumSvgOlustur(mumlar, guncelFiyat, sembol) {
   }
 
   var cizimAktifMi = cizimAracAl(sembol) !== "sec";
+  svg += cizimTutamaclarSvg(sembol, olcek);
   svg += '<rect class="cizim-katman" data-sembol="' + sembol + '" x="0" y="0" width="' + w + '" height="' + h + '" fill="transparent" style="pointer-events:' + (cizimAktifMi ? "all" : "none") + ';cursor:crosshair;touch-action:none"></rect>';
 
   svg += "</svg>";
