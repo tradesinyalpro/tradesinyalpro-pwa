@@ -1078,8 +1078,8 @@ function uyumsuzlukBul(mumlar, rsiDizisi) {
 
 // --- SINYAL KARTLARINDAKI CANLI MUM GRAFIGI (destek/direnc cizgileriyle) ---
 // Zaman dilimini/mum sayisini degistirmek icin sadece bu iki satiri guncelle.
-var MUM_GRAFIK_ARALIK = "15m";
-var MUM_GRAFIK_MUM_SAYISI = 96; // 15m x 96 = son 24 saat
+var MUM_GRAFIK_ARALIK = "1h";
+var MUM_GRAFIK_MUM_SAYISI = 48; // 1h x 48 = son 48 saat
 var MUM_GRAFIK_YENILEME_MS = 60000; // sembol basina en fazla bu sıklıkta yeniden veri cekilir
 var mumGrafikOnbellek = {}; // {SEMBOL: {mumlar:[...], zaman: Date.now(), yukleniyor:bool}}
 
@@ -1134,8 +1134,8 @@ document.addEventListener("click", function(e) {
 });
 
 function rsiBilgiFormatla(deger) {
-  if (deger === null || deger === undefined) return "RSI(14, 15dk): -";
-  return "RSI(14, 15dk): " + deger.toFixed(1);
+  if (deger === null || deger === undefined) return "RSI(14, 1sa): -";
+  return "RSI(14, 1sa): " + deger.toFixed(1);
 }
 
 function rsiBilgiGuncelle(el) {
