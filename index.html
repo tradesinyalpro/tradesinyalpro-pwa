@@ -2317,14 +2317,10 @@ function coinPerformansSatirIcerik(sembol, odalar, yon, gosterilecekOdalar, odaS
       html += '<span style="color:#475569">-</span>';
     } else {
       toplamTp += d.tp; toplamStop += d.stop;
-      html += '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">';
-      html += '<span style="color:#60a5fa;font-weight:600;cursor:pointer" onclick="sinyaleGit(\'' + oda + '\',\'' + sembol + '\')">&#10003; ' + d.acilan + '</span>';
-      if (d.tp > 0 || d.stop > 0) {
-        html += '<div style="display:flex;gap:6px">';
-        if (d.tp > 0) html += '<span style="color:#4ade80">&#10003; ' + d.tp + '</span>';
-        if (d.stop > 0) html += '<span style="color:#f87171">&#10007; ' + d.stop + '</span>';
-        html += '</div>';
-      }
+      html += '<div style="display:flex;justify-content:center;align-items:center">';
+      html += '<span style="width:30px;text-align:center;color:#60a5fa;font-weight:600;cursor:pointer" onclick="sinyaleGit(\'' + oda + '\',\'' + sembol + '\')">&#10003;' + d.acilan + '</span>';
+      html += '<span style="width:26px;text-align:center;color:' + (d.tp > 0 ? '#4ade80' : '#334155') + '">' + (d.tp > 0 ? ('&#10003;' + d.tp) : '-') + '</span>';
+      html += '<span style="width:26px;text-align:center;color:' + (d.stop > 0 ? '#f87171' : '#334155') + '">' + (d.stop > 0 ? ('&#10007;' + d.stop) : '-') + '</span>';
       html += '</div>';
     }
     html += '</td>';
@@ -2335,9 +2331,9 @@ function coinPerformansSatirIcerik(sembol, odalar, yon, gosterilecekOdalar, odaS
   var yuzdeRenk = basariYuzde === null ? "#64748b" : basariYuzde >= 66 ? "#4ade80" : basariYuzde >= 40 ? "#fbbf24" : "#f87171";
   html += '<td style="text-align:center;padding:6px 4px;border-left:1px solid #1e293b">';
   html += '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">';
-  html += '<div style="display:flex;gap:8px">';
-  html += '<span style="color:#4ade80;font-weight:600">' + toplamTp + '</span>';
-  html += '<span style="color:#f87171;font-weight:600">' + toplamStop + '</span>';
+  html += '<div style="display:flex;justify-content:center">';
+  html += '<span style="width:26px;text-align:center;color:#4ade80;font-weight:600">' + toplamTp + '</span>';
+  html += '<span style="width:26px;text-align:center;color:#f87171;font-weight:600">' + toplamStop + '</span>';
   html += '</div>';
   if (basariYuzde !== null) html += '<span style="font-size:11px;color:' + yuzdeRenk + ';font-weight:600">%' + basariYuzde + '</span>';
   html += '</div></td>';
