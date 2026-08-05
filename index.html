@@ -1151,8 +1151,9 @@ function cizimAraciSifirla(sembol) {
 
 function svgKoordCoz(svgEl, clientX, clientY, olcek) {
   var rect = svgEl.getBoundingClientRect();
-  var relX = rect.width ? (clientX - rect.left) / rect.width : 0;
-  var relY = rect.height ? (clientY - rect.top) / rect.height : 0;
+  if (!rect.width || !rect.height) return null; // eleman DOM'dan kopmus/gizli - guvenilir konum yok
+  var relX = (clientX - rect.left) / rect.width;
+  var relY = (clientY - rect.top) / rect.height;
   var x = relX * olcek.w, y = relY * olcek.h;
   if (x < 0) x = 0; if (x > olcek.w) x = olcek.w;
   if (y < 0) y = 0; if (y > olcek.h) y = olcek.h;
@@ -1272,6 +1273,7 @@ document.addEventListener("pointerdown", function(e) {
   if (!olcek || !svgEl || isNaN(index) || !kayit) return;
   e.preventDefault();
   var nokta = svgKoordCoz(svgEl, e.clientX, e.clientY, olcek);
+  if (!nokta) return;
   cizimTasima = {
     sembol: sembol, index: index, tip: kayit.tip,
     baslangic: kayit.tip === "yatay" ? { y: kayit.y } : { x1: kayit.x1, y1: kayit.y1, x2: kayit.x2, y2: kayit.y2 },
@@ -1286,6 +1288,7 @@ document.addEventListener("pointermove", function(e) {
   var olcek = cizimOlcek[cizimTasima.sembol];
   if (!olcek) return;
   var nokta = svgKoordCoz(cizimTasima.svg, e.clientX, e.clientY, olcek);
+  if (!nokta) return; // eleman gecici olarak kopuk - bu hareketi atla, mevcut konumu bozma
   var dx = nokta.x - cizimTasima.baslangicNokta.x;
   var dy = nokta.y - cizimTasima.baslangicNokta.y;
   cizimTasimaGuncelle(cizimTasima.sembol, cizimTasima.index, dx, dy, olcek);
@@ -1323,6 +1326,7 @@ document.addEventListener("pointerdown", function(e) {
   if (!olcek || !svgEl) return;
   e.preventDefault();
   var nokta = svgKoordCoz(svgEl, e.clientX, e.clientY, olcek);
+  if (!nokta) return;
   cizimSuruklemeyiTemizle();
 
   if (arac === "yatay") {
@@ -1401,6 +1405,7 @@ document.addEventListener("pointermove", function(e) {
   var olcek = cizimOlcek[sembol];
   if (!olcek) return;
   var nokta = svgKoordCoz(cizimSurukleme.svg, e.clientX, e.clientY, olcek);
+  if (!nokta) return; // eleman gecici olarak kopuk - bu hareketi atla, son gecerli konumu koru
   cizimSurukleme.x2 = nokta.x;
   cizimSurukleme.y2 = nokta.y;
   if (cizimSurukleme.tip === "trend") {
@@ -2328,6 +2333,9 @@ function fiyatKopyala(deger, el) {
 }
 
 function sinyalleriGoster() {
+  // Aktif bir cizim/olcum/tasima surerken listeyi yeniden olusturma - DOM'daki
+  // grafik elemani altindan kayarsa surukleme koordinatlari bozulur (cizgi sol ust kosede biter).
+  if (cizimSurukleme || cizimTasima) return;
   var toplamTp = 0, toplamStop = 0;
   var tumBotlar = Object.keys(tumVeriler);
   for (var bb = 0; bb < tumBotlar.length; bb++) {
