@@ -1221,9 +1221,9 @@ function cizimTutamaclarSvg(sembol, olcek) {
   for (var i = 0; i < liste.length; i++) {
     var c = liste[i];
     if (c.tip === "trend") {
-      svg += '<line class="cizim-tutamac" data-sembol="' + sembol + '" data-index="' + i + '" data-tip="trend" x1="' + c.x1 + '" y1="' + c.y1 + '" x2="' + c.x2 + '" y2="' + c.y2 + '" stroke="transparent" stroke-width="9" style="pointer-events:stroke;cursor:move;touch-action:none"></line>';
+      svg += '<line class="cizim-tutamac" data-sembol="' + sembol + '" data-index="' + i + '" data-tip="trend" x1="' + c.x1 + '" y1="' + c.y1 + '" x2="' + c.x2 + '" y2="' + c.y2 + '" stroke="transparent" stroke-width="9" style="pointer-events:stroke;cursor:move;touch-action:none;user-select:none;-webkit-user-select:none"></line>';
     } else if (c.tip === "yatay") {
-      svg += '<line class="cizim-tutamac" data-sembol="' + sembol + '" data-index="' + i + '" data-tip="yatay" x1="0" y1="' + c.y + '" x2="' + olcek.w + '" y2="' + c.y + '" stroke="transparent" stroke-width="9" style="pointer-events:stroke;cursor:move;touch-action:none"></line>';
+      svg += '<line class="cizim-tutamac" data-sembol="' + sembol + '" data-index="' + i + '" data-tip="yatay" x1="0" y1="' + c.y + '" x2="' + olcek.w + '" y2="' + c.y + '" stroke="transparent" stroke-width="9" style="pointer-events:stroke;cursor:move;touch-action:none;user-select:none;-webkit-user-select:none"></line>';
     }
   }
   return svg;
@@ -1270,6 +1270,7 @@ document.addEventListener("pointerdown", function(e) {
   var svgEl = tutamac.ownerSVGElement || tutamac.closest("svg");
   var kayit = cizimler[sembol] && cizimler[sembol][index];
   if (!olcek || !svgEl || isNaN(index) || !kayit) return;
+  e.preventDefault();
   var nokta = svgKoordCoz(svgEl, e.clientX, e.clientY, olcek);
   cizimTasima = {
     sembol: sembol, index: index, tip: kayit.tip,
@@ -1277,23 +1278,28 @@ document.addEventListener("pointerdown", function(e) {
     baslangicNokta: nokta, svg: svgEl
   };
   if (tutamac.setPointerCapture) { try { tutamac.setPointerCapture(e.pointerId); } catch (err) {} }
-});
+}, { passive: false });
 
 document.addEventListener("pointermove", function(e) {
   if (!cizimTasima) return;
+  e.preventDefault();
   var olcek = cizimOlcek[cizimTasima.sembol];
   if (!olcek) return;
   var nokta = svgKoordCoz(cizimTasima.svg, e.clientX, e.clientY, olcek);
   var dx = nokta.x - cizimTasima.baslangicNokta.x;
   var dy = nokta.y - cizimTasima.baslangicNokta.y;
   cizimTasimaGuncelle(cizimTasima.sembol, cizimTasima.index, dx, dy, olcek);
-});
+}, { passive: false });
 
 document.addEventListener("pointerup", function(e) {
   if (!cizimTasima) return;
   var sembol = cizimTasima.sembol;
   cizimTasima = null;
   mumGrafikHucreleriDoldur(sembol);
+});
+
+document.addEventListener("selectstart", function(e) {
+  if (cizimSurukleme || cizimTasima) e.preventDefault();
 });
 
 function cizimSuruklemeyiTemizle() {
@@ -1315,6 +1321,7 @@ document.addEventListener("pointerdown", function(e) {
   var olcek = cizimOlcek[sembol];
   var svgEl = overlay.ownerSVGElement || overlay.closest("svg");
   if (!olcek || !svgEl) return;
+  e.preventDefault();
   var nokta = svgKoordCoz(svgEl, e.clientX, e.clientY, olcek);
   cizimSuruklemeyiTemizle();
 
@@ -1368,7 +1375,7 @@ document.addEventListener("pointerdown", function(e) {
 
   cizimSurukleme = { sembol: sembol, tip: arac, x1: nokta.x, y1: nokta.y, svg: svgEl, onizlemeEls: onizlemeEls };
   if (overlay.setPointerCapture) { try { overlay.setPointerCapture(e.pointerId); } catch (err) {} }
-});
+}, { passive: false });
 
 function cizimOlcumOnizlemeGuncelle(sur, olcek) {
   var els = sur.onizlemeEls;
@@ -1389,6 +1396,7 @@ function cizimOlcumOnizlemeGuncelle(sur, olcek) {
 
 document.addEventListener("pointermove", function(e) {
   if (!cizimSurukleme) return;
+  e.preventDefault();
   var sembol = cizimSurukleme.sembol;
   var olcek = cizimOlcek[sembol];
   if (!olcek) return;
@@ -1403,7 +1411,7 @@ document.addEventListener("pointermove", function(e) {
     if (olcumCizgi2) { olcumCizgi2.setAttribute("x2", nokta.x); olcumCizgi2.setAttribute("y2", nokta.y); }
     cizimOlcumOnizlemeGuncelle(cizimSurukleme, olcek);
   }
-});
+}, { passive: false });
 
 document.addEventListener("pointerup", function(e) {
   if (!cizimSurukleme) return;
@@ -1586,7 +1594,7 @@ function mumSvgOlustur(mumlar, guncelFiyat, sembol) {
 
   var cizimAktifMi = cizimAracAl(sembol) !== "sec";
   svg += cizimTutamaclarSvg(sembol, olcek);
-  svg += '<rect class="cizim-katman" data-sembol="' + sembol + '" x="0" y="0" width="' + w + '" height="' + h + '" fill="transparent" style="pointer-events:' + (cizimAktifMi ? "all" : "none") + ';cursor:crosshair;touch-action:none"></rect>';
+  svg += '<rect class="cizim-katman" data-sembol="' + sembol + '" x="0" y="0" width="' + w + '" height="' + h + '" fill="transparent" style="pointer-events:' + (cizimAktifMi ? "all" : "none") + ';cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none"></rect>';
 
   svg += "</svg>";
 
