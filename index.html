@@ -2337,7 +2337,7 @@ function coinPerformansGoster() {
         } else {
           toplamTp += d.tp; toplamStop += d.stop;
           html += '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">';
-          html += '<span style="color:#60a5fa;font-weight:600">&#10003; ' + d.acilan + '</span>';
+          html += '<span style="color:#60a5fa;font-weight:600;cursor:pointer" onclick="sinyaleGit(\'' + oda + '\',\'' + sembol + '\')">&#10003; ' + d.acilan + '</span>';
           if (d.tp > 0 || d.stop > 0) {
             html += '<div style="display:flex;gap:6px">';
             if (d.tp > 0) html += '<span style="color:#4ade80">&#10003; ' + d.tp + '</span>';
