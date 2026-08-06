@@ -139,8 +139,16 @@
   }
   .kart-kapat-btn { display: none; cursor: pointer; font-size: 15px; color: #94a3b8; margin-left: 8px; }
   .signal-card.kart-genisletilmis .kart-kapat-btn { display: inline-block; }
+  /* Kart tam ekrana genisledi ginde: grafik istatistiklerin ALTINA gecsin ve buyusun */
+  .signal-card.kart-genisletilmis .sig-stats-row { flex-direction: column; align-items: stretch; }
+  .signal-card.kart-genisletilmis .sig-stats-left { width: 100%; }
+  .signal-card.kart-genisletilmis .sig-stats-chart { max-width: none; margin-left: 0; width: 100%; }
+  .signal-card.kart-genisletilmis .mum-grafik-yer svg:nth-of-type(1) { height: 230px !important; }
+  .signal-card.kart-genisletilmis .mum-grafik-yer svg:nth-of-type(2) { height: 95px !important; }
   @media (max-width: 700px) {
     .signal-card.kart-genisletilmis { top: 0; left: 0; right: 0; bottom: 0; border-radius: 0; }
+    .signal-card.kart-genisletilmis .mum-grafik-yer svg:nth-of-type(1) { height: 50vh !important; }
+    .signal-card.kart-genisletilmis .mum-grafik-yer svg:nth-of-type(2) { height: 18vh !important; }
   }
   .loading { text-align: center; padding: 30px; color: #475569; }
   .error { background: #2d0a0a; border: 1px solid #7f1d1d; border-radius: 12px; padding: 16px; text-align: center; color: #f87171; font-size: 13px; margin: 16px 0; }
@@ -673,6 +681,20 @@ function kartSec(anahtar) {
   secilenKartAnahtari = (secilenKartAnahtari === anahtar) ? null : anahtar;
   kartBackdropGuncelle();
   sinyalleriGoster();
+  if (secilenKartAnahtari) {
+    var parcalar = secilenKartAnahtari.split("|");
+    var sembol = parcalar[1];
+    if (sembol) {
+      // Genisletilince grafigin kesin yuklenmesini garanti et: eski/asilmis bir
+      // "yukleniyor" kilidi varsa temizle ve hemen yeniden dene (ayrica DOM'un
+      // yeni olusturulan elemanini da aninda onbellekten doldur).
+      var kayit = mumGrafikOnbellek[sembol];
+      if (kayit) kayit.yukleniyor = false;
+      mumGrafikHucreleriDoldur(sembol);
+      mumGrafikSembolGuncelle(sembol);
+      setTimeout(function() { mumGrafikHucreleriDoldur(sembol); }, 700);
+    }
+  }
 }
 
 function kartKapat() {
