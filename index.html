@@ -425,6 +425,7 @@
     <div class="bot-filter" id="analiz-alt-filtre">
       <button class="bot-btn active" onclick="analizAltSekmeDegistir('kripto',this)">Kripto Analiz</button>
       <button class="bot-btn" onclick="analizAltSekmeDegistir('hisse',this)">ABD Hisse Analiz</button>
+      <button class="bot-btn" onclick="analizAltSekmeDegistir('bist',this)">BIST Analiz</button>
     </div>
     <div id="kripto-analiz-bolumu" style="padding:16px">
       <div id="kripto-analiz-mesajlari" style="display:flex;flex-direction:column;gap:8px;min-height:200px;margin-bottom:12px"></div>
@@ -444,7 +445,17 @@
         <button class="refresh-btn" onclick="hisseAnalizGonder()">Analiz Et</button>
       </div>
     </div>
+    <div id="bist-analiz-bolumu" style="padding:16px;display:none">
+      <div id="bist-analiz-mesajlari" style="display:flex;flex-direction:column;gap:8px;min-height:200px;margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px;position:sticky;bottom:0;background:#0a0f1e;padding:8px 0">
+        <input id="bist-analiz-input" type="text" placeholder="BIST hisse kodu (orn: EREGL, THYAO, ASELS)" maxlength="20"
+          style="flex:1;background:#111827;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px"
+          onkeypress="if(event.key==='Enter')bistAnalizGonder()">
+        <button class="refresh-btn" onclick="bistAnalizGonder()">Analiz Et</button>
+      </div>
+    </div>
   </div>
+
 
   <div id="balina" style="display:none">
     <div class="bot-filter">
@@ -929,12 +940,18 @@ function hisseAnalizGoster() {
     'Henuz analiz yapmadiniz. Hisse kodunu yazip "Analiz Et" butonuna basin (ornek: NVDA), NASDAQ acik mi diye sormak icin /piyasa yazip gonderin.');
 }
 
+function bistAnalizGoster() {
+  analizMesajlariRenderEt(bistAnalizMesajlari, "bist-analiz-mesajlari",
+    'Henuz analiz yapmadiniz. BIST hisse kodunu yazip "Analiz Et" butonuna basin (ornek: EREGL, THYAO, ASELS).');
+}
+
 function analizAltSekmeDegistir(sekme, el) {
   var btnlar = document.querySelectorAll("#analiz-alt-filtre .bot-btn");
   for (var i = 0; i < btnlar.length; i++) btnlar[i].classList.remove("active");
   el.classList.add("active");
   document.getElementById("kripto-analiz-bolumu").style.display = sekme === "kripto" ? "block" : "none";
   document.getElementById("hisse-analiz-bolumu").style.display = sekme === "hisse" ? "block" : "none";
+  document.getElementById("bist-analiz-bolumu").style.display = sekme === "bist" ? "block" : "none";
 }
 
 function kriptoAnalizGonder() {
@@ -955,6 +972,14 @@ function hisseAnalizGonder() {
     return;
   }
   hisseAnaliziBaslat(deger);
+}
+
+function bistAnalizGonder() {
+  var input = document.getElementById("bist-analiz-input");
+  var deger = input.value.trim();
+  if (!deger) return;
+  input.value = "";
+  bistAnaliziBaslat(deger);
 }
 
 function sohbetGonder() {
@@ -1014,6 +1039,7 @@ function sohbetSil(id) {
 
 var kriptoAnalizMesajlari = []; // {id, tip: "kullanici"|"bot", metin, zaman}
 var hisseAnalizMesajlari = [];
+var bistAnalizMesajlari = [];
 var sohbetYerelIdSayaci = 0;
 
 function analizMesajEkle(dizi, renderFn, tip, metin, ozelId) {
@@ -1816,6 +1842,38 @@ function hisseAnaliziBaslat(sembolRaw) {
   };
   xhr.onerror = function() {
     analizMesajGuncelle(hisseAnalizMesajlari, hisseAnalizGoster, yukleniyorId, "⚠️ Sunucuya ulasilamadi.");
+  };
+  xhr.send(JSON.stringify({ sembol: sembol }));
+}
+
+function bistAnaliziBaslat(sembolRaw) {
+  var sembol = (sembolRaw || "").trim().toUpperCase();
+  if (!sembol) {
+    analizMesajEkle(bistAnalizMesajlari, bistAnalizGoster, "bot", "Kullanim: EREGL gibi bir BIST hisse kodu girin.");
+    return;
+  }
+  analizMesajEkle(bistAnalizMesajlari, bistAnalizGoster, "kullanici", sembol);
+  var yukleniyorId = analizMesajEkle(bistAnalizMesajlari, bistAnalizGoster, "bot", "⏳ " + sembol + " BIST'te araniyor, KAP ve sirket verileri taraniyor (biraz surebilir)...");
+
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/bist-analiz-yorumla", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    var yanit;
+    try { yanit = JSON.parse(xhr.responseText); } catch (e) { yanit = {}; }
+    if (xhr.status === 200 && yanit.yorum) {
+      analizMesajGuncelle(bistAnalizMesajlari, bistAnalizGoster, yukleniyorId, yanit.yorum + YASAL_UYARI_METNI);
+    } else if (xhr.status === 429) {
+      analizMesajGuncelle(bistAnalizMesajlari, bistAnalizGoster, yukleniyorId, "⏳ " + (yanit.hata || "Gunluk analiz hakkiniz doldu."));
+    } else if (xhr.status === 404) {
+      analizMesajGuncelle(bistAnalizMesajlari, bistAnalizGoster, yukleniyorId, "⚠️ " + (yanit.hata || "Bu kod BIST'te bulunamadi."));
+    } else {
+      analizMesajGuncelle(bistAnalizMesajlari, bistAnalizGoster, yukleniyorId, "⚠️ " + (yanit.hata || "Analiz olusturulamadi."));
+    }
+  };
+  xhr.onerror = function() {
+    analizMesajGuncelle(bistAnalizMesajlari, bistAnalizGoster, yukleniyorId, "⚠️ Sunucuya ulasilamadi.");
   };
   xhr.send(JSON.stringify({ sembol: sembol }));
 }
@@ -3515,7 +3573,7 @@ function sekmeAc(id, el) {
   // Analiz sekmesi (coin/hisse/piyasa analizleri) - onceki mesaj gecmisini
   // gostermek icin sekme her acildiginda render edilir, otomatik veri
   // cekmez (sadece kullanicinin kendi sorgusuyla tetiklenir).
-  if (id === "analiz") { kriptoAnalizGoster(); hisseAnalizGoster(); }
+  if (id === "analiz") { kriptoAnalizGoster(); hisseAnalizGoster(); bistAnalizGoster(); }
   if (id === "yonetici") buyumePaneliGoster();
   if (id === "piyasa") altinFiyatlariGoster();
   if (id === "genelbakis") genelBakisDoldur("genelbakis-icerik");
