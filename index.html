@@ -129,6 +129,19 @@
   .cizim-arac-cubugu { display: flex; gap: 3px; justify-content: flex-end; margin-bottom: 3px; }
   .cizim-btn { background: #1e293b; border: 1px solid #334155; color: #94a3b8; width: 20px; height: 20px; border-radius: 5px; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; padding: 0; }
   .cizim-btn.aktif { background: #1e3a8a; border-color: #3b82f6; color: #93c5fd; }
+  .kart-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.78); z-index: 8000; }
+  .kart-backdrop.acik { display: block; }
+  .sig-symbol-tikla { cursor: pointer; }
+  .signal-card.kart-genisletilmis {
+    position: fixed; top: 3vh; left: 3vw; right: 3vw; bottom: 3vh;
+    z-index: 8001; width: auto; height: auto; overflow-y: auto;
+    box-shadow: 0 10px 44px rgba(0,0,0,0.65); border-color: #3b82f6;
+  }
+  .kart-kapat-btn { display: none; cursor: pointer; font-size: 15px; color: #94a3b8; margin-left: 8px; }
+  .signal-card.kart-genisletilmis .kart-kapat-btn { display: inline-block; }
+  @media (max-width: 700px) {
+    .signal-card.kart-genisletilmis { top: 0; left: 0; right: 0; bottom: 0; border-radius: 0; }
+  }
   .loading { text-align: center; padding: 30px; color: #475569; }
   .error { background: #2d0a0a; border: 1px solid #7f1d1d; border-radius: 12px; padding: 16px; text-align: center; color: #f87171; font-size: 13px; margin: 16px 0; }
   .news-card { background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 14px; margin-bottom: 8px; }
@@ -301,6 +314,7 @@
     </div>
     <div id="sessiz-saat-paneli" style="display:none;margin-bottom:10px"></div>
     <div id="sinyal-listesi"><div class="loading">Yukleniyor...</div></div>
+    <div id="kart-backdrop" class="kart-backdrop" onclick="kartKapat()"></div>
   </div>
 
   <div id="performans" style="display:none">
@@ -636,6 +650,30 @@ var aktifSekme = "sinyaller";
 var sonSohbetMesajlari = [];
 var sonPortfoy = { kayitlar: [], ozet: {} };
 var takipDurumu = {};
+var secilenKartAnahtari = null;
+
+function kartBackdropGuncelle() {
+  var bd = document.getElementById("kart-backdrop");
+  if (!bd) return;
+  if (secilenKartAnahtari) bd.classList.add("acik"); else bd.classList.remove("acik");
+}
+
+function kartSec(anahtar) {
+  secilenKartAnahtari = (secilenKartAnahtari === anahtar) ? null : anahtar;
+  kartBackdropGuncelle();
+  sinyalleriGoster();
+}
+
+function kartKapat() {
+  if (!secilenKartAnahtari) return;
+  secilenKartAnahtari = null;
+  kartBackdropGuncelle();
+  sinyalleriGoster();
+}
+
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Escape" && secilenKartAnahtari) kartKapat();
+});
 
 var BOT_ADLARI = {
   "SINYAL_ODA_1": "Oda 1",
@@ -2421,8 +2459,12 @@ function sinyalleriGoster() {
       ? '<span onclick="sinyalGorseliOlustur(\'' + s.sembol + '\',\'' + yon + '\',\'' + (s.giris || s.maliyet || "-") + '\',\'' + (s.hedef || "-") + '\',\'' + (s.stop || "-") + '\')" style="cursor:pointer;font-size:14px;margin-left:6px" title="Tanitim gorseli olustur (sadece yonetici)">🖼️</span>'
       : "";
 
-    html += '<div class="signal-card ' + cls + '">';
-    html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + yildizHtml + takipHtml + gorselBtnHtml + '</div>';
+    var kartAnahtari = bot + "|" + s.sembol + "|" + s.zaman;
+    var genisletilmisMi = secilenKartAnahtari === kartAnahtari;
+    var kapatBtnHtml = '<span class="kart-kapat-btn" onclick="event.stopPropagation();kartKapat()" title="Kapat">&#10005;</span>';
+
+    html += '<div class="signal-card ' + cls + (genisletilmisMi ? " kart-genisletilmis" : "") + '" data-kart-anahtari="' + kartAnahtari + '">';
+    html += '<div class="sig-header"><div class="sig-symbol"><span class="sig-symbol-tikla" onclick="kartSec(\'' + kartAnahtari.replace(/'/g, "\\'") + '\')">#' + s.sembol + '</span>' + yildizHtml + takipHtml + gorselBtnHtml + kapatBtnHtml + '</div>';
     html += '<div class="sig-badges">' + pnlHtml + '<span class="badge ' + cls + '">' + yon + '</span>';
     html += '<span class="badge bot">' + botAdi(bot) + '</span></div></div>';
     html += canliFiyatHtml;
