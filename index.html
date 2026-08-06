@@ -145,6 +145,7 @@
   .signal-card.kart-genisletilmis .sig-stats-chart { max-width: none; margin-left: 0; width: 100%; }
   .signal-card.kart-genisletilmis .mum-grafik-yer svg:nth-of-type(1) { height: 230px !important; }
   .signal-card.kart-genisletilmis .mum-grafik-yer svg:nth-of-type(2) { height: 95px !important; }
+  .signal-card.kart-genisletilmis .mum-grafik-yer { touch-action: none; }
   @media (max-width: 700px) {
     .signal-card.kart-genisletilmis { top: 0; left: 0; right: 0; bottom: auto; height: auto; max-height: 100vh; border-radius: 0; }
     .signal-card.kart-genisletilmis .mum-grafik-yer svg:nth-of-type(1) { height: 92px !important; }
@@ -670,6 +671,12 @@ var sonSohbetMesajlari = [];
 var sonPortfoy = { kayitlar: [], ozet: {} };
 var takipDurumu = {};
 var secilenKartAnahtari = null;
+
+function kartGenisletilmisMi(sembol) {
+  if (!secilenKartAnahtari) return false;
+  var parcalar = secilenKartAnahtari.split("|");
+  return parcalar[1] === sembol;
+}
 
 function kartBackdropGuncelle() {
   var bd = document.getElementById("kart-backdrop");
@@ -1710,9 +1717,12 @@ function mumSvgOlustur(mumlar, guncelFiyat, sembol) {
     svg += '<rect class="mum-el" data-sembol="' + sembol + '" data-idx="' + j + '" x="' + hx + '" y="0" width="' + hucre + '" height="' + h + '" fill="transparent" pointer-events="all" style="cursor:pointer"></rect>';
   }
 
-  var cizimAktifMi = cizimAracAl(sembol) !== "sec";
-  svg += cizimTutamaclarSvg(sembol, olcek);
-  svg += '<rect class="cizim-katman" data-sembol="' + sembol + '" x="0" y="0" width="' + w + '" height="' + h + '" fill="transparent" style="pointer-events:' + (cizimAktifMi ? "all" : "none") + ';cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none"></rect>';
+  var genisMi = kartGenisletilmisMi(sembol);
+  var cizimAktifMi = genisMi && cizimAracAl(sembol) !== "sec";
+  if (genisMi) {
+    svg += cizimTutamaclarSvg(sembol, olcek);
+    svg += '<rect class="cizim-katman" data-sembol="' + sembol + '" x="0" y="0" width="' + w + '" height="' + h + '" fill="transparent" style="pointer-events:' + (cizimAktifMi ? "all" : "none") + ';cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none"></rect>';
+  }
 
   svg += "</svg>";
 
@@ -2598,14 +2608,16 @@ function sinyalleriGoster() {
     html += '<div class="sig-stats-row">';
     html += '<div class="sig-stats-left">' + satirlarHtml + '</div>';
     html += '<div class="sig-stats-chart">';
-    html += '<div class="cizim-arac-cubugu" data-sembol="' + s.sembol + '">';
-    html += '<button type="button" class="cizim-btn aktif" data-arac="sec" data-sembol="' + s.sembol + '" onclick="cizimAraciSec(this)" title="Sec (imlec)">&#8598;</button>';
-    html += '<button type="button" class="cizim-btn" data-arac="trend" data-sembol="' + s.sembol + '" onclick="cizimAraciSec(this)" title="Trend cizgisi">&#8599;</button>';
-    html += '<button type="button" class="cizim-btn" data-arac="yatay" data-sembol="' + s.sembol + '" onclick="cizimAraciSec(this)" title="Yatay isin">&#8213;</button>';
-    html += '<button type="button" class="cizim-btn" data-arac="olcum" data-sembol="' + s.sembol + '" onclick="cizimAraciSec(this)" title="Olcum araci">&#128207;</button>';
-    html += '<button type="button" class="cizim-btn" data-sembol="' + s.sembol + '" onclick="cizimTemizle(this)" title="Cizimleri temizle">&#128465;</button>';
-    html += '</div>';
-    html += '<div class="mum-grafik-yer" data-sembol="' + s.sembol + '" style="width:100%;min-height:40px;text-align:center;touch-action:none"><span style="font-size:10px;color:#475569">Grafik yukleniyor...</span></div>';
+    if (genisletilmisMi) {
+      html += '<div class="cizim-arac-cubugu" data-sembol="' + s.sembol + '">';
+      html += '<button type="button" class="cizim-btn aktif" data-arac="sec" data-sembol="' + s.sembol + '" onclick="cizimAraciSec(this)" title="Sec (imlec)">&#8598;</button>';
+      html += '<button type="button" class="cizim-btn" data-arac="trend" data-sembol="' + s.sembol + '" onclick="cizimAraciSec(this)" title="Trend cizgisi">&#8599;</button>';
+      html += '<button type="button" class="cizim-btn" data-arac="yatay" data-sembol="' + s.sembol + '" onclick="cizimAraciSec(this)" title="Yatay isin">&#8213;</button>';
+      html += '<button type="button" class="cizim-btn" data-arac="olcum" data-sembol="' + s.sembol + '" onclick="cizimAraciSec(this)" title="Olcum araci">&#128207;</button>';
+      html += '<button type="button" class="cizim-btn" data-sembol="' + s.sembol + '" onclick="cizimTemizle(this)" title="Cizimleri temizle">&#128465;</button>';
+      html += '</div>';
+    }
+    html += '<div class="mum-grafik-yer" data-sembol="' + s.sembol + '" style="width:100%;min-height:40px;text-align:center"><span style="font-size:10px;color:#475569">Grafik yukleniyor...</span></div>';
     html += '</div>';
     html += '</div>';
     html += kademehtml;
