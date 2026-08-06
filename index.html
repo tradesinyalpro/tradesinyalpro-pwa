@@ -133,7 +133,7 @@
   .kart-backdrop.acik { display: block; }
   .sig-symbol-tikla { cursor: pointer; }
   .signal-card.kart-genisletilmis {
-    position: fixed; top: 3vh; left: 3vw; right: 3vw; bottom: 3vh;
+    position: fixed; top: 1vh; left: 3vw; right: 3vw; bottom: 1vh;
     z-index: 8001; width: auto; height: auto; overflow-y: auto;
     box-shadow: 0 10px 44px rgba(0,0,0,0.65); border-color: #3b82f6;
   }
@@ -146,9 +146,9 @@
   .signal-card.kart-genisletilmis .mum-grafik-yer svg:nth-of-type(1) { height: 230px !important; }
   .signal-card.kart-genisletilmis .mum-grafik-yer svg:nth-of-type(2) { height: 95px !important; }
   @media (max-width: 700px) {
-    .signal-card.kart-genisletilmis { top: 0; left: 0; right: 0; bottom: 0; border-radius: 0; }
-    .signal-card.kart-genisletilmis .mum-grafik-yer svg:nth-of-type(1) { height: 50vh !important; }
-    .signal-card.kart-genisletilmis .mum-grafik-yer svg:nth-of-type(2) { height: 18vh !important; }
+    .signal-card.kart-genisletilmis { top: 0; left: 0; right: 0; bottom: auto; height: auto; max-height: 100vh; border-radius: 0; }
+    .signal-card.kart-genisletilmis .mum-grafik-yer svg:nth-of-type(1) { height: 92px !important; }
+    .signal-card.kart-genisletilmis .mum-grafik-yer svg:nth-of-type(2) { height: 38px !important; }
   }
   .loading { text-align: center; padding: 30px; color: #475569; }
   .error { background: #2d0a0a; border: 1px solid #7f1d1d; border-radius: 12px; padding: 16px; text-align: center; color: #f87171; font-size: 13px; margin: 16px 0; }
@@ -1387,9 +1387,27 @@ document.addEventListener("pointerup", function(e) {
   mumGrafikHucreleriDoldur(sembol);
 });
 
+// Mobil tarayicilar bazen suruklemeyi "sayfa kaydirma" jesti sanip
+// pointerup yerine pointercancel gonderir - bu durumda da tasimayi ayni
+// pointerup gibi SONLANDIRIYORUZ (son bilinen konumda birak), yoksa
+// tasima "takili" kalir.
+document.addEventListener("pointercancel", function(e) {
+  if (!cizimTasima) return;
+  var sembol = cizimTasima.sembol;
+  cizimTasima = null;
+  mumGrafikHucreleriDoldur(sembol);
+});
+
 document.addEventListener("selectstart", function(e) {
   if (cizimSurukleme || cizimTasima) e.preventDefault();
 });
+
+// Ek guvenlik: bazi Android WebView'lerde touch-action:none tek basina
+// yetmeyip tarayici yine de sayfayi kaydirmaya calisabiliyor. Bir cizim/
+// tasima aktifken dokunma hareketini de dogrudan engelliyoruz.
+document.addEventListener("touchmove", function(e) {
+  if (cizimSurukleme || cizimTasima) e.preventDefault();
+}, { passive: false });
 
 function cizimSuruklemeyiTemizle() {
   if (cizimSurukleme && cizimSurukleme.onizlemeEls) {
@@ -1504,7 +1522,7 @@ document.addEventListener("pointermove", function(e) {
   }
 }, { passive: false });
 
-document.addEventListener("pointerup", function(e) {
+function cizimSuruklemeyiSonlandir() {
   if (!cizimSurukleme) return;
   var sembol = cizimSurukleme.sembol;
   var tip = cizimSurukleme.tip;
@@ -1520,7 +1538,16 @@ document.addEventListener("pointerup", function(e) {
   }
   cizimAraciSifirla(sembol);
   mumGrafikHucreleriDoldur(sembol);
-});
+}
+
+document.addEventListener("pointerup", cizimSuruklemeyiSonlandir);
+
+// Mobil tarayicilar/webview'ler suruklemeyi bazen "sayfa kaydirma" jesti
+// sanip pointerup yerine pointercancel gonderiyor - onceden bu durumda
+// cizim tamamen kayboluyordu (sadece ilk temas noktasindaki kucuk kirinti
+// kaliyordu). Artik pointercancel de pointerup ile AYNI sekilde ele
+// alinip, o ana kadar cizilen kismi kaydediyor.
+document.addEventListener("pointercancel", cizimSuruklemeyiSonlandir);
 
 
 function fiyatEtiketFormatla(v) {
@@ -2578,7 +2605,7 @@ function sinyalleriGoster() {
     html += '<button type="button" class="cizim-btn" data-arac="olcum" data-sembol="' + s.sembol + '" onclick="cizimAraciSec(this)" title="Olcum araci">&#128207;</button>';
     html += '<button type="button" class="cizim-btn" data-sembol="' + s.sembol + '" onclick="cizimTemizle(this)" title="Cizimleri temizle">&#128465;</button>';
     html += '</div>';
-    html += '<div class="mum-grafik-yer" data-sembol="' + s.sembol + '" style="width:100%;min-height:40px;text-align:center"><span style="font-size:10px;color:#475569">Grafik yukleniyor...</span></div>';
+    html += '<div class="mum-grafik-yer" data-sembol="' + s.sembol + '" style="width:100%;min-height:40px;text-align:center;touch-action:none"><span style="font-size:10px;color:#475569">Grafik yukleniyor...</span></div>';
     html += '</div>';
     html += '</div>';
     html += kademehtml;
