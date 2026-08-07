@@ -1912,7 +1912,7 @@ function bistAnaliziBaslat(sembolRaw) {
     return;
   }
   analizMesajEkle(bistAnalizMesajlari, bistAnalizGoster, "kullanici", sembol);
-  var yukleniyorId = analizMesajEkle(bistAnalizMesajlari, bistAnalizGoster, "bot", "⏳ " + sembol + " BIST'te araniyor, KAP ve sirket verileri taraniyor (biraz surebilir)...");
+  var yukleniyorId = analizMesajEkle(bistAnalizMesajlari, bistAnalizGoster, "bot", "⏳ " + sembol + " analiz ediliyor...");
 
   var xhr = new XMLHttpRequest();
   xhr.open("POST", API + "/bist-analiz-yorumla", true);
