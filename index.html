@@ -129,6 +129,8 @@
   .cizim-arac-cubugu { display: flex; gap: 3px; justify-content: flex-end; margin-bottom: 3px; }
   .cizim-btn { background: #1e293b; border: 1px solid #334155; color: #94a3b8; width: 20px; height: 20px; border-radius: 5px; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; padding: 0; }
   .cizim-btn.aktif { background: #1e3a8a; border-color: #3b82f6; color: #93c5fd; }
+  .zaman-dilimi-cubugu { display: flex; gap: 3px; justify-content: flex-end; margin-bottom: 3px; }
+  .zaman-btn { width: auto !important; padding: 0 8px; font-size: 10px; font-weight: 600; }
   .kart-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.78); z-index: 8000; }
   .kart-backdrop.acik { display: block; }
   .sig-symbol-tikla { cursor: pointer; }
@@ -685,8 +687,14 @@ function kartBackdropGuncelle() {
 }
 
 function kartSec(anahtar) {
+  var oncekiAnahtar = secilenKartAnahtari;
   secilenKartAnahtari = (secilenKartAnahtari === anahtar) ? null : anahtar;
   kartBackdropGuncelle();
+  if (!secilenKartAnahtari && oncekiAnahtar) {
+    // Kart kapatildi (ayni isme tekrar tiklanarak) - zaman dilimi secimini sifirla
+    var kapananSembol = oncekiAnahtar.split("|")[1];
+    if (kapananSembol) delete mumZamanDilimi[kapananSembol];
+  }
   sinyalleriGoster();
   if (secilenKartAnahtari) {
     var parcalar = secilenKartAnahtari.split("|");
@@ -695,7 +703,7 @@ function kartSec(anahtar) {
       // Genisletilince grafigin kesin yuklenmesini garanti et: eski/asilmis bir
       // "yukleniyor" kilidi varsa temizle ve hemen yeniden dene (ayrica DOM'un
       // yeni olusturulan elemanini da aninda onbellekten doldur).
-      var kayit = mumGrafikOnbellek[sembol];
+      var kayit = mumGrafikOnbellek[mumGrafikAnahtar(sembol)];
       if (kayit) kayit.yukleniyor = false;
       mumGrafikHucreleriDoldur(sembol);
       mumGrafikSembolGuncelle(sembol);
@@ -706,6 +714,8 @@ function kartSec(anahtar) {
 
 function kartKapat() {
   if (!secilenKartAnahtari) return;
+  var kapananSembol = secilenKartAnahtari.split("|")[1];
+  if (kapananSembol) delete mumZamanDilimi[kapananSembol];
   secilenKartAnahtari = null;
   kartBackdropGuncelle();
   sinyalleriGoster();
@@ -1206,7 +1216,36 @@ function uyumsuzlukBul(mumlar, rsiDizisi) {
 var MUM_GRAFIK_ARALIK = "1h";
 var MUM_GRAFIK_MUM_SAYISI = 72; // 1h x 72 = son 72 saat
 var MUM_GRAFIK_YENILEME_MS = 60000; // sembol basina en fazla bu sıklıkta yeniden veri cekilir
-var mumGrafikOnbellek = {}; // {SEMBOL: {mumlar:[...], zaman: Date.now(), yukleniyor:bool}}
+var mumGrafikOnbellek = {}; // {"SEMBOL|ARALIK": {mumlar:[...], zaman: Date.now(), yukleniyor:bool}}
+var mumZamanDilimi = {}; // {SEMBOL: '15m'|'1h'|'4h'} - varsayilan 1h
+var ZAMAN_DILIMI_AYARLARI = {
+  "15m": { sayi: 96, etiket: "15dk" },
+  "1h": { sayi: 72, etiket: "1sa" },
+  "4h": { sayi: 72, etiket: "4sa" }
+};
+
+function mumZamanDilimiAl(sembol) {
+  return mumZamanDilimi[sembol] || "1h";
+}
+
+function mumGrafikAnahtar(sembol) {
+  return sembol + "|" + mumZamanDilimiAl(sembol);
+}
+
+function zamanDilimiSec(btn) {
+  var sembol = btn.getAttribute("data-sembol");
+  var interval = btn.getAttribute("data-interval");
+  if (mumZamanDilimiAl(sembol) === interval) return;
+  mumZamanDilimi[sembol] = interval;
+  var cubuk = btn.closest(".zaman-dilimi-cubugu");
+  if (cubuk) {
+    var hepsi = cubuk.querySelectorAll(".zaman-btn");
+    for (var i = 0; i < hepsi.length; i++) hepsi[i].classList.remove("aktif");
+    btn.classList.add("aktif");
+  }
+  mumGrafikHucreleriDoldur(sembol);
+  mumGrafikSembolGuncelle(sembol);
+}
 
 // --- GRAFIK UZERINE CIZIM ARACLARI (trend cizgisi, yatay isin, olcum) ---
 var SVG_NS = "http://www.w3.org/2000/svg";
@@ -1261,16 +1300,24 @@ function cizimXToIndex(olcek, x) {
   return (x - olcek.pad) / olcek.hucre;
 }
 
-function cizimOlcumBilgisi(olcek, x1, y1, x2, y2) {
+var ZAMAN_DILIMI_DAKIKA = { "15m": 15, "1h": 60, "4h": 240 };
+
+function cizimOlcumBilgisi(olcek, x1, y1, x2, y2, sembol) {
   var p1 = cizimYToFiyat(olcek, y1), p2 = cizimYToFiyat(olcek, y2);
   var fark = p2 - p1;
   var yuzde = p1 !== 0 ? (fark / p1) * 100 : 0;
   var i1 = cizimXToIndex(olcek, x1), i2 = cizimXToIndex(olcek, x2);
   var cubuk = Math.round(Math.abs(i2 - i1));
-  var saatAraligi = 1; // her mum = 1 saat (MUM_GRAFIK_ARALIK = "1h")
-  var toplamSaat = cubuk * saatAraligi;
-  var gun = Math.floor(toplamSaat / 24), saat = toplamSaat % 24;
-  var zamanStr = (gun > 0 ? gun + "g " : "") + saat + "s";
+  var dakikaPerBar = ZAMAN_DILIMI_DAKIKA[mumZamanDilimiAl(sembol)] || 60;
+  var toplamDakika = cubuk * dakikaPerBar;
+  var gun = Math.floor(toplamDakika / 1440);
+  var saat = Math.floor((toplamDakika % 1440) / 60);
+  var dakika = toplamDakika % 60;
+  var parcalar = [];
+  if (gun > 0) parcalar.push(gun + "g");
+  if (saat > 0) parcalar.push(saat + "s");
+  if (dakika > 0 || parcalar.length === 0) parcalar.push(dakika + "dk");
+  var zamanStr = parcalar.join(" ");
   var renk = fark >= 0 ? "#4ade80" : "#f87171";
   var satir1 = (fark >= 0 ? "+" : "") + fiyatEtiketFormatla(fark) + " (" + (yuzde >= 0 ? "+" : "") + yuzde.toFixed(2) + "%)";
   var satir2 = cubuk + " cubukta, " + zamanStr;
@@ -1288,7 +1335,7 @@ function cizimlerSvg(sembol, olcek) {
     } else if (c.tip === "yatay") {
       svg += '<line class="cizim-gorunen" data-sembol="' + sembol + '" data-index="' + i + '" x1="0" y1="' + c.y + '" x2="' + olcek.w + '" y2="' + c.y + '" stroke="#38bdf8" stroke-width="1.4" stroke-dasharray="4,2" vector-effect="non-scaling-stroke" style="pointer-events:none"></line>';
     } else if (c.tip === "olcum") {
-      var bilgi = cizimOlcumBilgisi(olcek, c.x1, c.y1, c.x2, c.y2);
+      var bilgi = cizimOlcumBilgisi(olcek, c.x1, c.y1, c.x2, c.y2, sembol);
       svg += '<line x1="' + c.x1 + '" y1="' + c.y1 + '" x2="' + c.x2 + '" y2="' + c.y2 + '" stroke="#818cf8" stroke-width="1" stroke-dasharray="2,2" vector-effect="non-scaling-stroke" style="pointer-events:none"></line>';
       var minX = Math.min(c.x1, c.x2), maxX = Math.max(c.x1, c.x2);
       var kutuX = (minX + maxX) / 2 - 44;
@@ -1495,7 +1542,7 @@ document.addEventListener("pointerdown", function(e) {
 function cizimOlcumOnizlemeGuncelle(sur, olcek) {
   var els = sur.onizlemeEls;
   var cizgi = els[0], kutu = els[1], satir1 = els[2], satir2 = els[3];
-  var bilgi = cizimOlcumBilgisi(olcek, sur.x1, sur.y1, sur.x2, sur.y2);
+  var bilgi = cizimOlcumBilgisi(olcek, sur.x1, sur.y1, sur.x2, sur.y2, sur.sembol);
   var minX = Math.min(sur.x1, sur.x2), maxX = Math.max(sur.x1, sur.x2);
   var kutuX = (minX + maxX) / 2 - 44;
   if (kutuX < 1) kutuX = 1;
@@ -1579,7 +1626,7 @@ function mumBilgiFormatla(m) {
 function mumBilgiGuncelle(el) {
   var sembol = el.getAttribute("data-sembol");
   var idx = parseInt(el.getAttribute("data-idx"), 10);
-  var kayit = mumGrafikOnbellek[sembol];
+  var kayit = mumGrafikOnbellek[mumGrafikAnahtar(sembol)];
   if (!kayit || !kayit.mumlar || !kayit.mumlar[idx]) return;
   var kart = el.closest(".mum-grafik-yer");
   if (!kart) return;
@@ -1607,21 +1654,22 @@ document.addEventListener("click", function(e) {
   if (el) mumBilgiGuncelle(el);
 });
 
-function rsiBilgiFormatla(deger) {
-  if (deger === null || deger === undefined) return "RSI(14, 1sa): -";
-  return "RSI(14, 1sa): " + deger.toFixed(1);
+function rsiBilgiFormatla(deger, etiket) {
+  var e = etiket || "1sa";
+  if (deger === null || deger === undefined) return "RSI(14, " + e + "): -";
+  return "RSI(14, " + e + "): " + deger.toFixed(1);
 }
 
 function rsiBilgiGuncelle(el) {
   var sembol = el.getAttribute("data-sembol");
   var idx = parseInt(el.getAttribute("data-idx"), 10);
-  var kayit = mumGrafikOnbellek[sembol];
+  var kayit = mumGrafikOnbellek[mumGrafikAnahtar(sembol)];
   if (!kayit || !kayit.mumlar) return;
   var kapanislar = kayit.mumlar.map(function(m) { return m.kapanis; });
   var rsiDizisi = rsiHesapla(kapanislar, 14);
   var kart = el.closest(".mum-grafik-yer");
   var bilgiEl = kart ? kart.querySelector(".rsi-bilgi") : null;
-  if (bilgiEl) bilgiEl.textContent = rsiBilgiFormatla(rsiDizisi[idx]);
+  if (bilgiEl) bilgiEl.textContent = rsiBilgiFormatla(rsiDizisi[idx], (ZAMAN_DILIMI_AYARLARI[mumZamanDilimiAl(sembol)] || {}).etiket);
 }
 
 document.addEventListener("mouseover", function(e) {
@@ -1658,7 +1706,7 @@ function rsiSvgOlustur(mumlar, sembol) {
   svg += "</svg>";
   var sonRsi = null;
   for (var k = rsiDizisi.length - 1; k >= 0; k--) { if (rsiDizisi[k] !== null && rsiDizisi[k] !== undefined) { sonRsi = rsiDizisi[k]; break; } }
-  var rsiBilgiHtml = '<div class="rsi-bilgi" style="font-size:10px;color:#94a3b8;text-align:center;margin-top:2px">' + rsiBilgiFormatla(sonRsi) + '</div>';
+  var rsiBilgiHtml = '<div class="rsi-bilgi" style="font-size:10px;color:#94a3b8;text-align:center;margin-top:2px">' + rsiBilgiFormatla(sonRsi, (ZAMAN_DILIMI_AYARLARI[mumZamanDilimiAl(sembol)] || {}).etiket) + '</div>';
   return svg + rsiBilgiHtml;
 }
 
@@ -1732,23 +1780,34 @@ function mumSvgOlustur(mumlar, guncelFiyat, sembol) {
 
 function mumGrafikHucreleriDoldur(sembol) {
   var hucreler = document.querySelectorAll('.mum-grafik-yer[data-sembol="' + sembol + '"]');
-  var kayit = mumGrafikOnbellek[sembol];
+  var anahtar = mumGrafikAnahtar(sembol);
+  var kayit = mumGrafikOnbellek[anahtar];
   var guncelFiyat = parseFloat(canliFiyatlar[sembol]) || null;
-  var svg = kayit && kayit.mumlar ? mumSvgOlustur(kayit.mumlar, guncelFiyat, sembol) : '<span style="font-size:10px;color:#475569">Grafik alinamadi</span>';
+  var svg;
+  if (kayit && kayit.mumlar) {
+    svg = mumSvgOlustur(kayit.mumlar, guncelFiyat, sembol);
+  } else if (kayit && !kayit.mumlar && !kayit.yukleniyor) {
+    svg = '<span style="font-size:10px;color:#475569">Grafik alinamadi</span>';
+  } else {
+    svg = '<span style="font-size:10px;color:#475569">Grafik yukleniyor...</span>';
+  }
   for (var i = 0; i < hucreler.length; i++) hucreler[i].innerHTML = svg;
 }
 
 function mumGrafikSembolGuncelle(sembol) {
-  var kayit = mumGrafikOnbellek[sembol];
+  var interval = mumZamanDilimiAl(sembol);
+  var anahtar = mumGrafikAnahtar(sembol);
+  var kayit = mumGrafikOnbellek[anahtar];
   var simdi = Date.now();
   if (kayit && kayit.yukleniyor) return;
   if (kayit && kayit.zaman && (simdi - kayit.zaman) < MUM_GRAFIK_YENILEME_MS) return;
-  mumGrafikOnbellek[sembol] = { mumlar: kayit ? kayit.mumlar : null, zaman: kayit ? kayit.zaman : 0, yukleniyor: true };
-  binanceKlineGetir(sembol, MUM_GRAFIK_ARALIK, MUM_GRAFIK_MUM_SAYISI, function(mumlar) {
-    mumGrafikOnbellek[sembol] = { mumlar: mumlar, zaman: Date.now(), yukleniyor: false };
+  mumGrafikOnbellek[anahtar] = { mumlar: kayit ? kayit.mumlar : null, zaman: kayit ? kayit.zaman : 0, yukleniyor: true };
+  var sayi = (ZAMAN_DILIMI_AYARLARI[interval] || ZAMAN_DILIMI_AYARLARI["1h"]).sayi;
+  binanceKlineGetir(sembol, interval, sayi, function(mumlar) {
+    mumGrafikOnbellek[anahtar] = { mumlar: mumlar, zaman: Date.now(), yukleniyor: false };
     mumGrafikHucreleriDoldur(sembol);
   }, function() {
-    mumGrafikOnbellek[sembol] = { mumlar: kayit ? kayit.mumlar : null, zaman: Date.now(), yukleniyor: false };
+    mumGrafikOnbellek[anahtar] = { mumlar: kayit ? kayit.mumlar : null, zaman: Date.now(), yukleniyor: false };
     mumGrafikHucreleriDoldur(sembol);
   });
 }
@@ -1760,7 +1819,8 @@ function mumGrafikleriYukle() {
     var sembol = hucreler[i].getAttribute("data-sembol");
     if (!sembol || gorulen[sembol]) continue;
     gorulen[sembol] = true;
-    var kayit = mumGrafikOnbellek[sembol];
+    var anahtar = mumGrafikAnahtar(sembol);
+    var kayit = mumGrafikOnbellek[anahtar];
     if (kayit && kayit.mumlar) mumGrafikHucreleriDoldur(sembol);
     mumGrafikSembolGuncelle(sembol);
   }
@@ -2609,6 +2669,12 @@ function sinyalleriGoster() {
     html += '<div class="sig-stats-left">' + satirlarHtml + '</div>';
     html += '<div class="sig-stats-chart">';
     if (genisletilmisMi) {
+      var aktifZaman = mumZamanDilimiAl(s.sembol);
+      html += '<div class="zaman-dilimi-cubugu" data-sembol="' + s.sembol + '">';
+      html += '<button type="button" class="cizim-btn zaman-btn' + (aktifZaman === "15m" ? " aktif" : "") + '" data-interval="15m" data-sembol="' + s.sembol + '" onclick="zamanDilimiSec(this)">15dk</button>';
+      html += '<button type="button" class="cizim-btn zaman-btn' + (aktifZaman === "1h" ? " aktif" : "") + '" data-interval="1h" data-sembol="' + s.sembol + '" onclick="zamanDilimiSec(this)">1sa</button>';
+      html += '<button type="button" class="cizim-btn zaman-btn' + (aktifZaman === "4h" ? " aktif" : "") + '" data-interval="4h" data-sembol="' + s.sembol + '" onclick="zamanDilimiSec(this)">4sa</button>';
+      html += '</div>';
       html += '<div class="cizim-arac-cubugu" data-sembol="' + s.sembol + '">';
       html += '<button type="button" class="cizim-btn aktif" data-arac="sec" data-sembol="' + s.sembol + '" onclick="cizimAraciSec(this)" title="Sec (imlec)">&#8598;</button>';
       html += '<button type="button" class="cizim-btn" data-arac="trend" data-sembol="' + s.sembol + '" onclick="cizimAraciSec(this)" title="Trend cizgisi">&#8599;</button>';
