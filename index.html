@@ -3810,6 +3810,17 @@ function genelBakisDoldur(hedefId) {
     if (!durumVerisi || !vitrinVerisi) return;
     var calisiyorMu = durumVerisi.api === "ok";
     var html = '<div class="signal-card" style="text-align:center;margin-bottom:12px">';
+    html += '<div style="font-size:12.5px;color:#94a3b8;margin-bottom:10px">Kanallarimiz</div>';
+    html += '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">';
+    html += '<a href="https://www.youtube.com/@tradesinyalpro" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:#dc2626;color:#fff;padding:10px 18px;border-radius:10px;text-decoration:none;font-weight:600;font-size:13px">';
+    html += '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M23.5 6.2s-.23-1.64-.94-2.36c-.9-.94-1.9-.95-2.36-1C16.9 2.5 12 2.5 12 2.5h-.01s-4.89 0-8.19.34c-.46.05-1.46.06-2.36 1C.73 4.56.5 6.2.5 6.2S.26 8.13.26 10.05v1.79c0 1.93.24 3.85.24 3.85s.23 1.64.94 2.36c.9.95 2.08.92 2.6 1.02 1.89.18 8 .24 8 .24s4.9-.01 8.19-.35c.46-.06 1.46-.06 2.36-1 .71-.72.94-2.36.94-2.36s.24-1.92.24-3.85v-1.79c0-1.92-.24-3.85-.24-3.85zM9.55 14.65V7.35l6.27 3.65-6.27 3.65z"/></svg>';
+    html += 'YouTube</a>';
+    html += '<a href="https://t.me/tradesinyalpro" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:#3b82f6;color:#fff;padding:10px 18px;border-radius:10px;text-decoration:none;font-weight:600;font-size:13px">';
+    html += '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M22.05 2.94a1.5 1.5 0 0 0-1.53-.25L1.9 10.06a1.4 1.4 0 0 0 .1 2.63l4.7 1.47 1.8 5.79a1 1 0 0 0 1.7.4l2.6-2.6 4.6 3.4a1.4 1.4 0 0 0 2.24-.85l3.1-15.5a1.5 1.5 0 0 0-.69-1.86zM8.4 13.9l-3.6-1.13 12.5-7.7-9.9 8.9v-.07zm1.1 4.8-.9-2.9 2 1.5-1.1 1.4zm2.5-3-1.9-1.4 8.7-7.8-6.8 9.2z"/></svg>';
+    html += 'Telegram</a>';
+    html += '</div></div>';
+
+    html += '<div class="signal-card" style="text-align:center;margin-bottom:12px">';
     html += '<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:4px">';
     html += '<span style="width:10px;height:10px;border-radius:50%;background:' + (calisiyorMu ? "#4ade80" : "#f87171") + '"></span>';
     html += '<span style="font-size:13px;font-weight:600">' + (calisiyorMu ? "Sistem calisiyor" : "Sistem yanit vermiyor") + '</span></div>';
