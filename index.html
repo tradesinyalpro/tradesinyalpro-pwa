@@ -178,6 +178,10 @@
   .auth-toggle { text-align: center; margin-top: 16px; font-size: 13px; color: #60a5fa; cursor: pointer; }
   .auth-error { background: #2d0a0a; color: #f87171; padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; display: none; }
   .auth-success { background: #052e16; color: #4ade80; padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; display: none; }
+  .canli-yayin-banner { background: #dc2626; color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .canli-yayin-banner a { color: #fff; text-decoration: underline; }
+  .canli-yayin-dot { width: 9px; height: 9px; border-radius: 50%; background: #fff; animation: canliYayinNabiz 1.4s infinite; flex-shrink: 0; }
+  @keyframes canliYayinNabiz { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
   .durum-banner { padding: 12px 16px; font-size: 13px; text-align: center; }
   .durum-banner.bekliyor { background: #1e293b; color: #93c5fd; }
   .durum-banner.suresi-dolmus { background: #451a03; color: #fbbf24; }
@@ -255,6 +259,7 @@
 <div id="genelbakis-genel" class="auth-screen" style="display:none;flex-direction:column;overflow-y:auto;padding:24px 16px">
   <div style="text-align:center;margin-bottom:16px">
     <div class="auth-logo" style="margin-bottom:6px">Trade<span>Sinyal</span>Pro</div>
+    <div id="canli-yayin-banner-genel" style="max-width:480px;margin:0 auto"></div>
     <div style="font-size:12px;color:#94a3b8;max-width:480px;margin:0 auto">Burada paylaşılan veriler yatırım tavsiyesi değildir, bilgilendirme amaçlıdır.</div>
   </div>
   <div id="genelbakis-genel-icerik" style="max-width:480px;width:100%;margin:0 auto"><div class="loading">Yukleniyor...</div></div>
@@ -274,6 +279,7 @@
   </div>
 </div>
 
+<div id="canli-yayin-banner-app"></div>
 <div id="durum-banner-alani"></div>
 <div id="bildirim-banner-alani"></div>
 <div id="pwa-kurulum-banner-alani"></div>
@@ -737,6 +743,8 @@ function botAdi(bot) {
 }
 
 function veriYukle() {
+  canliYayinKontrolEt();
+
   var xhr = new XMLHttpRequest();
   xhr.open("GET", API + "/sinyaller", true);
   xhr.setRequestHeader("X-Auth-Token", authToken || "");
@@ -3869,6 +3877,24 @@ function genelBakisDoldur(hedefId) {
   xhr2.send();
 }
 
+function canliYayinKontrolEt() {
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/durum", true);
+  xhr.onload = function() {
+    if (xhr.status !== 200) return;
+    var veri;
+    try { veri = JSON.parse(xhr.responseText); } catch (e) { return; }
+    var html = veri.canli_yayin ?
+      '<div class="canli-yayin-banner"><span class="canli-yayin-dot"></span>Canlı yayındayız! ' +
+      '<a href="https://www.youtube.com/@tradesinyalpro" target="_blank" rel="noopener">İzlemek için tıkla</a></div>' : '';
+    var alan1 = document.getElementById("canli-yayin-banner-genel");
+    var alan2 = document.getElementById("canli-yayin-banner-app");
+    if (alan1) alan1.innerHTML = html;
+    if (alan2) alan2.innerHTML = html;
+  };
+  xhr.send();
+}
+
 function genelBakisGirisGoster() {
   document.getElementById("genelbakis-genel").style.display = "none";
   document.getElementById("auth-ekrani").style.display = "flex";
@@ -4484,6 +4510,7 @@ function sayfaBaslat() {
     document.getElementById("yukleniyor-ekrani").style.display = "none";
     document.getElementById("genelbakis-genel").style.display = "flex";
     genelBakisDoldur("genelbakis-genel-icerik");
+    canliYayinKontrolEt();
     if (localStorage.getItem("ts_admin_cihazi") !== "1") ziyaretKaydet("misafir");
     return;
   }
@@ -4505,6 +4532,7 @@ function sayfaBaslat() {
       localStorage.removeItem("ts_token");
       document.getElementById("genelbakis-genel").style.display = "flex";
       genelBakisDoldur("genelbakis-genel-icerik");
+      canliYayinKontrolEt();
       if (localStorage.getItem("ts_admin_cihazi") !== "1") ziyaretKaydet("misafir");
     }
   };
@@ -4512,6 +4540,7 @@ function sayfaBaslat() {
     document.getElementById("yukleniyor-ekrani").style.display = "none";
     document.getElementById("genelbakis-genel").style.display = "flex";
     genelBakisDoldur("genelbakis-genel-icerik");
+    canliYayinKontrolEt();
     if (localStorage.getItem("ts_admin_cihazi") !== "1") ziyaretKaydet("misafir");
   };
   xhr.send();
