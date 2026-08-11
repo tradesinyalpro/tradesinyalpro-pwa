@@ -92,7 +92,7 @@
   .signal-card.stop { border-left: 3px solid #f87171; opacity: 0.7; }
   .sig-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   .sig-symbol { font-size: 14px; font-weight: 600; }
-  .sig-badges { display: flex; gap: 6px; align-items: center; }
+  .sig-badges { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
   .badge { font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 20px; }
   .badge.long { background: #052e16; color: #4ade80; }
   .badge.aktif { background: #0c1a3d; color: #60a5fa; }
@@ -616,6 +616,7 @@ var tumRaporlar = [];
 var spotFiyatlar = {};
 var futuresFiyatlar = {};
 var canliFiyatlar = {};
+var fundingRateleri = {};
 var fiyatYonleri = {};
 
 var fiyatRenderZamanlayici = null;
@@ -894,6 +895,24 @@ function veriYukle() {
     }
   };
   xhr6.send();
+
+  var xhr7 = new XMLHttpRequest();
+  xhr7.open("GET", "https://fapi.binance.com/fapi/v1/premiumIndex", true);
+  xhr7.onload = function() {
+    if (xhr7.status === 200) {
+      try {
+        var liste7 = JSON.parse(xhr7.responseText);
+        var sozluk7 = {};
+        for (var i = 0; i < liste7.length; i++) {
+          if (liste7[i].lastFundingRate !== undefined) {
+            sozluk7[liste7[i].symbol] = parseFloat(liste7[i].lastFundingRate) * 100;
+          }
+        }
+        fundingRateleri = sozluk7;
+      } catch (e) {}
+    }
+  };
+  xhr7.send();
 
   var xhr9 = new XMLHttpRequest();
   xhr9.open("GET", API + "/sohbet/mesajlar", true);
@@ -2285,7 +2304,7 @@ function portfoyGoster() {
   referansBilgisiYukle();
   html += '<div class="stats-grid">';
   html += '<div class="stat-card"><div class="stat-label">Toplam Takip</div><div class="stat-val blue">' + (ozet.toplam || 0) + '</div></div>';
-  html += '<div class="stat-card"><div class="stat-label">TP / Stop</div><div class="stat-val">' + (ozet.tp || 0) + ' / ' + (ozet.stop || 0) + '</div></div>';
+  html += '<div class="stat-card"><div class="stat-label">BAŞARILI / BAŞARISIZ</div><div class="stat-val">' + (ozet.tp || 0) + ' / ' + (ozet.stop || 0) + '</div></div>';
   html += '<div class="stat-card"><div class="stat-label">Takipte (Aktif)</div><div class="stat-val blue">' + (ozet.aktif || 0) + '</div></div>';
   html += '<div class="stat-card"><div class="stat-label">Sanal Toplam Getiri</div><div class="stat-val" style="color:' + getiriRenk + '">%' + (ozet.toplam_getiri_yuzde || 0) + '</div></div>';
   html += '</div>';
@@ -2297,8 +2316,8 @@ function portfoyGoster() {
     html += '<div style="text-align:right;margin-bottom:10px"><span onclick="portfoyHepsiniSil()" style="cursor:pointer;color:#f87171;font-size:12px;background:#2d0a0a;padding:6px 12px;border-radius:8px">Hepsini Sil</span></div>';
     for (var i = kayitlar.length - 1; i >= 0; i--) {
       var k = kayitlar[i];
-      var durumRozeti = k.durum === "tp" ? '<span class="badge long">TP</span>' :
-        k.durum === "stop" ? '<span class="badge short">STOP</span>' :
+      var durumRozeti = k.durum === "tp" ? '<span class="badge long">BAŞARILI</span>' :
+        k.durum === "stop" ? '<span class="badge short">BAŞARISIZ</span>' :
         '<span class="badge bot">Takipte</span>';
       var getiriYazi;
       if (k.getiri_yuzde !== null && k.getiri_yuzde !== undefined) {
@@ -2484,7 +2503,7 @@ function haftalikOzetGorseliOlustur(basariYuzde, tp, stop) {
 
   ctx.fillStyle = "#94a3b8";
   ctx.font = "16px sans-serif";
-  ctx.fillText((tp + stop) + " islem  ·  " + tp + " TP  ·  " + stop + " Stop", w / 2, 320);
+  ctx.fillText((tp + stop) + " islem  ·  " + tp + " BAŞARILI  ·  " + stop + " BAŞARISIZ", w / 2, 320);
 
   ctx.fillStyle = "#475569";
   ctx.font = "13px sans-serif";
@@ -2726,10 +2745,20 @@ function sinyalleriGoster() {
     var genisletilmisMi = secilenKartAnahtari === kartAnahtari;
     var kapatBtnHtml = '<span class="kart-kapat-btn" onclick="event.stopPropagation();kartKapat()" title="Kapat">&#10005;</span>';
 
+    var fundingRateHtml = "";
+    if (fundingRateleri[s.sembol] !== undefined) {
+      var fr = fundingRateleri[s.sembol];
+      var frRenk = fr >= 0 ? "#4ade80" : "#f87171";
+      var frBg = fr >= 0 ? "#052e1a" : "#2d0a0a";
+      var frBorder = fr >= 0 ? "rgba(74,222,128,0.35)" : "rgba(248,113,113,0.35)";
+      fundingRateHtml = '<span class="badge" style="background:' + frBg + ';color:' + frRenk + ';border:1px solid ' + frBorder + '" title="Funding Rate">' +
+        (fr >= 0 ? "+" : "") + fr.toFixed(4) + '%</span>';
+    }
+
     html += '<div class="signal-card ' + cls + (genisletilmisMi ? " kart-genisletilmis" : "") + '" data-kart-anahtari="' + kartAnahtari + '">';
     html += '<div class="sig-header"><div class="sig-symbol"><span class="sig-symbol-tikla" onclick="kartSec(\'' + kartAnahtari.replace(/'/g, "\\'") + '\')">#' + s.sembol + '</span>' + yildizHtml + takipHtml + gorselBtnHtml + kapatBtnHtml + '</div>';
     html += '<div class="sig-badges">' + pnlHtml + '<span class="badge ' + cls + '">' + yon + '</span>';
-    html += '<span class="badge bot">' + botAdi(bot) + '</span></div></div>';
+    html += '<span class="badge bot">' + botAdi(bot) + '</span>' + fundingRateHtml + '</div></div>';
     html += canliFiyatHtml;
 
     var satirlar = [
@@ -2839,7 +2868,7 @@ function trendGrafigiHtml() {
 
   return '<div class="stat-card" style="margin-bottom:12px">' +
     '<div style="font-size:12px;color:#94a3b8;margin-bottom:6px">Son ' + tarihler.length + ' Gun ' +
-    '<span style="color:#4ade80;margin-left:8px">&#9632; TP</span> <span style="color:#f87171">&#9632; Stop</span></div>' +
+    '<span style="color:#4ade80;margin-left:8px">&#9632; BAŞARILI</span> <span style="color:#f87171">&#9632; BAŞARISIZ</span></div>' +
     svg + "</div>";
 }
 
@@ -2870,8 +2899,8 @@ function performansGoster() {
     html += '<div class="signal-card" style="margin-bottom:8px">';
     html += '<div class="sig-header" style="cursor:pointer" onclick="performansDetayAc(\'' + bot + '\')"><div class="sig-symbol">' + botAdi(bot) + ' &rsaquo;</div>';
     html += '<span class="badge bot">' + basari + '% basari</span></div>';
-    html += '<div class="sig-row"><span class="sig-key">TP</span><span class="sig-val green">' + tp + '</span></div>';
-    html += '<div class="sig-row"><span class="sig-key">Stop</span><span class="sig-val red">' + stop + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">BAŞARILI</span><span class="sig-val green">' + tp + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">BAŞARISIZ</span><span class="sig-val red">' + stop + '</span></div>';
     html += '<div class="sig-row"><span class="sig-key">Aktif</span><span class="sig-val blue">' + aktif + '</span></div>';
 
     if (sinyaller.length > 0) {
@@ -2898,8 +2927,8 @@ function performansGoster() {
   var genelToplam = toplamTp + toplamStop;
   var genelBasari = genelToplam > 0 ? Math.round(toplamTp / genelToplam * 100) : 0;
   var ozet = '<div class="stats-grid">';
-  ozet += '<div class="stat-card"><div class="stat-label">Toplam TP</div><div class="stat-val green">' + toplamTp + '</div></div>';
-  ozet += '<div class="stat-card"><div class="stat-label">Toplam Stop</div><div class="stat-val red">' + toplamStop + '</div></div>';
+  ozet += '<div class="stat-card"><div class="stat-label">Toplam BAŞARILI</div><div class="stat-val green">' + toplamTp + '</div></div>';
+  ozet += '<div class="stat-card"><div class="stat-label">Toplam BAŞARISIZ</div><div class="stat-val red">' + toplamStop + '</div></div>';
   ozet += '<div class="stat-card"><div class="stat-label">Aktif Veri</div><div class="stat-val blue">' + toplamAktif + '</div></div>';
   ozet += '<div class="stat-card"><div class="stat-label">Genel Basari</div><div class="stat-val green">' + genelBasari + '%</div></div></div>';
   ozet += trendGrafigiHtml();
@@ -2962,8 +2991,8 @@ function performansDetayHtml(bot) {
     html += '<div class="sig-header"><div class="sig-symbol">#' + sembol + '</div>';
     if (toplam > 0) html += '<span class="badge bot">' + basari + '% basari</span>';
     html += '</div>';
-    html += '<div class="sig-row"><span class="sig-key">TP</span><span class="sig-val green">' + g.tp + '</span></div>';
-    html += '<div class="sig-row"><span class="sig-key">Stop</span><span class="sig-val red">' + g.stop + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">BAŞARILI</span><span class="sig-val green">' + g.tp + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">BAŞARISIZ</span><span class="sig-val red">' + g.stop + '</span></div>';
     html += '<div class="sig-row"><span class="sig-key">Aktif</span><span class="sig-val blue">' + g.aktif + '</span></div>';
     html += '</div>';
   }
@@ -3189,8 +3218,8 @@ function gecmisGoster() {
 
   if (hepsi.length > 0) {
     html += '<div class="stats-grid" style="margin-bottom:12px">';
-    html += '<div class="stat-card"><div class="stat-label">Toplam TP</div><div class="stat-val green">' + toplamTp + '</div></div>';
-    html += '<div class="stat-card"><div class="stat-label">Toplam Stop</div><div class="stat-val red">' + toplamStop + '</div></div>';
+    html += '<div class="stat-card"><div class="stat-label">Toplam BAŞARILI</div><div class="stat-val green">' + toplamTp + '</div></div>';
+    html += '<div class="stat-card"><div class="stat-label">Toplam BAŞARISIZ</div><div class="stat-val red">' + toplamStop + '</div></div>';
     html += '</div>';
     html += '<div class="stat-card" style="margin-bottom:16px;text-align:center">';
     html += '<div class="stat-label">Toplam Islem: ' + toplamIslem + ' &nbsp;·&nbsp; Basari Orani</div>';
@@ -3202,7 +3231,7 @@ function gecmisGoster() {
     var s = hepsi[k].s;
     var bot = hepsi[k].bot;
     var sonuc = s.durum === "tp" ? "tp" : "stop";
-    var sonucYazi = s.durum === "tp" ? "TP" : "Stop";
+    var sonucYazi = s.durum === "tp" ? "BAŞARILI" : "BAŞARISIZ";
     var yon = s.yon || "";
     var yonCls = yon === "LONG" ? "long" : "short";
     var favoriMi = favoriCoinler[s.sembol];
@@ -3265,7 +3294,7 @@ function raporGoster() {
     var gunToplam = gunTp + gunStop;
     var gunBasari = gunToplam > 0 ? Math.round(gunTp / gunToplam * 100) : 0;
 
-    html += '<div class="section-title">' + tarih + ' &nbsp;·&nbsp; Gun Toplami: ' + gunTp + ' TP / ' + gunStop + ' Stop (%' + gunBasari + ')</div>';
+    html += '<div class="section-title">' + tarih + ' &nbsp;·&nbsp; Gun Toplami: ' + gunTp + ' BAŞARILI / ' + gunStop + ' BAŞARISIZ (%' + gunBasari + ')</div>';
     for (var k2 = 0; k2 < kayitlar.length; k2++) {
       var r = kayitlar[k2];
       var toplam = r.tp + r.stop;
@@ -3273,8 +3302,8 @@ function raporGoster() {
       html += '<div class="signal-card" style="margin-bottom:8px">';
       html += '<div class="sig-header"><div class="sig-symbol">' + botAdi(r.bot) + '</div>';
       html += '<span class="badge bot">' + basari + '% basari</span></div>';
-      html += '<div class="sig-row"><span class="sig-key">TP</span><span class="sig-val green">' + r.tp + '</span></div>';
-      html += '<div class="sig-row"><span class="sig-key">Stop</span><span class="sig-val red">' + r.stop + '</span></div>';
+      html += '<div class="sig-row"><span class="sig-key">BAŞARILI</span><span class="sig-val green">' + r.tp + '</span></div>';
+      html += '<div class="sig-row"><span class="sig-key">BAŞARISIZ</span><span class="sig-val red">' + r.stop + '</span></div>';
       html += '</div>';
     }
   }
@@ -3919,7 +3948,7 @@ function genelBakisDoldur(hedefId) {
     html += '<span style="font-size:13px;font-weight:600">' + (calisiyorMu ? "Sistem calisiyor" : "Sistem yanit vermiyor") + '</span></div>';
     html += '<div style="font-size:44px;font-weight:800;color:#4ade80;margin-top:10px">' + (vitrinVerisi.genel.basari_yuzde !== null ? "%" + vitrinVerisi.genel.basari_yuzde : "-") + '</div>';
     html += '<div style="font-size:10.5px;color:#64748b;letter-spacing:0.06em">GENEL BASARI ORANI</div>';
-    html += '<div style="font-size:12px;color:#94a3b8;margin-top:6px">' + vitrinVerisi.genel.toplam + ' veri &middot; ' + vitrinVerisi.genel.tp + ' TP &middot; ' + vitrinVerisi.genel.stop + ' Stop</div>';
+    html += '<div style="font-size:12px;color:#94a3b8;margin-top:6px">' + vitrinVerisi.genel.toplam + ' veri &middot; ' + vitrinVerisi.genel.tp + ' BAŞARILI &middot; ' + vitrinVerisi.genel.stop + ' BAŞARISIZ</div>';
     html += '</div>';
 
     html += '<div class="signal-card" style="margin-bottom:12px">';
