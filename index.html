@@ -368,6 +368,7 @@
   <div id="piyasa" style="display:none;padding:8px 12px">
     <div class="bot-filter" style="margin-bottom:10px">
       <button class="bot-btn active" id="piyasa-kripto-btn" onclick="piyasaGorunumDegistir('kripto')">Kripto</button>
+      <button class="bot-btn" id="piyasa-hisse-btn" onclick="piyasaGorunumDegistir('hisse')">ABD Hisse</button>
       <button class="bot-btn" id="piyasa-altin-btn" onclick="piyasaGorunumDegistir('altin')">Altin</button>
     </div>
 
@@ -434,6 +435,60 @@
       <div class="signal-card" style="padding:12px 14px">
         <div style="font-size:13px;color:#94a3b8;margin-bottom:10px;display:flex;align-items:center;gap:6px">&#9878; Altin &amp; Gumus</div>
         <div id="altin-icerik"><div class="loading">Yukleniyor...</div></div>
+      </div>
+    </div>
+
+    <div id="piyasa-hisse-panel" style="display:none">
+      <div style="font-size:11px;color:#64748b;margin:2px 4px 8px">TradingView'in ucretsiz widget'i - fiyatlar borsaya gore ~15 dakika gecikmeli olabilir.</div>
+      <div class="signal-card" style="padding:12px 8px 4px">
+        <div class="tradingview-widget-container" style="height:820px">
+          <div class="tradingview-widget-container__widget"></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-market-overview.js" async>
+          {
+            "colorTheme": "dark",
+            "dateRange": "1D",
+            "showChart": false,
+            "locale": "tr",
+            "isTransparent": true,
+            "showSymbolLogo": true,
+            "showFloatingTooltip": false,
+            "width": "100%",
+            "height": "820",
+            "plotLineColorGrowing": "rgba(74, 222, 128, 1)",
+            "plotLineColorFalling": "rgba(248, 113, 113, 1)",
+            "gridLineColor": "rgba(30, 41, 59, 0)",
+            "scaleFontColor": "rgba(148, 163, 184, 1)",
+            "belowLineFillColorGrowing": "rgba(74, 222, 128, 0.12)",
+            "belowLineFillColorFalling": "rgba(248, 113, 113, 0.12)",
+            "belowLineFillColorGrowingBottom": "rgba(74, 222, 128, 0)",
+            "belowLineFillColorFallingBottom": "rgba(248, 113, 113, 0)",
+            "symbolActiveColor": "rgba(59, 130, 246, 0.12)",
+            "tabs": [
+              {
+                "title": "ABD Hisse",
+                "symbols": [
+                  { "s": "NASDAQ:AAPL", "d": "Apple" },
+                  { "s": "NASDAQ:MSFT", "d": "Microsoft" },
+                  { "s": "NASDAQ:GOOGL", "d": "Google" },
+                  { "s": "NASDAQ:AMZN", "d": "Amazon" },
+                  { "s": "NASDAQ:NVDA", "d": "Nvidia" },
+                  { "s": "NASDAQ:META", "d": "Meta" },
+                  { "s": "NASDAQ:TSLA", "d": "Tesla" },
+                  { "s": "NASDAQ:CRWD", "d": "CrowdStrike" },
+                  { "s": "NYSE:SNOW", "d": "Snowflake" },
+                  { "s": "NASDAQ:OKTA", "d": "Okta" },
+                  { "s": "NYSE:RDDT", "d": "Reddit" },
+                  { "s": "NASDAQ:HOOD", "d": "Robinhood" },
+                  { "s": "NASDAQ:SOFI", "d": "SoFi" },
+                  { "s": "NASDAQ:COIN", "d": "Coinbase" },
+                  { "s": "NASDAQ:PLTR", "d": "Palantir" }
+                ],
+                "originalTitle": "ABD Hisse"
+              }
+            ]
+          }
+          </script>
+        </div>
       </div>
     </div>
   </div>
@@ -563,6 +618,8 @@ var futuresFiyatlar = {};
 var canliFiyatlar = {};
 var fiyatYonleri = {};
 
+var fiyatRenderZamanlayici = null;
+
 function fiyatlariBirlestirVeGoster() {
   var yeni = {};
   // Tum botlar sadece Binance FUTURES uzerinde islem yaptigi icin futures
@@ -583,7 +640,17 @@ function fiyatlariBirlestirVeGoster() {
   });
   fiyatYonleri = yeniYonler;
   canliFiyatlar = yeni;
-  if (aktifSekme === "sinyaller") sinyalleriGoster();
+  // Bu fonksiyon spot ve futures fiyatlari icin AYRI AYRI (ayni 10sn'lik
+  // dongude arka arkaya 2 kez) cagriliyor - ikisi de listeyi yeniden cizmeye
+  // calisirsa telefon gibi zayif cihazlarda kaydirirken hissedilen takilmaya
+  // yol aciyordu. Kisa bir gecikmeyle (debounce) art arda gelen cagrilari
+  // TEK bir cizime indiriyoruz.
+  if (aktifSekme !== "sinyaller") return;
+  if (fiyatRenderZamanlayici) return;
+  fiyatRenderZamanlayici = setTimeout(function() {
+    fiyatRenderZamanlayici = null;
+    if (aktifSekme === "sinyaller") sinyalleriGoster();
+  }, 300);
 }
 var tumBalina = { islemler: [], ozet: {} };
 var balinaKategori = "kripto";
@@ -742,6 +809,9 @@ function botAdi(bot) {
   return BOT_ADLARI[bot] || bot;
 }
 
+var sonSinyalVerisiJSON = null;
+var sinyalVerisiDegistiMi = true; // ilk yuklemede her zaman ciz
+
 function veriYukle() {
   canliYayinKontrolEt();
 
@@ -750,6 +820,8 @@ function veriYukle() {
   xhr.setRequestHeader("X-Auth-Token", authToken || "");
   xhr.onload = function() {
     if (xhr.status === 200) {
+      sinyalVerisiDegistiMi = (xhr.responseText !== sonSinyalVerisiJSON);
+      sonSinyalVerisiJSON = xhr.responseText;
       tumVeriler = JSON.parse(xhr.responseText);
       guncelle();
     } else {
@@ -2292,7 +2364,13 @@ function portfoyHepsiniSil() {
 
 function guncelle() {
   if (aktifSekme === "sinyaller") {
-    sinyalleriGoster();
+    // Veri gercekten degismediyse (10sn'lik otomatik yenilemede cogu zaman
+    // degismez) tum kart+grafik listesini bastan cizmiyoruz - bu, ozellikle
+    // dusuk guclu telefonlarda kaydirma sirasinda hissedilen "takilma"ya
+    // yol aciyordu. Kullanicinin kendi eylemleri (filtre, kart ac/kapa vb.)
+    // zaten sinyalleriGoster()'i DOGRUDAN cagiriyor, bu koruma sadece
+    // otomatik periyodik yenilemeyi etkiliyor.
+    if (sinyalVerisiDegistiMi) sinyalleriGoster();
   }
   if (aktifSekme === "performans") performansGoster();
   if (aktifSekme === "gecmis") gecmisGoster();
@@ -3758,18 +3836,25 @@ function altinFiyatlariGoster() {
 function piyasaGorunumDegistir(hangisi) {
   var kriptoPanel = document.getElementById("piyasa-kripto-panel");
   var altinPanel = document.getElementById("piyasa-altin-panel");
+  var hissePanel = document.getElementById("piyasa-hisse-panel");
   var kriptoBtn = document.getElementById("piyasa-kripto-btn");
   var altinBtn = document.getElementById("piyasa-altin-btn");
+  var hisseBtn = document.getElementById("piyasa-hisse-btn");
+  kriptoPanel.style.display = "none";
+  altinPanel.style.display = "none";
+  hissePanel.style.display = "none";
+  kriptoBtn.classList.remove("active");
+  altinBtn.classList.remove("active");
+  hisseBtn.classList.remove("active");
   if (hangisi === "altin") {
-    kriptoPanel.style.display = "none";
     altinPanel.style.display = "block";
-    kriptoBtn.classList.remove("active");
     altinBtn.classList.add("active");
     altinFiyatlariGoster();
+  } else if (hangisi === "hisse") {
+    hissePanel.style.display = "block";
+    hisseBtn.classList.add("active");
   } else {
     kriptoPanel.style.display = "block";
-    altinPanel.style.display = "none";
-    altinBtn.classList.remove("active");
     kriptoBtn.classList.add("active");
   }
 }
