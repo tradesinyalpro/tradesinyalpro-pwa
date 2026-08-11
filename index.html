@@ -37,6 +37,7 @@
   .sig-stats-chart { flex: 1; min-width: 0; }
   @media (min-width: 701px) {
     .sig-stats-chart { max-width: 620px; margin-left: auto; }
+    .funding-badge { order: -1; }
   }
   @media (max-width: 700px) {
     .sig-stats-row { flex-direction: column; align-items: stretch; gap: 8px; }
@@ -2751,7 +2752,7 @@ function sinyalleriGoster() {
       var frRenk = fr >= 0 ? "#4ade80" : "#f87171";
       var frBg = fr >= 0 ? "#052e1a" : "#2d0a0a";
       var frBorder = fr >= 0 ? "rgba(74,222,128,0.35)" : "rgba(248,113,113,0.35)";
-      fundingRateHtml = '<span class="badge" style="background:' + frBg + ';color:' + frRenk + ';border:1px solid ' + frBorder + '" title="Funding Rate">' +
+      fundingRateHtml = '<span class="badge funding-badge" style="background:' + frBg + ';color:' + frRenk + ';border:1px solid ' + frBorder + '" title="Funding Rate">' +
         (fr >= 0 ? "+" : "") + fr.toFixed(4) + '%</span>';
     }
 
