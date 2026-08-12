@@ -3442,6 +3442,7 @@ function piyasaGoster() {
 function balinaFiltre(kategori, el) {
   balinaKategori = kategori;
   altcoinDetaySembol = null;
+  balinaCoinDetay = null;
   var btnlar = document.querySelectorAll("#balina .bot-btn");
   for (var i = 0; i < btnlar.length; i++) btnlar[i].classList.remove("active");
   el.classList.add("active");
@@ -3449,6 +3450,7 @@ function balinaFiltre(kategori, el) {
 }
 
 var altcoinDetaySembol = null;
+var balinaCoinDetay = null;
 var performansDetayBot = null;
 
 function altcoinDetayAc(sembol) {
@@ -3461,8 +3463,19 @@ function altcoinDetayKapat() {
   history.back();
 }
 
+function balinaCoinDetayAc(sembol) {
+  balinaCoinDetay = sembol;
+  history.pushState({ balinaCoinDetay: sembol }, "", "");
+  balinaGoster();
+}
+
+function balinaCoinDetayKapat() {
+  history.back();
+}
+
 window.addEventListener("popstate", function(e) {
   altcoinDetaySembol = (e.state && e.state.altcoinDetay) ? e.state.altcoinDetay : null;
+  balinaCoinDetay = (e.state && e.state.balinaCoinDetay) ? e.state.balinaCoinDetay : null;
   performansDetayBot = (e.state && e.state.performansDetay) ? e.state.performansDetay : null;
   if (aktifSekme === "balina") balinaGoster();
   if (aktifSekme === "performans") performansGoster();
@@ -3511,6 +3524,15 @@ function balinaGoster() {
     document.getElementById("balina-icerik").innerHTML = html;
     return;
   }
+  if (balinaKategori !== "altcoin" && balinaCoinDetay) {
+    var coinIslemleri = islemler.filter(function(t) { return t.sembol === balinaCoinDetay; });
+    html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">';
+    html += '<span onclick="balinaCoinDetayKapat()" style="cursor:pointer;font-size:13px;color:#60a5fa">&larr; Geri</span>';
+    html += '<div class="section-title" style="margin:0">#' + balinaCoinDetay + '</div></div>';
+    html += balinaIkiSutunHtml(coinIslemleri);
+    document.getElementById("balina-icerik").innerHTML = html;
+    return;
+  }
 
   // --- Genel Alim/Satim Baskisi ---
   var ozetSemboller = Object.keys(ozet);
@@ -3524,7 +3546,7 @@ function balinaGoster() {
       var o = ozet[s];
       var alim = o.alim_yuzde || 0;
       var satim = o.satim_yuzde || 0;
-      html += '<div class="stat-card" style="margin-bottom:8px">';
+      html += '<div class="stat-card" style="margin-bottom:8px;cursor:pointer" onclick="balinaCoinDetayAc(\'' + s + '\')">';
       html += '<div class="sig-header"><div class="sig-symbol">#' + s + '</div>';
       html += '<span class="badge long">Alim %' + alim + '</span></div>';
       html += '<div class="balina-ozet-bar">';
@@ -3544,42 +3566,46 @@ function balinaGoster() {
       html += altcoinTabloHtml(islemler);
     }
   } else {
-    if (islemler.length === 0) {
-      html += '<div class="empty">Henuz balina hareketi tespit edilmedi</div>';
-    } else {
-      var longIslemler = islemler.filter(function(t) { return t.yon === "LONG"; });
-      var shortIslemler = islemler.filter(function(t) { return t.yon !== "LONG"; });
-
-      var balinaKartHtml = function(t) {
-        var yonCls = t.yon === "LONG" ? "long" : "short";
-        var seviyeYazi = t.seviye === "mega" ? "MEGA BALINA" : t.seviye === "buyuk" ? "Buyuk Balina" : "Balina";
-        var ikon = t.seviye === "mega" ? "\uD83D\uDC33\uD83D\uDC33\uD83D\uDC33" : t.seviye === "buyuk" ? "\uD83D\uDC33\uD83D\uDC33" : "\uD83D\uDC33";
-        var degerFormatli = "$" + Math.round(t.deger || 0).toLocaleString();
-        var kart = '<div class="signal-card ' + yonCls + '">';
-        kart += '<div class="sig-header"><div class="sig-symbol">' + ikon + ' #' + t.sembol + '</div>';
-        kart += '<div class="sig-badges"><span class="badge ' + yonCls + '">' + t.yon + '</span>';
-        kart += '<span class="badge seviye-' + t.seviye + '">' + seviyeYazi + '</span></div></div>';
-        kart += '<div class="sig-row"><span class="sig-key">Deger</span><span class="sig-val">' + degerFormatli + '</span></div>';
-        kart += '<div class="sig-time">' + (t.zaman || "") + '</div></div>';
-        return kart;
-      };
-
-      html += '<div class="balina-iki-sutun">';
-      html += '<div class="balina-sutun">';
-      html += '<div class="section-title" style="color:#4ade80">Long (' + longIslemler.length + ')</div>';
-      if (longIslemler.length === 0) html += '<div class="empty">Henuz LONG hareketi yok</div>';
-      for (var k = 0; k < longIslemler.length; k++) html += balinaKartHtml(longIslemler[k]);
-      html += '</div>';
-      html += '<div class="balina-sutun">';
-      html += '<div class="section-title" style="color:#f87171">Short (' + shortIslemler.length + ')</div>';
-      if (shortIslemler.length === 0) html += '<div class="empty">Henuz SHORT hareketi yok</div>';
-      for (var k = 0; k < shortIslemler.length; k++) html += balinaKartHtml(shortIslemler[k]);
-      html += '</div>';
-      html += '</div>';
-    }
+    html += balinaIkiSutunHtml(islemler);
   }
 
   document.getElementById("balina-icerik").innerHTML = html;
+}
+
+function balinaKartHtml(t) {
+  var yonCls = t.yon === "LONG" ? "long" : "short";
+  var seviyeYazi = t.seviye === "mega" ? "MEGA BALINA" : t.seviye === "buyuk" ? "Buyuk Balina" : "Balina";
+  var ikon = t.seviye === "mega" ? "\uD83D\uDC33\uD83D\uDC33\uD83D\uDC33" : t.seviye === "buyuk" ? "\uD83D\uDC33\uD83D\uDC33" : "\uD83D\uDC33";
+  var degerFormatli = "$" + Math.round(t.deger || 0).toLocaleString();
+  var kart = '<div class="signal-card ' + yonCls + '">';
+  kart += '<div class="sig-header"><div class="sig-symbol">' + ikon + ' #' + t.sembol + '</div>';
+  kart += '<div class="sig-badges"><span class="badge ' + yonCls + '">' + t.yon + '</span>';
+  kart += '<span class="badge seviye-' + t.seviye + '">' + seviyeYazi + '</span></div></div>';
+  kart += '<div class="sig-row"><span class="sig-key">Deger</span><span class="sig-val">' + degerFormatli + '</span></div>';
+  kart += '<div class="sig-time">' + (t.zaman || "") + '</div></div>';
+  return kart;
+}
+
+function balinaIkiSutunHtml(islemler) {
+  if (islemler.length === 0) {
+    return '<div class="empty">Henuz balina hareketi tespit edilmedi</div>';
+  }
+  var longIslemler = islemler.filter(function(t) { return t.yon === "LONG"; });
+  var shortIslemler = islemler.filter(function(t) { return t.yon !== "LONG"; });
+
+  var html = '<div class="balina-iki-sutun">';
+  html += '<div class="balina-sutun">';
+  html += '<div class="section-title" style="color:#4ade80">Long (' + longIslemler.length + ')</div>';
+  if (longIslemler.length === 0) html += '<div class="empty">Henuz LONG hareketi yok</div>';
+  for (var k = 0; k < longIslemler.length; k++) html += balinaKartHtml(longIslemler[k]);
+  html += '</div>';
+  html += '<div class="balina-sutun">';
+  html += '<div class="section-title" style="color:#f87171">Short (' + shortIslemler.length + ')</div>';
+  if (shortIslemler.length === 0) html += '<div class="empty">Henuz SHORT hareketi yok</div>';
+  for (var k = 0; k < shortIslemler.length; k++) html += balinaKartHtml(shortIslemler[k]);
+  html += '</div>';
+  html += '</div>';
+  return html;
 }
 
 function baskinlikHesapla(kayitlar) {
