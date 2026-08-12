@@ -3491,6 +3491,16 @@ function performansDetayKapat() {
   history.back();
 }
 
+function turkiyeZamanindanMs(zamanStr) {
+  // Backend zamanlari "YYYY-MM-DD HH:MM:SS" (Turkiye, sabit UTC+3, DST yok)
+  // formatinda gonderiyor - tarayicinin yerel saat dilimine gore hatali
+  // yorumlamasini engellemek icin elle ayristirip UTC+3'ten UTC'ye ceviriyoruz.
+  if (!zamanStr) return 0;
+  var p = zamanStr.split(/[- :]/);
+  if (p.length < 6) return 0;
+  return Date.UTC(+p[0], +p[1] - 1, +p[2], +p[3], +p[4], +p[5]) - (3 * 60 * 60 * 1000);
+}
+
 function balinaGoster() {
   // Backend artik islemleri coin bazinda ({"BTCUSDT":[...], ...}) gonderiyor,
   // her coin kendi icinde en fazla 20 kayit tutuyor. Mevcut filtreleme
@@ -3535,7 +3545,18 @@ function balinaGoster() {
   }
 
   // --- Genel Alim/Satim Baskisi ---
-  var ozetSemboller = Object.keys(ozet);
+  // Sadece SON 24 SAAT icinde en az bir $100k+ islemi olan (yani ayni kategoride
+  // asagidaki balina listesinde zaten gorunen) coinler bu ozet listede yer alsin -
+  // aksi halde kucuk hacimli coinler de (100k'yi hic gecmeden) burada gorunuyordu.
+  var simdiMs = Date.now();
+  var YIRMIDORT_SAAT_MS = 24 * 60 * 60 * 1000;
+  var coin100kSon24Saat = {};
+  for (var bi = 0; bi < islemler.length; bi++) {
+    var bt = islemler[bi];
+    if (coin100kSon24Saat[bt.sembol]) continue;
+    if (simdiMs - turkiyeZamanindanMs(bt.zaman) <= YIRMIDORT_SAAT_MS) coin100kSon24Saat[bt.sembol] = true;
+  }
+  var ozetSemboller = Object.keys(ozet).filter(function(s) { return coin100kSon24Saat[s]; });
   if (ozetSemboller.length > 0) {
     ozetSemboller.sort(function(a, b) { return (ozet[b].toplam_hacim || 0) - (ozet[a].toplam_hacim || 0); });
     ozetSemboller = ozetSemboller.slice(0, 12);
