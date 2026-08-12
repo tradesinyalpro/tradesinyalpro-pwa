@@ -3654,7 +3654,16 @@ function altcoinTabloHtml(islemler) {
   for (var s = 0; s < goruntulenecekler.length; s++) {
     var sembol = goruntulenecekler[s];
     var kayitlar = gruplar[sembol] || [];
-    html += '<tr><td class="coin-adi" style="cursor:pointer" onclick="altcoinDetayAc(\'' + sembol + '\')">#' + sembol + baskinlikBarHtml(gruplarTam[sembol] || [], "kucuk") + '</td>';
+    var fiyat = canliFiyatlar[sembol];
+    var fr = fundingRateleri[sembol];
+    var kucukBilgi = '<div style="display:flex;align-items:center;gap:7px;margin-top:3px;font-size:10px">';
+    kucukBilgi += '<span style="color:#94a3b8">' + (fiyat !== undefined ? fiyatEtiketFormatla(parseFloat(fiyat)) : "-") + '</span>';
+    if (fr !== undefined) {
+      var frRenkKucuk = fr >= 0 ? "#4ade80" : "#f87171";
+      kucukBilgi += '<span style="color:' + frRenkKucuk + '">' + (fr >= 0 ? "+" : "") + fr.toFixed(4) + '%</span>';
+    }
+    kucukBilgi += '</div>';
+    html += '<tr><td class="coin-adi" style="cursor:pointer" onclick="altcoinDetayAc(\'' + sembol + '\')">#' + sembol + kucukBilgi + '</td>';
     for (var k = 0; k < maxSutun; k++) {
       if (k < kayitlar.length) {
         var t = kayitlar[k];
