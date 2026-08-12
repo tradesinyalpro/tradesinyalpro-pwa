@@ -4577,6 +4577,7 @@ function yoneticiPaneliGoster() {
       }
       html += '<div class="sig-time">Kayit: ' + (u.olusturma_tarihi || "-") + '</div>';
       if (u.onay_tarihi) html += '<div class="sig-time">Onay: ' + u.onay_tarihi + '</div>';
+      if (u.ilk_onay_no) html += '<div class="sig-time" style="color:#60a5fa">İlk üye #' + u.ilk_onay_no + '</div>';
       if (u.durum === "bekliyor") {
         html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciDenemeBaslat(\'' + u.kullanici_adi + '\')">Deneme Baslat (3 Gun)</button></div>';
       }
