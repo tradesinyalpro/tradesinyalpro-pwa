@@ -3451,6 +3451,7 @@ function balinaFiltre(kategori, el) {
 
 var altcoinDetaySembol = null;
 var balinaCoinDetay = null;
+var balinaListeScrollY = 0;
 var performansDetayBot = null;
 
 function altcoinDetayAc(sembol) {
@@ -3464,20 +3465,31 @@ function altcoinDetayKapat() {
 }
 
 function balinaCoinDetayAc(sembol) {
+  balinaListeScrollY = window.scrollY;
   balinaCoinDetay = sembol;
   history.pushState({ balinaCoinDetay: sembol }, "", "");
   balinaGoster();
+  window.scrollTo(0, 0);
 }
 
 function balinaCoinDetayKapat() {
-  history.back();
+  // history.back() bazi telefon/tarayicilarda beklenmedik bir "arama onerisi"
+  // cubugu tetikliyordu - onun yerine dogrudan durumu sifirlayip listeyi
+  // (kaldigi kaydirma konumuyla) yeniden gosteriyoruz.
+  balinaCoinDetay = null;
+  balinaGoster();
+  window.scrollTo(0, balinaListeScrollY);
 }
 
 window.addEventListener("popstate", function(e) {
   altcoinDetaySembol = (e.state && e.state.altcoinDetay) ? e.state.altcoinDetay : null;
+  var oncekiBalinaCoinDetay = balinaCoinDetay;
   balinaCoinDetay = (e.state && e.state.balinaCoinDetay) ? e.state.balinaCoinDetay : null;
   performansDetayBot = (e.state && e.state.performansDetay) ? e.state.performansDetay : null;
-  if (aktifSekme === "balina") balinaGoster();
+  if (aktifSekme === "balina") {
+    balinaGoster();
+    if (oncekiBalinaCoinDetay && !balinaCoinDetay) window.scrollTo(0, balinaListeScrollY);
+  }
   if (aktifSekme === "performans") performansGoster();
 });
 
@@ -3595,11 +3607,12 @@ function balinaGoster() {
 
 function balinaKartHtml(t) {
   var yonCls = t.yon === "LONG" ? "long" : "short";
+  var yonRenk = t.yon === "LONG" ? "#4ade80" : "#f87171";
   var seviyeYazi = t.seviye === "mega" ? "MEGA BALINA" : t.seviye === "buyuk" ? "Buyuk Balina" : "Balina";
   var ikon = t.seviye === "mega" ? "\uD83D\uDC33\uD83D\uDC33\uD83D\uDC33" : t.seviye === "buyuk" ? "\uD83D\uDC33\uD83D\uDC33" : "\uD83D\uDC33";
   var degerFormatli = "$" + Math.round(t.deger || 0).toLocaleString();
   var kart = '<div class="signal-card ' + yonCls + '">';
-  kart += '<div class="sig-header"><div class="sig-symbol">' + ikon + ' #' + t.sembol + '</div>';
+  kart += '<div class="sig-header"><div class="sig-symbol"><span style="display:inline-block;border:1.5px solid ' + yonRenk + ';border-radius:8px;padding:2px 8px">' + ikon + ' #' + t.sembol + '</span></div>';
   kart += '<div class="sig-badges"><span class="badge ' + yonCls + '">' + t.yon + '</span>';
   kart += '<span class="badge seviye-' + t.seviye + '">' + seviyeYazi + '</span></div></div>';
   kart += '<div class="sig-row"><span class="sig-key">Deger</span><span class="sig-val">' + degerFormatli + '</span></div>';
