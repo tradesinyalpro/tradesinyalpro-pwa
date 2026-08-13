@@ -2764,8 +2764,10 @@ function sinyalleriGoster() {
         (fr >= 0 ? "+" : "") + fr.toFixed(4) + '%</span>';
     }
 
+    var sembolCerceveRengi = yon === "LONG" ? "#4ade80" : "#f87171";
+
     html += '<div class="signal-card ' + cls + (genisletilmisMi ? " kart-genisletilmis" : "") + '" data-kart-anahtari="' + kartAnahtari + '">';
-    html += '<div class="sig-header"><div class="sig-symbol"><span class="sig-symbol-tikla" onclick="kartSec(\'' + kartAnahtari.replace(/'/g, "\\'") + '\')">#' + s.sembol + '</span>' + yildizHtml + takipHtml + gorselBtnHtml + kapatBtnHtml + '</div>';
+    html += '<div class="sig-header"><div class="sig-symbol"><span class="sig-symbol-tikla" style="display:inline-block;border:1.5px solid ' + sembolCerceveRengi + ';border-radius:8px;padding:2px 8px" onclick="kartSec(\'' + kartAnahtari.replace(/'/g, "\\'") + '\')">#' + s.sembol + '</span>' + yildizHtml + takipHtml + gorselBtnHtml + kapatBtnHtml + '</div>';
     html += '<div class="sig-badges">' + pnlHtml + '<span class="badge ' + cls + '">' + yon + '</span>';
     html += '<span class="badge bot">' + botAdi(bot) + '</span>' + fundingRateHtml + '</div></div>';
     html += canliFiyatHtml;
@@ -3607,12 +3609,11 @@ function balinaGoster() {
 
 function balinaKartHtml(t) {
   var yonCls = t.yon === "LONG" ? "long" : "short";
-  var yonRenk = t.yon === "LONG" ? "#4ade80" : "#f87171";
   var seviyeYazi = t.seviye === "mega" ? "MEGA BALINA" : t.seviye === "buyuk" ? "Buyuk Balina" : "Balina";
   var ikon = t.seviye === "mega" ? "\uD83D\uDC33\uD83D\uDC33\uD83D\uDC33" : t.seviye === "buyuk" ? "\uD83D\uDC33\uD83D\uDC33" : "\uD83D\uDC33";
   var degerFormatli = "$" + Math.round(t.deger || 0).toLocaleString();
   var kart = '<div class="signal-card ' + yonCls + '">';
-  kart += '<div class="sig-header"><div class="sig-symbol"><span style="display:inline-block;border:1.5px solid ' + yonRenk + ';border-radius:8px;padding:2px 8px">' + ikon + ' #' + t.sembol + '</span></div>';
+  kart += '<div class="sig-header"><div class="sig-symbol">' + ikon + ' #' + t.sembol + '</div>';
   kart += '<div class="sig-badges"><span class="badge ' + yonCls + '">' + t.yon + '</span>';
   kart += '<span class="badge seviye-' + t.seviye + '">' + seviyeYazi + '</span></div></div>';
   kart += '<div class="sig-row"><span class="sig-key">Deger</span><span class="sig-val">' + degerFormatli + '</span></div>';
