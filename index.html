@@ -96,6 +96,9 @@
   .sig-badges { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
   .balina-iki-sutun { display: flex; gap: 6px; align-items: flex-start; }
   .balina-sutun { flex: 1; min-width: 0; }
+  .ozet-toggle { display: flex; margin: 0 0 10px; background: #111827; border: 1px solid #1e293b; border-radius: 10px; padding: 3px; }
+  .ozet-toggle span { flex: 1; text-align: center; font-size: 12px; padding: 7px 0; border-radius: 8px; color: #64748b; cursor: pointer; }
+  .ozet-toggle span.aktif { background: #1e3a8a; color: #93c5fd; font-weight: 600; }
   @media (max-width: 700px) {
     .balina-sutun .signal-card { padding: 8px 8px; }
     .balina-sutun .sig-symbol { font-size: 12px; }
@@ -309,7 +312,15 @@
   <div class="tab" onclick="sekmeAc('yonetici',this)" id="yonetici-tab" style="display:none">Yonetici</div>
 </div>
 
+<div id="coin-arama-cubugu" style="padding:10px 12px;border-bottom:1px solid #1e293b">
+  <div style="display:flex;align-items:center;gap:8px;background:#111827;border:1.5px solid #3b82f6;border-radius:12px;padding:10px 14px">
+    <span style="color:#475569;font-size:14px">&#128269;</span>
+    <input id="coin-arama-input" type="text" placeholder="Coin ara (orn: SOL) - o coine ait tum verileri gorun" oninput="coinAramaGirdiDegisti()" style="background:none;border:none;outline:none;color:#e2e8f0;font-size:14px;width:100%">
+  </div>
+</div>
+
 <div class="content">
+  <div id="coin-arama-sonuc" style="display:none;padding:8px 12px"></div>
   <div id="genelbakis" style="display:none;padding:8px 12px">
     <div id="genelbakis-icerik"><div class="loading">Yukleniyor...</div></div>
   </div>
@@ -3898,7 +3909,274 @@ function sinyaleGit(bot, sembol) {
   }, 60);
 }
 
+var coinAramaZamanlayici = null;
+var coinAramaGenelIstatistikMod = "tum"; // "tum" | "30gun" | "7gun"
+
+function coinAramaGirdiDegisti() {
+  if (coinAramaZamanlayici) clearTimeout(coinAramaZamanlayici);
+  coinAramaZamanlayici = setTimeout(coinAramaUygula, 200);
+}
+
+function coinAramaUygula() {
+  var girdi = document.getElementById("coin-arama-input");
+  var sorgu = girdi ? girdi.value.trim().toUpperCase() : "";
+  var sonucDiv = document.getElementById("coin-arama-sonuc");
+  var divlar = document.querySelectorAll(".content > div");
+  if (!sorgu) {
+    for (var i = 0; i < divlar.length; i++) divlar[i].style.display = "none";
+    var aktifEl = document.getElementById(aktifSekme);
+    if (aktifEl) aktifEl.style.display = "block";
+    return;
+  }
+  for (var j = 0; j < divlar.length; j++) divlar[j].style.display = "none";
+  sonucDiv.style.display = "block";
+  coinAramaGenelIstatistikMod = "tum";
+  coinAramaSonucCiz(sorgu);
+}
+
+function coinAramaEslesenSemboller(sorgu) {
+  var birlesik = {};
+  var fr = fundingRateleri || {};
+  Object.keys(fr).forEach(function(s) { birlesik[s] = true; });
+  var botlar = Object.keys(tumVeriler || {});
+  for (var b = 0; b < botlar.length; b++) {
+    var sinyaller = (tumVeriler[botlar[b]] || {}).sinyaller || [];
+    for (var i = 0; i < sinyaller.length; i++) {
+      if (sinyaller[i].sembol) birlesik[sinyaller[i].sembol] = true;
+    }
+  }
+  return Object.keys(birlesik).filter(function(s) { return s.indexOf(sorgu) !== -1; }).sort();
+}
+
+function coinAramaSonucCiz(sorgu) {
+  var sonucDiv = document.getElementById("coin-arama-sonuc");
+  var eslesen = coinAramaEslesenSemboller(sorgu);
+  if (eslesen.length === 0) {
+    sonucDiv.innerHTML = '<div class="empty">Eslesen coin bulunamadi</div>';
+    return;
+  }
+  if (eslesen.length > 1) {
+    var html = '<div class="section-title" style="margin-top:0">Eslesen Coinler (' + eslesen.length + ')</div>';
+    for (var i = 0; i < eslesen.length; i++) {
+      html += '<div class="stat-card" style="margin-bottom:8px;cursor:pointer" onclick="coinAramaSemboleGit(\'' + eslesen[i] + '\')">#' + eslesen[i] + '</div>';
+    }
+    sonucDiv.innerHTML = html;
+    return;
+  }
+  coinAramaTekSembolGoster(eslesen[0]);
+}
+
+function coinAramaSemboleGit(sembol) {
+  var girdi = document.getElementById("coin-arama-input");
+  if (girdi) girdi.value = sembol;
+  coinAramaGenelIstatistikMod = "tum";
+  coinAramaTekSembolGoster(sembol);
+}
+
+function coinAramaAktifKartHtml(s, bot) {
+  var yon = s.yon || "LONG";
+  var cls = yon === "LONG" ? "long" : "short";
+  var asamaSayisi = s.asama || 0;
+  var kademehtml = '<div style="display:flex;gap:4px;align-items:center;margin:6px 0">' +
+    '<div style="display:flex;gap:3px;flex:1">' +
+    '<div style="flex:1;height:5px;border-radius:3px;background:' + (asamaSayisi >= 1 ? "#3b82f6" : "#1e293b") + '"></div>' +
+    '<div style="flex:1;height:5px;border-radius:3px;background:' + (asamaSayisi >= 2 ? "#3b82f6" : "#1e293b") + '"></div>' +
+    '<div style="flex:1;height:5px;border-radius:3px;background:' + (asamaSayisi >= 3 ? "#3b82f6" : "#1e293b") + '"></div>' +
+    '</div><span style="font-size:10px;color:#64748b">Kademe ' + asamaSayisi + '/3</span></div>';
+
+  var canliFiyat = canliFiyatlar[s.sembol];
+  var fiyatYonu = fiyatYonleri[s.sembol];
+  var fiyatRengi = fiyatYonu === "yukari" ? "#4ade80" : fiyatYonu === "asagi" ? "#f87171" : "#60a5fa";
+  var canliFiyatHtml = canliFiyat ? '<div style="text-align:center;margin:8px 0;padding:8px;background:#0c1424;border-radius:8px">' +
+    '<div style="font-size:10px;color:#64748b;letter-spacing:0.05em;margin-bottom:2px">ANLIK FIYAT</div>' +
+    '<div style="font-size:19px;font-weight:700;color:' + fiyatRengi + '">' + canliFiyat + '</div></div>' : "";
+
+  var girisNumPnl = parseFloat(s.giris || s.maliyet);
+  var pnlHtml = "";
+  if (canliFiyat && girisNumPnl) {
+    var canliFiyatNum = parseFloat(canliFiyat);
+    var hamYuzde = yon === "LONG"
+      ? (canliFiyatNum - girisNumPnl) / girisNumPnl * 100
+      : (girisNumPnl - canliFiyatNum) / girisNumPnl * 100;
+    var pnlYuzde = hamYuzde * 8;
+    var pnlPozitif = pnlYuzde >= 0;
+    var pnlRenk = pnlPozitif ? "#4ade80" : "#f87171";
+    var pnlBg = pnlPozitif ? "#052e1a" : "#2d0a0a";
+    var pnlBorder = pnlPozitif ? "rgba(74,222,128,0.35)" : "rgba(248,113,113,0.35)";
+    pnlHtml = '<span class="badge" style="background:' + pnlBg + ';color:' + pnlRenk + ';border:1px solid ' + pnlBorder + '">' +
+      (pnlPozitif ? "+" : "") + pnlYuzde.toFixed(1) + '%</span>';
+  }
+
+  var fundingHtml = "";
+  if (fundingRateleri[s.sembol] !== undefined) {
+    var fr = fundingRateleri[s.sembol];
+    var frRenk = fr >= 0 ? "#4ade80" : "#f87171";
+    var frBg = fr >= 0 ? "#052e1a" : "#2d0a0a";
+    var frBorder = fr >= 0 ? "rgba(74,222,128,0.35)" : "rgba(248,113,113,0.35)";
+    fundingHtml = '<span class="badge" style="background:' + frBg + ';color:' + frRenk + ';border:1px solid ' + frBorder + '" title="Funding Rate">' +
+      (fr >= 0 ? "+" : "") + fr.toFixed(4) + '%</span>';
+  }
+
+  var kart = '<div class="signal-card ' + cls + '" style="cursor:pointer" onclick="sinyaleGit(\'' + bot + '\',\'' + s.sembol + '\')" title="Veriler sekmesinde bu sinyale git">';
+  kart += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + '</div>';
+  kart += '<div class="sig-badges">' + pnlHtml + '<span class="badge ' + cls + '">' + yon + '</span><span class="badge bot">' + botAdi(bot) + '</span>' + fundingHtml + '</div></div>';
+  kart += canliFiyatHtml;
+  kart += '<div class="sig-row"><span class="sig-key">Giris</span><span class="sig-val">' + (s.giris || s.maliyet || "-") + '</span></div>';
+  kart += '<div class="sig-row"><span class="sig-key">Hedef</span><span class="sig-val green">' + (s.hedef || "-") + '</span></div>';
+  kart += '<div class="sig-row"><span class="sig-key">Stop</span><span class="sig-val red">' + (s.stop || "-") + '</span></div>';
+  kart += kademehtml;
+  kart += '</div>';
+  return kart;
+}
+
+function coinAramaBalinayaGit(sembol) {
+  var balinaTab = document.querySelector('.tab[onclick*="balina"]');
+  if (balinaTab) sekmeAc("balina", balinaTab);
+  var kriptoBtn = document.querySelector('#balina .bot-btn[onclick*="kripto"]');
+  if (kriptoBtn) balinaFiltre("kripto", kriptoBtn);
+  balinaCoinDetayAc(sembol);
+}
+
+function coinAramaOzetGridHtml(yonVerisi, sembol) {
+  var uzun = yonVerisi.LONG || { tp: 0, stop: 0 };
+  var kisa = yonVerisi.SHORT || { tp: 0, stop: 0 };
+  var uzunToplam = uzun.tp + uzun.stop;
+  var kisaToplam = kisa.tp + kisa.stop;
+  var uzunBasari = uzunToplam > 0 ? Math.round(uzun.tp / uzunToplam * 100) : null;
+  var kisaBasari = kisaToplam > 0 ? Math.round(kisa.tp / kisaToplam * 100) : null;
+  var tiklamaOzellik = sembol ? ' style="flex:1;cursor:pointer" onclick="coinAramaBalinayaGit(\'' + sembol + '\')" title="Balina Takip\'te bu coinin Long/Short detayini gor"' : ' style="flex:1"';
+  var html = '<div style="display:flex;gap:10px">';
+  html += '<div class="stat-card"' + tiklamaOzellik + '>';
+  html += '<div style="font-size:13px;color:#4ade80;margin-bottom:8px">&#9650; Long</div>';
+  html += '<div style="font-size:20px;font-weight:800;color:#4ade80;margin-bottom:6px">' + uzunToplam + ' islem</div>';
+  html += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#64748b">Basarili</span><span style="font-weight:700;color:#4ade80">' + uzun.tp + '</span></div>';
+  html += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#64748b">Basarisiz</span><span style="font-weight:700;color:#f87171">' + uzun.stop + '</span></div>';
+  html += '<div style="font-size:11px;color:#64748b;margin-top:8px">' + (uzunBasari !== null ? "%" + uzunBasari + " basari" : "Veri yok") + '</div>';
+  html += '</div>';
+  html += '<div class="stat-card"' + tiklamaOzellik + '>';
+  html += '<div style="font-size:13px;color:#f87171;margin-bottom:8px">&#9660; Short</div>';
+  html += '<div style="font-size:20px;font-weight:800;color:#f87171;margin-bottom:6px">' + kisaToplam + ' islem</div>';
+  html += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#64748b">Basarili</span><span style="font-weight:700;color:#4ade80">' + kisa.tp + '</span></div>';
+  html += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#64748b">Basarisiz</span><span style="font-weight:700;color:#f87171">' + kisa.stop + '</span></div>';
+  html += '<div style="font-size:11px;color:#64748b;margin-top:8px">' + (kisaBasari !== null ? "%" + kisaBasari + " basari" : "Veri yok") + '</div>';
+  html += '</div>';
+  html += '</div>';
+  return html;
+}
+
+function coinAramaIstatistikYukle(sembol) {
+  var alan = document.getElementById("coin-arama-istatistik-alani");
+  if (!alan) return;
+
+  if (coinAramaGenelIstatistikMod === "tum") {
+    alan.innerHTML = '<div class="loading">Yukleniyor...</div>';
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", API + "/coin-performans", true);
+    xhr.setRequestHeader("X-Auth-Token", authToken || "");
+    xhr.onload = function() {
+      if (xhr.status !== 200) { alan.innerHTML = '<div class="empty">Veri alinamadi</div>'; return; }
+      var yanit;
+      try { yanit = JSON.parse(xhr.responseText); } catch (e) { alan.innerHTML = '<div class="empty">Veri alinamadi</div>'; return; }
+      var yon = (yanit.coin_yon || {})[sembol] || { LONG: { tp: 0, stop: 0 }, SHORT: { tp: 0, stop: 0 } };
+      alan.innerHTML = coinAramaOzetGridHtml(yon, sembol);
+    };
+    xhr.onerror = function() { alan.innerHTML = '<div class="empty">Sunucuya ulasilamadi</div>'; };
+    xhr.send();
+    return;
+  }
+
+  var gunSayisi = coinAramaGenelIstatistikMod === "7gun" ? 7 : 30;
+  var sinirMs = gunSayisi * 24 * 60 * 60 * 1000;
+  var simdiMs = Date.now();
+  var yonSayaci = { LONG: { tp: 0, stop: 0 }, SHORT: { tp: 0, stop: 0 } };
+  var botlar = Object.keys(tumVeriler || {});
+  for (var b = 0; b < botlar.length; b++) {
+    var sinyaller = (tumVeriler[botlar[b]] || {}).sinyaller || [];
+    for (var i = 0; i < sinyaller.length; i++) {
+      var s = sinyaller[i];
+      if (s.sembol !== sembol) continue;
+      if (s.durum !== "tp" && s.durum !== "stop") continue;
+      var zamanMs = turkiyeZamanindanMs(s.sonuc_zamani || s.zaman);
+      if (!zamanMs || simdiMs - zamanMs > sinirMs) continue;
+      var yonAdi = s.yon === "LONG" ? "LONG" : "SHORT";
+      yonSayaci[yonAdi][s.durum === "tp" ? "tp" : "stop"]++;
+    }
+  }
+  alan.innerHTML = coinAramaOzetGridHtml(yonSayaci, sembol);
+}
+
+function coinAramaModDegistir(el, mod, sembol) {
+  coinAramaGenelIstatistikMod = mod;
+  var toggleEl = document.getElementById("coin-arama-toggle");
+  if (toggleEl) {
+    var spanlar = toggleEl.querySelectorAll("span");
+    for (var i = 0; i < spanlar.length; i++) spanlar[i].classList.remove("aktif");
+  }
+  el.classList.add("aktif");
+  coinAramaIstatistikYukle(sembol);
+}
+
+function coinAramaTekSembolGoster(sembol) {
+  var sonucDiv = document.getElementById("coin-arama-sonuc");
+  var html = '<div class="section-title" style="margin-top:0">#' + sembol + '</div>';
+
+  var aktifKartlar = [];
+  var botlar = Object.keys(tumVeriler || {});
+  for (var b = 0; b < botlar.length; b++) {
+    var bot = botlar[b];
+    var sinyaller = (tumVeriler[bot] || {}).sinyaller || [];
+    for (var i = 0; i < sinyaller.length; i++) {
+      var s = sinyaller[i];
+      if (s.sembol !== sembol) continue;
+      if (s.durum === "tp" || s.durum === "stop") continue;
+      aktifKartlar.push(coinAramaAktifKartHtml(s, bot));
+    }
+  }
+  if (aktifKartlar.length > 0) {
+    html += '<div class="section-title">Aktif Sinyaller (' + aktifKartlar.length + ')</div>';
+    html += aktifKartlar.join("");
+  }
+
+  var ozet = (tumBalina.ozet || {})[sembol];
+  if (ozet) {
+    html += '<div class="section-title">Anlik Balina Baskisi (5dk)</div>';
+    html += '<div class="stat-card" style="cursor:pointer" onclick="coinAramaBalinayaGit(\'' + sembol + '\')" title="Balina Takip\'te bu coinin detayini gor">';
+    html += '<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:#4ade80">Alim %' + ozet.alim_yuzde + '</span><span style="color:#f87171">Satim %' + ozet.satim_yuzde + '</span></div>';
+    html += '<div style="height:8px;border-radius:4px;overflow:hidden;display:flex;margin-top:8px"><div style="background:#4ade80;width:' + ozet.alim_yuzde + '%"></div><div style="background:#f87171;width:' + ozet.satim_yuzde + '%"></div></div>';
+    html += '</div>';
+  }
+
+  if (fundingRateleri[sembol] !== undefined) {
+    var fr = fundingRateleri[sembol];
+    var frRenk = fr >= 0 ? "#4ade80" : "#f87171";
+    html += '<div class="section-title">Funding Rate</div>';
+    html += '<div class="stat-card" style="display:flex;justify-content:space-between;align-items:center">';
+    html += '<span style="color:#94a3b8;font-size:13px">' + sembol + ' Perp</span>';
+    html += '<span style="font-size:16px;font-weight:700;color:' + frRenk + '">' + (fr >= 0 ? "+" : "") + fr.toFixed(4) + '%</span>';
+    html += '</div>';
+  }
+
+  html += '<div class="section-title">Genel Istatistik</div>';
+  html += '<div class="ozet-toggle" id="coin-arama-toggle">';
+  html += '<span class="' + (coinAramaGenelIstatistikMod === "tum" ? "aktif" : "") + '" onclick="coinAramaModDegistir(this,\'tum\',\'' + sembol + '\')">Tum Zamanlar</span>';
+  html += '<span class="' + (coinAramaGenelIstatistikMod === "30gun" ? "aktif" : "") + '" onclick="coinAramaModDegistir(this,\'30gun\',\'' + sembol + '\')">Son 30 Gun</span>';
+  html += '<span class="' + (coinAramaGenelIstatistikMod === "7gun" ? "aktif" : "") + '" onclick="coinAramaModDegistir(this,\'7gun\',\'' + sembol + '\')">Son 7 Gun</span>';
+  html += '</div>';
+  html += '<div id="coin-arama-istatistik-alani"><div class="loading">Yukleniyor...</div></div>';
+
+  sonucDiv.innerHTML = html;
+  coinAramaIstatistikYukle(sembol);
+}
+
 function sekmeAc(id, el) {
+  // Coin arama aktifken bir sekmeye tiklanirsa aramayi temizle ki sekme
+  // normal sekilde acilsin (aksi halde arama sonucu ekranda takili kalirdi)
+  var aramaGirdi = document.getElementById("coin-arama-input");
+  if (aramaGirdi && aramaGirdi.value) {
+    aramaGirdi.value = "";
+    var aramaSonucEl = document.getElementById("coin-arama-sonuc");
+    if (aramaSonucEl) aramaSonucEl.style.display = "none";
+  }
   aktifSekme = id;
   var tablar = document.querySelectorAll(".tab");
   for (var i = 0; i < tablar.length; i++) tablar[i].classList.remove("active");
