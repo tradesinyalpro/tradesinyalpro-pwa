@@ -4029,12 +4029,17 @@ function coinAramaAktifKartHtml(s, bot) {
   return kart;
 }
 
-function coinAramaBalinayaGit(sembol) {
+function coinAramaBalinayaGit(sembol, kategori) {
+  var hedefKategori = kategori || "kripto";
   var balinaTab = document.querySelector('.tab[onclick*="balina"]');
   if (balinaTab) sekmeAc("balina", balinaTab);
-  var kriptoBtn = document.querySelector('#balina .bot-btn[onclick*="kripto"]');
-  if (kriptoBtn) balinaFiltre("kripto", kriptoBtn);
-  balinaCoinDetayAc(sembol);
+  var hedefBtn = document.querySelector('#balina .bot-btn[onclick*="' + hedefKategori + '"]');
+  if (hedefBtn) balinaFiltre(hedefKategori, hedefBtn);
+  if (hedefKategori === "altcoin") {
+    altcoinDetayAc(sembol);
+  } else {
+    balinaCoinDetayAc(sembol);
+  }
 }
 
 function coinAramaOzetGridHtml(yonVerisi, sembol) {
@@ -4044,17 +4049,20 @@ function coinAramaOzetGridHtml(yonVerisi, sembol) {
   var kisaToplam = kisa.tp + kisa.stop;
   var uzunBasari = uzunToplam > 0 ? Math.round(uzun.tp / uzunToplam * 100) : null;
   var kisaBasari = kisaToplam > 0 ? Math.round(kisa.tp / kisaToplam * 100) : null;
-  var tiklamaOzellik = sembol ? ' style="flex:1;cursor:pointer" onclick="coinAramaBalinayaGit(\'' + sembol + '\')" title="Balina Takip\'te bu coinin Long/Short detayini gor"' : ' style="flex:1"';
+  var balinaBaglantilari = sembol
+    ? '<span style="font-size:10px;color:#60a5fa;cursor:pointer;text-decoration:underline" onclick="event.stopPropagation();coinAramaBalinayaGit(\'' + sembol + '\',\'kripto\')">Kripto</span>' +
+      '<span style="font-size:10px;color:#60a5fa;cursor:pointer;text-decoration:underline;margin-left:8px" onclick="event.stopPropagation();coinAramaBalinayaGit(\'' + sembol + '\',\'altcoin\')">Altcoin</span>'
+    : "";
   var html = '<div style="display:flex;gap:10px">';
-  html += '<div class="stat-card"' + tiklamaOzellik + '>';
-  html += '<div style="font-size:13px;color:#4ade80;margin-bottom:8px">&#9650; Long</div>';
+  html += '<div class="stat-card" style="flex:1">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:13px;color:#4ade80">&#9650; Long</span>' + balinaBaglantilari + '</div>';
   html += '<div style="font-size:20px;font-weight:800;color:#4ade80;margin-bottom:6px">' + uzunToplam + ' islem</div>';
   html += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#64748b">Basarili</span><span style="font-weight:700;color:#4ade80">' + uzun.tp + '</span></div>';
   html += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#64748b">Basarisiz</span><span style="font-weight:700;color:#f87171">' + uzun.stop + '</span></div>';
   html += '<div style="font-size:11px;color:#64748b;margin-top:8px">' + (uzunBasari !== null ? "%" + uzunBasari + " basari" : "Veri yok") + '</div>';
   html += '</div>';
-  html += '<div class="stat-card"' + tiklamaOzellik + '>';
-  html += '<div style="font-size:13px;color:#f87171;margin-bottom:8px">&#9660; Short</div>';
+  html += '<div class="stat-card" style="flex:1">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:13px;color:#f87171">&#9660; Short</span>' + balinaBaglantilari + '</div>';
   html += '<div style="font-size:20px;font-weight:800;color:#f87171;margin-bottom:6px">' + kisaToplam + ' islem</div>';
   html += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#64748b">Basarili</span><span style="font-weight:700;color:#4ade80">' + kisa.tp + '</span></div>';
   html += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#64748b">Basarisiz</span><span style="font-weight:700;color:#f87171">' + kisa.stop + '</span></div>';
@@ -4140,7 +4148,12 @@ function coinAramaTekSembolGoster(sembol) {
   var ozet = (tumBalina.ozet || {})[sembol];
   if (ozet) {
     html += '<div class="section-title">Anlik Balina Baskisi (5dk)</div>';
-    html += '<div class="stat-card" style="cursor:pointer" onclick="coinAramaBalinayaGit(\'' + sembol + '\')" title="Balina Takip\'te bu coinin detayini gor">';
+    html += '<div class="stat-card">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+    html += '<span style="font-size:11px;color:#64748b">Detay icin:</span>';
+    html += '<span><span style="font-size:10px;color:#60a5fa;cursor:pointer;text-decoration:underline" onclick="coinAramaBalinayaGit(\'' + sembol + '\',\'kripto\')">Kripto</span>' +
+      '<span style="font-size:10px;color:#60a5fa;cursor:pointer;text-decoration:underline;margin-left:8px" onclick="coinAramaBalinayaGit(\'' + sembol + '\',\'altcoin\')">Altcoin</span></span>';
+    html += '</div>';
     html += '<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:#4ade80">Alim %' + ozet.alim_yuzde + '</span><span style="color:#f87171">Satim %' + ozet.satim_yuzde + '</span></div>';
     html += '<div style="height:8px;border-radius:4px;overflow:hidden;display:flex;margin-top:8px"><div style="background:#4ade80;width:' + ozet.alim_yuzde + '%"></div><div style="background:#f87171;width:' + ozet.satim_yuzde + '%"></div></div>';
     html += '</div>';
