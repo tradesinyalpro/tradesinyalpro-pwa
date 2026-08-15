@@ -2730,32 +2730,37 @@ function sinyalleriGoster() {
       '<div style="flex:1;height:5px;border-radius:3px;background:' + (asamaSayisi >= 3 ? "#3b82f6" : "#1e293b") + '"></div>' +
       '</div><span style="font-size:10px;color:#64748b">Kademe ' + asamaSayisi + '/3</span></div>';
     var canliFiyat = canliFiyatlar[s.sembol];
-    var fiyatYonu = fiyatYonleri[s.sembol];
-    var fiyatRengi = fiyatYonu === "yukari" ? "#4ade80" : fiyatYonu === "asagi" ? "#f87171" : "#60a5fa";
-    var canliFiyatHtml = canliFiyat ? '<div style="text-align:center;margin:8px 0;padding:8px;background:#0c1424;border-radius:8px">' +
-      '<div style="font-size:10px;color:#64748b;letter-spacing:0.05em;margin-bottom:2px">ANLIK FIYAT</div>' +
-      '<div style="font-size:19px;font-weight:700;color:' + fiyatRengi + '">' + canliFiyat + '</div></div>' : "";
+    var girisNumPnl = parseFloat(s.giris || s.maliyet);
+    var pnlYuzde = null;
+    if (canliFiyat && girisNumPnl) {
+      var canliFiyatNum = parseFloat(canliFiyat);
+      var hamYuzde = yon === "LONG"
+        ? (canliFiyatNum - girisNumPnl) / girisNumPnl * 100
+        : (girisNumPnl - canliFiyatNum) / girisNumPnl * 100;
+      pnlYuzde = hamYuzde * 8;
+    }
+    // ROI (kar/zarar) durumuna gore renk: ANLIK FIYAT kutusunun cercevesi,
+    // icindeki fiyat yazisi ve yaninda gosterilen ROI yuzdesi HEPSI ayni
+    // rengi (yesil=kar, kirmizi=zarar) kullanir - eskiden fiyat rengi
+    // yukari/asagi tik yonune gore ayri belirleniyordu, artik tutarli
+    // tek bir kar/zarar rengi kullaniliyor (rozet satirindaki ayrı ROI
+    // rozetiyle "iki yesil" karisikligi yasanmasin diye buraya tasindi).
+    var pnlPozitif = pnlYuzde === null ? true : pnlYuzde >= 0;
+    var fiyatKutuRengi = pnlPozitif ? "#4ade80" : "#f87171";
+    var pnlMetniHtml = pnlYuzde !== null
+      ? '<div style="border-left:1px solid #1e293b;padding-left:10px;text-align:left"><div style="font-size:10px;color:#64748b;letter-spacing:0.05em;margin-bottom:2px">ROI (8x)</div><div style="font-size:17px;font-weight:700;color:' + fiyatKutuRengi + '">' + (pnlPozitif ? "+" : "") + "%" + pnlYuzde.toFixed(1) + '</div></div>'
+      : "";
+    var canliFiyatHtml = canliFiyat ? '<div style="display:flex;align-items:center;justify-content:center;gap:12px;margin:8px 0;padding:8px;background:#0c1424;border:1.5px solid ' + fiyatKutuRengi + ';border-radius:8px">' +
+      '<div style="text-align:center"><div style="font-size:10px;color:#64748b;letter-spacing:0.05em;margin-bottom:2px">ANLIK FIYAT</div>' +
+      '<div style="font-size:19px;font-weight:700;color:' + fiyatKutuRengi + '">' + canliFiyat + '</div></div>' +
+      pnlMetniHtml + '</div>' : "";
     var favoriMi = favoriCoinler[s.sembol];
     var yildizHtml = '<span onclick="favoriToggle(\'' + s.sembol + '\')" style="cursor:pointer;font-size:16px;margin-left:6px;color:' + (favoriMi ? "#fbbf24" : "#475569") + '">' + (favoriMi ? "&#9733;" : "&#9734;") + '</span>';
     var takipAnahtari = bot + "|" + s.sembol + "|" + s.zaman;
     var takipliMi = !!takipDurumu[takipAnahtari];
     var takipHtml = '<span onclick="takipToggle(\'' + bot + '\',\'' + s.sembol + '\',\'' + s.zaman + '\')" style="cursor:pointer;font-size:14px;margin-left:6px" title="Sanal Portfoyde Takip Et">' + (takipliMi ? "📌" : "📍") + '</span>';
 
-    var girisNumPnl = parseFloat(s.giris || s.maliyet);
-    var pnlHtml = "";
-    if (canliFiyat && girisNumPnl) {
-      var canliFiyatNum = parseFloat(canliFiyat);
-      var hamYuzde = yon === "LONG"
-        ? (canliFiyatNum - girisNumPnl) / girisNumPnl * 100
-        : (girisNumPnl - canliFiyatNum) / girisNumPnl * 100;
-      var pnlYuzde = hamYuzde * 8;
-      var pnlPozitif = pnlYuzde >= 0;
-      var pnlRenk = pnlPozitif ? "#4ade80" : "#f87171";
-      var pnlBg = pnlPozitif ? "#052e1a" : "#2d0a0a";
-      var pnlBorder = pnlPozitif ? "rgba(74,222,128,0.35)" : "rgba(248,113,113,0.35)";
-      pnlHtml = '<span class="badge" style="background:' + pnlBg + ';color:' + pnlRenk + ';border:1px solid ' + pnlBorder + ';text-align:center;display:inline-flex;align-items:center;justify-content:center;line-height:1">' +
-        (pnlPozitif ? "+" : "") + "%" + pnlYuzde.toFixed(1) + '</span>';
-    }
+    var pnlHtml = ""; // ROI artik rozet satirinda degil, ANLIK FIYAT kutusunun yaninda gosteriliyor
 
     var gorselBtnHtml = hesapDurumu === "admin"
       ? '<span onclick="sinyalGorseliOlustur(\'' + s.sembol + '\',\'' + yon + '\',\'' + (s.giris || s.maliyet || "-") + '\',\'' + (s.hedef || "-") + '\',\'' + (s.stop || "-") + '\')" style="cursor:pointer;font-size:14px;margin-left:6px" title="Tanitim gorseli olustur (sadece yonetici)">🖼️</span>'
@@ -3985,27 +3990,26 @@ function coinAramaAktifKartHtml(s, bot) {
     '</div><span style="font-size:10px;color:#64748b">Kademe ' + asamaSayisi + '/3</span></div>';
 
   var canliFiyat = canliFiyatlar[s.sembol];
-  var fiyatYonu = fiyatYonleri[s.sembol];
-  var fiyatRengi = fiyatYonu === "yukari" ? "#4ade80" : fiyatYonu === "asagi" ? "#f87171" : "#60a5fa";
-  var canliFiyatHtml = canliFiyat ? '<div style="text-align:center;margin:8px 0;padding:8px;background:#0c1424;border-radius:8px">' +
-    '<div style="font-size:10px;color:#64748b;letter-spacing:0.05em;margin-bottom:2px">ANLIK FIYAT</div>' +
-    '<div style="font-size:19px;font-weight:700;color:' + fiyatRengi + '">' + canliFiyat + '</div></div>' : "";
-
   var girisNumPnl = parseFloat(s.giris || s.maliyet);
-  var pnlHtml = "";
+  var pnlYuzde = null;
   if (canliFiyat && girisNumPnl) {
     var canliFiyatNum = parseFloat(canliFiyat);
     var hamYuzde = yon === "LONG"
       ? (canliFiyatNum - girisNumPnl) / girisNumPnl * 100
       : (girisNumPnl - canliFiyatNum) / girisNumPnl * 100;
-    var pnlYuzde = hamYuzde * 8;
-    var pnlPozitif = pnlYuzde >= 0;
-    var pnlRenk = pnlPozitif ? "#4ade80" : "#f87171";
-    var pnlBg = pnlPozitif ? "#052e1a" : "#2d0a0a";
-    var pnlBorder = pnlPozitif ? "rgba(74,222,128,0.35)" : "rgba(248,113,113,0.35)";
-    pnlHtml = '<span class="badge" style="background:' + pnlBg + ';color:' + pnlRenk + ';border:1px solid ' + pnlBorder + '">' +
-      (pnlPozitif ? "+" : "") + pnlYuzde.toFixed(1) + '%</span>';
+    pnlYuzde = hamYuzde * 8;
   }
+  var pnlPozitif = pnlYuzde === null ? true : pnlYuzde >= 0;
+  var fiyatKutuRengi = pnlPozitif ? "#4ade80" : "#f87171";
+  var pnlMetniHtml = pnlYuzde !== null
+    ? '<div style="border-left:1px solid #1e293b;padding-left:10px;text-align:left"><div style="font-size:10px;color:#64748b;letter-spacing:0.05em;margin-bottom:2px">ROI (8x)</div><div style="font-size:17px;font-weight:700;color:' + fiyatKutuRengi + '">' + (pnlPozitif ? "+" : "") + "%" + pnlYuzde.toFixed(1) + '</div></div>'
+    : "";
+  var canliFiyatHtml = canliFiyat ? '<div style="display:flex;align-items:center;justify-content:center;gap:12px;margin:8px 0;padding:8px;background:#0c1424;border:1.5px solid ' + fiyatKutuRengi + ';border-radius:8px">' +
+    '<div style="text-align:center"><div style="font-size:10px;color:#64748b;letter-spacing:0.05em;margin-bottom:2px">ANLIK FIYAT</div>' +
+    '<div style="font-size:19px;font-weight:700;color:' + fiyatKutuRengi + '">' + canliFiyat + '</div></div>' +
+    pnlMetniHtml + '</div>' : "";
+
+  var pnlHtml = ""; // ROI artik rozet satirinda degil, ANLIK FIYAT kutusunun yaninda gosteriliyor
 
   var fundingHtml = "";
   if (fundingRateleri[s.sembol] !== undefined) {
