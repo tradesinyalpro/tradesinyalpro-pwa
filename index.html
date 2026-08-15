@@ -2748,7 +2748,7 @@ function sinyalleriGoster() {
     var pnlPozitif = pnlYuzde === null ? true : pnlYuzde >= 0;
     var fiyatKutuRengi = pnlPozitif ? "#4ade80" : "#f87171";
     var pnlMetniHtml = pnlYuzde !== null
-      ? '<div style="text-align:left"><div style="font-size:10px;color:#64748b;letter-spacing:0.05em;margin-bottom:2px">ROI (8x)</div><div style="font-size:17px;font-weight:700;color:' + fiyatKutuRengi + '">' + (pnlPozitif ? "+" : "") + "%" + pnlYuzde.toFixed(1) + '</div></div>'
+      ? '<div style="text-align:left"><div style="font-size:10px;color:#64748b;letter-spacing:0.05em;margin-bottom:2px">ROI</div><div style="font-size:17px;font-weight:700;color:' + fiyatKutuRengi + '">' + (pnlPozitif ? "+" : "") + "%" + pnlYuzde.toFixed(1) + '</div></div>'
       : "";
     var canliFiyatHtml = canliFiyat ? '<div style="display:flex;align-items:center;justify-content:center;gap:14px;margin:8px 0">' +
       '<div style="display:inline-block;text-align:center;padding:6px 16px;background:#0c1424;border:1.5px solid ' + fiyatKutuRengi + ';border-radius:10px">' +
@@ -4003,7 +4003,7 @@ function coinAramaAktifKartHtml(s, bot) {
   var pnlPozitif = pnlYuzde === null ? true : pnlYuzde >= 0;
   var fiyatKutuRengi = pnlPozitif ? "#4ade80" : "#f87171";
   var pnlMetniHtml = pnlYuzde !== null
-    ? '<div style="text-align:left"><div style="font-size:10px;color:#64748b;letter-spacing:0.05em;margin-bottom:2px">ROI (8x)</div><div style="font-size:17px;font-weight:700;color:' + fiyatKutuRengi + '">' + (pnlPozitif ? "+" : "") + "%" + pnlYuzde.toFixed(1) + '</div></div>'
+    ? '<div style="text-align:left"><div style="font-size:10px;color:#64748b;letter-spacing:0.05em;margin-bottom:2px">ROI</div><div style="font-size:17px;font-weight:700;color:' + fiyatKutuRengi + '">' + (pnlPozitif ? "+" : "") + "%" + pnlYuzde.toFixed(1) + '</div></div>'
     : "";
   var canliFiyatHtml = canliFiyat ? '<div style="display:flex;align-items:center;justify-content:center;gap:14px;margin:8px 0">' +
     '<div style="display:inline-block;text-align:center;padding:6px 16px;background:#0c1424;border:1.5px solid ' + fiyatKutuRengi + ';border-radius:10px">' +
