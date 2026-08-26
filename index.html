@@ -5234,7 +5234,10 @@ function yoneticiPaneliGoster() {
         var butonYazisi = u.durum === "suresi_dolmus" ? "Yenile (30 Gun)" : "Direkt Onayla (30 Gun)";
         html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciOnayla(\'' + u.kullanici_adi + '\')">' + butonYazisi + '</button></div>';
       }
-      html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciSifreSifirla(\'' + u.kullanici_adi + '\')">Sifre Sifirla (Kaydi Sil)</button></div>';
+      html += '<div style="text-align:center;margin-top:8px;display:flex;gap:8px;justify-content:center">' +
+        '<button class="refresh-btn" style="background:#22c55e" onclick="kullaniciGercekSifreSifirla(\'' + u.kullanici_adi + '\')">Sifre Sifirla (Kaydi Silmez)</button>' +
+        '<button class="refresh-btn" onclick="kullaniciSifreSifirla(\'' + u.kullanici_adi + '\')">Sifre Sifirla (Kaydi Sil)</button>' +
+        '</div>';
       html += '</div>';
     }
     document.getElementById("yonetici-icerik").innerHTML = html;
@@ -5257,6 +5260,33 @@ function kullaniciDenemeBaslat(kadi) {
   xhr.setRequestHeader("Content-Type", "application/json");
   xhr.setRequestHeader("X-Auth-Token", authToken);
   xhr.onload = function() { yoneticiPaneliGoster(); };
+  xhr.send(JSON.stringify({ kullanici_adi: kadi }));
+}
+
+function kullaniciGercekSifreSifirla(kadi) {
+  var onay = confirm(
+    kadi + " icin YENI, RASTGELE bir gecici sifre uretilecek.\n\n" +
+    "Kullanicinin KAYDI SILINMEZ - uyelik suresi, gecmisi ve onay durumu " +
+    "AYNEN KORUNUR. Uretilen sifreyi kullaniciya (Telegram vb.) kendiniz " +
+    "iletmeniz gerekir.\n\nDevam etmek istiyor musunuz?"
+  );
+  if (!onay) return;
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/admin/gercek_sifre_sifirla", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken);
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      var yanit = JSON.parse(xhr.responseText);
+      prompt(
+        kadi + " icin yeni gecici sifre olusturuldu.\n" +
+        "Bu sifreyi kopyalayip kullaniciya iletin (bu pencere kapandiktan sonra tekrar goruntulenemez):",
+        yanit.yeni_sifre
+      );
+    } else {
+      alert("Hata olustu, tekrar deneyin.");
+    }
+  };
   xhr.send(JSON.stringify({ kullanici_adi: kadi }));
 }
 
