@@ -300,6 +300,7 @@
 <div class="tabs" id="tabs-alani">
   <div class="tab" onclick="sekmeAc('genelbakis',this)">Genel Bakis</div>
   <div class="tab active" onclick="sekmeAc('sinyaller',this)" data-tam-erisim="1">Veriler</div>
+  <div class="tab" onclick="sekmeAc('destekdirenc',this)" data-tam-erisim="1">Destek/Direnç</div>
   <div class="tab" onclick="sekmeAc('portfoy',this)" data-tam-erisim="1">Portfoyum</div>
   <div class="tab" onclick="sekmeAc('performans',this)" data-tam-erisim="1">Performans</div>
   <div class="tab" onclick="sekmeAc('coinperformans',this)" data-tam-erisim="1">Coin Performans</div>
@@ -308,7 +309,6 @@
   <div class="tab" onclick="sekmeAc('piyasa',this)" data-tam-erisim="1">Piyasa</div>
   <div class="tab" onclick="sekmeAc('analiz',this)" data-tam-erisim="1">Analiz</div>
   <div class="tab" onclick="sekmeAc('balina',this)" data-tam-erisim="1">Balina Takip</div>
-  <div class="tab" onclick="sekmeAc('destekdirenc',this)" data-tam-erisim="1">Destek/Direnç</div>
   <div class="tab" onclick="sekmeAc('haberler',this)" data-tam-erisim="1">Haberler</div>
   <div class="tab" onclick="sekmeAc('iletisim',this)">Iletisim</div>
   <div class="tab" onclick="sekmeAc('yonetici',this)" id="yonetici-tab" style="display:none">Yonetici</div>
@@ -567,9 +567,6 @@
     </div>
     <div id="dd-seviye-bilgi" style="font-size:12.5px;color:#94a3b8;margin-bottom:10px;line-height:1.7"></div>
     <div id="dd-chart" style="width:100%;height:400px;border-radius:10px;overflow:hidden;background:#0a0f1e"></div>
-    <div style="font-size:10.5px;color:#475569;margin-top:8px;line-height:1.5">
-      Destek/Direnç, Binance Eklemeli botunun kendi stratejisiyle (son 96×15dk mum) hesaplanır. Giriş/Hedef/Stop/E1-E2-E3 seviyeleri, o coin için şu an açık bir sinyal varsa gösterilir.
-    </div>
   </div>
 
   <div id="haberler" style="display:none">
@@ -4239,7 +4236,7 @@ var DD_COINS = ["BTCUSDT","EGLDUSDT","ETHUSDT","SOLUSDT","LINKUSDT","AVAXUSDT","
   "ETCUSDT","LTCUSDT","INJUSDT","BNBUSDT","ATOMUSDT","NEOUSDT","YFIUSDT","BCHUSDT",
   "AAVEUSDT","OPUSDT","NMRUSDT","APTUSDT","TAOUSDT","HYPEUSDT","DOTUSDT","ADAUSDT",
   "NEARUSDT","TIAUSDT","XMRUSDT","GASUSDT","DASHUSDT","XRPUSDT","ZENUSDT","ZECUSDT","ORDIUSDT"];
-var ddChart = null, ddSeries = null, ddPriceLines = [], ddSeciliCoin = "BTCUSDT", ddIlkYuklendi = false;
+var ddChart = null, ddSeries = null, ddPriceLines = [], ddSeciliCoin = "BTCUSDT", ddIlkYuklendi = false, ddSonCizilenCoin = null;
 
 function ddSekmeIlkYukle() {
   if (!ddIlkYuklendi) {
@@ -4311,7 +4308,9 @@ function ddYukle(symbol) {
     if ((guncelFiyat - destek) / guncelFiyat < 0.003 && rsi <= 35) sinyalKosulu = "LONG (destek + RSI dusuk)";
     else if ((direnc - guncelFiyat) / guncelFiyat < 0.003 && rsi >= 65) sinyalKosulu = "SHORT (direnc + RSI yuksek)";
 
-    ddGrafikCiz(candleData, destek, direnc);
+    var coinDegisti = (symbol !== ddSonCizilenCoin);
+    ddSonCizilenCoin = symbol;
+    ddGrafikCiz(candleData, destek, direnc, coinDegisti);
 
     // Bu coin icin su an ACIK bir Oda2 sinyali var mi - backend'den kontrol
     var xhr2 = new XMLHttpRequest();
@@ -4374,9 +4373,10 @@ function ddYukle(symbol) {
   xhr.send();
 }
 
-function ddGrafikCiz(candleData, destek, direnc) {
+function ddGrafikCiz(candleData, destek, direnc, coinDegisti) {
   var kutu = document.getElementById("dd-chart");
-  if (!ddChart) {
+  var ilkOlusturma = !ddChart;
+  if (ilkOlusturma) {
     ddChart = LightweightCharts.createChart(kutu, {
       layout: { background: { color: "#0a0f1e" }, textColor: "#94a3b8" },
       grid: { vertLines: { color: "#141d33" }, horzLines: { color: "#141d33" } },
@@ -4390,16 +4390,23 @@ function ddGrafikCiz(candleData, destek, direnc) {
     });
     window.addEventListener("resize", function() { if (ddChart) ddChart.applyOptions({ width: kutu.clientWidth }); });
   }
-  // Kullanici grafigi fare ile bir kez manuel kaydirirsa/yakinlastirirsa,
-  // kutuphane fiyat eksenindeki OTOMATIK OLCEKLENDIRMEYI KALICI OLARAK
-  // KAPATIYOR. Bu yuzden coin degistiginde eski (yanlis buyuklukteki) fiyat
-  // araliginda "kilitli" kaliyordu (orn. 250$'lik bir coine gecince hala
-  // 1-2$'lik eski araliktaymis gibi bos gorunuyordu). Her yeni veri
-  // yuklemesinde otomatik olcegi ZORLA yeniden actigimiz icin bu artik
-  // olmayacak - her coin secildiginde grafik dogru araliga oturacak.
-  ddSeries.priceScale().applyOptions({ autoScale: true });
-  ddSeries.setData(candleData);
-  ddChart.timeScale().fitContent();
+
+  if (coinDegisti || ilkOlusturma) {
+    // Yeni bir coin secildi (ya da ilk yukleme) - kutuphane fiyat eksenindeki
+    // otomatik olceklendirmeyi kullanici bir onceki coinde manuel kaydirmis/
+    // yakinlastirmissa KALICI OLARAK KAPATMIS olabilir (orn. 250$'lik bir
+    // coine gecince hala eski coinin 1-2$'lik araliginda kaliyordu) - bu
+    // yuzden coin degisiminde otomatik olcegi ZORLA yeniden aciyoruz.
+    ddSeries.priceScale().applyOptions({ autoScale: true });
+    ddSeries.setData(candleData);
+    ddChart.timeScale().fitContent();
+  } else {
+    // AYNI coin, sadece 10sn'lik otomatik yenileme - kullanicinin o an
+    // yakinlastirdigi/kaydirdigi GORUNUMU BOZMADAN sadece veriyi guncelle.
+    var gorunenAralik = ddChart.timeScale().getVisibleLogicalRange();
+    ddSeries.setData(candleData);
+    if (gorunenAralik) ddChart.timeScale().setVisibleLogicalRange(gorunenAralik);
+  }
 }
 
 function ddPriceLinelerCiz(acikSinyal, destek, direnc) {
