@@ -4286,7 +4286,7 @@ function ddYukle(symbol) {
   var chartKutu = document.getElementById("dd-chart");
   if (!bilgiKutu || !chartKutu) return;
 
-  var klineUrl = "https://fapi.binance.com/fapi/v1/klines?symbol=" + symbol + "&interval=15m&limit=100";
+  var klineUrl = "https://fapi.binance.com/fapi/v1/klines?symbol=" + symbol + "&interval=15m&limit=288";
   var xhr = new XMLHttpRequest();
   xhr.open("GET", klineUrl, true);
   xhr.onload = function() {
@@ -4337,14 +4337,29 @@ function ddYukle(symbol) {
       if (sinyalKosulu) html += ddSeviyeSatiri("Sinyal Koşulu", sinyalKosulu, "#fbbf24");
 
       if (acikSinyal) {
+        var yonRengi = acikSinyal.yon === "LONG" ? "#22c55e" : "#ef4444";
         html += '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #1e293b">' +
-          '<div style="color:#e2e8f0;font-weight:600;margin-bottom:4px">📍 Açık Sinyal: ' + acikSinyal.yon + '</div></div>';
+          '<div style="font-weight:700;margin-bottom:4px">📍 Açık Sinyal: <span style="color:' + yonRengi + '">' + acikSinyal.yon + '</span></div></div>';
         html += ddSeviyeSatiri("Giriş/Maliyet", acikSinyal.maliyet, "#e2e8f0");
         html += ddSeviyeSatiri("Hedef (TP)", acikSinyal.hedef, "#4ade80");
         html += ddSeviyeSatiri("Stop", acikSinyal.stop, "#f87171");
         html += ddSeviyeSatiri("E1", acikSinyal.e1, "#fbbf24");
         html += ddSeviyeSatiri("E2", acikSinyal.e2, "#fbbf24");
         html += ddSeviyeSatiri("E3", acikSinyal.e3, "#fbbf24");
+
+        // Pozisyon Durumu: mevcut sinyal kartlarindaki (sinyalKartOlustur)
+        // ile BIREBIR AYNI formul - ham fiyat farki * 8x sabit kaldirac (LEV).
+        var girisNum = parseFloat(acikSinyal.maliyet);
+        if (girisNum) {
+          var hamYuzde = acikSinyal.yon === "LONG"
+            ? (guncelFiyat - girisNum) / girisNum * 100
+            : (girisNum - guncelFiyat) / girisNum * 100;
+          var pozYuzde = hamYuzde * 8;
+          var pozPozitif = pozYuzde >= 0;
+          html += '<div style="margin-top:6px;padding-top:6px;border-top:1px dashed #1e293b;display:flex;justify-content:space-between">' +
+            '<span>Pozisyon Durumu</span><span style="font-weight:700;color:' + (pozPozitif ? "#4ade80" : "#f87171") + '">' +
+            (pozPozitif ? "+ %" : "- %") + Math.abs(pozYuzde).toFixed(1) + '</span></div>';
+        }
       } else {
         html += '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #1e293b;color:#475569">Bu coin icin su an acik bir sinyal yok.</div>';
       }
@@ -4375,7 +4390,16 @@ function ddGrafikCiz(candleData, destek, direnc) {
     });
     window.addEventListener("resize", function() { if (ddChart) ddChart.applyOptions({ width: kutu.clientWidth }); });
   }
+  // Kullanici grafigi fare ile bir kez manuel kaydirirsa/yakinlastirirsa,
+  // kutuphane fiyat eksenindeki OTOMATIK OLCEKLENDIRMEYI KALICI OLARAK
+  // KAPATIYOR. Bu yuzden coin degistiginde eski (yanlis buyuklukteki) fiyat
+  // araliginda "kilitli" kaliyordu (orn. 250$'lik bir coine gecince hala
+  // 1-2$'lik eski araliktaymis gibi bos gorunuyordu). Her yeni veri
+  // yuklemesinde otomatik olcegi ZORLA yeniden actigimiz icin bu artik
+  // olmayacak - her coin secildiginde grafik dogru araliga oturacak.
+  ddSeries.priceScale().applyOptions({ autoScale: true });
   ddSeries.setData(candleData);
+  ddChart.timeScale().fitContent();
 }
 
 function ddPriceLinelerCiz(acikSinyal, destek, direnc) {
