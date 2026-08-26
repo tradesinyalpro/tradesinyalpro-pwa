@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#0a0f1e">
 <title>TradeSinyalPro</title>
 <link rel="manifest" href="manifest.json">
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 
 <!-- iOS PWA destegi: dogru ikon ve tam ekran acilis icin -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -307,6 +308,7 @@
   <div class="tab" onclick="sekmeAc('piyasa',this)" data-tam-erisim="1">Piyasa</div>
   <div class="tab" onclick="sekmeAc('analiz',this)" data-tam-erisim="1">Analiz</div>
   <div class="tab" onclick="sekmeAc('balina',this)" data-tam-erisim="1">Balina Takip</div>
+  <div class="tab" onclick="sekmeAc('destekdirenc',this)" data-tam-erisim="1">Destek/Direnç</div>
   <div class="tab" onclick="sekmeAc('haberler',this)" data-tam-erisim="1">Haberler</div>
   <div class="tab" onclick="sekmeAc('iletisim',this)">Iletisim</div>
   <div class="tab" onclick="sekmeAc('yonetici',this)" id="yonetici-tab" style="display:none">Yonetici</div>
@@ -556,6 +558,18 @@
       <button class="bot-btn" onclick="balinaFiltre('hisse',this)">ABD Hisseleri</button>
     </div>
     <div id="balina-icerik"><div class="loading">Yukleniyor...</div></div>
+  </div>
+
+  <div id="destekdirenc" style="display:none;padding:8px 12px">
+    <div style="margin-bottom:10px">
+      <select id="dd-coin-sec" onchange="ddCoinDegisti()"
+        style="width:100%;background:#0a0f1e;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px"></select>
+    </div>
+    <div id="dd-seviye-bilgi" style="font-size:12.5px;color:#94a3b8;margin-bottom:10px;line-height:1.7"></div>
+    <div id="dd-chart" style="width:100%;height:400px;border-radius:10px;overflow:hidden;background:#0a0f1e"></div>
+    <div style="font-size:10.5px;color:#475569;margin-top:8px;line-height:1.5">
+      Destek/Direnç, Binance Eklemeli botunun kendi stratejisiyle (son 96×15dk mum) hesaplanır. Giriş/Hedef/Stop/E1-E2-E3 seviyeleri, o coin için şu an açık bir sinyal varsa gösterilir.
+    </div>
   </div>
 
   <div id="haberler" style="display:none">
@@ -2419,6 +2433,7 @@ function guncelle() {
   if (aktifSekme === "haberler") haberleriGoster();
   if (aktifSekme === "yonetici") yoneticiPaneliGoster();
   if (aktifSekme === "portfoy") portfoyGoster();
+  if (aktifSekme === "destekdirenc") ddYukle(ddSeciliCoin);
 }
 
 function sinyalGorseliOlustur(sembol, yon, giris, hedef, stop) {
@@ -4212,7 +4227,184 @@ function sekmeAc(id, el) {
   if (id === "piyasa") altinFiyatlariGoster();
   if (id === "genelbakis") genelBakisDoldur("genelbakis-icerik");
   if (id === "coinperformans") coinPerformansGoster();
+  if (id === "destekdirenc") ddSekmeIlkYukle();
 }
+
+// ==================== DESTEK/DIRENÇ SEKMESİ ====================
+// Binance Eklemeli botunun (Oda2) 15 dakikalık destek/direnç + RSI
+// stratejisi burada AYNEN (bot koduyla birebir aynı formulle) JS'e
+// tasinir - boylece grafikte gosterilen seviyeler botun GERCEK mantigina
+// sadik kalir, uydurma/genel bir teknik analiz DEGILDIR.
+var DD_COINS = ["BTCUSDT","EGLDUSDT","ETHUSDT","SOLUSDT","LINKUSDT","AVAXUSDT","COMPUSDT",
+  "ETCUSDT","LTCUSDT","INJUSDT","BNBUSDT","ATOMUSDT","NEOUSDT","YFIUSDT","BCHUSDT",
+  "AAVEUSDT","OPUSDT","NMRUSDT","APTUSDT","TAOUSDT","HYPEUSDT","DOTUSDT","ADAUSDT",
+  "NEARUSDT","TIAUSDT","XMRUSDT","GASUSDT","DASHUSDT","XRPUSDT","ZENUSDT","ZECUSDT","ORDIUSDT"];
+var ddChart = null, ddSeries = null, ddPriceLines = [], ddSeciliCoin = "BTCUSDT", ddIlkYuklendi = false;
+
+function ddSekmeIlkYukle() {
+  if (!ddIlkYuklendi) {
+    var sec = document.getElementById("dd-coin-sec");
+    var html = "";
+    for (var i = 0; i < DD_COINS.length; i++) html += '<option value="' + DD_COINS[i] + '">' + DD_COINS[i] + '</option>';
+    sec.innerHTML = html;
+    sec.value = ddSeciliCoin;
+    ddIlkYuklendi = true;
+  }
+  ddYukle(ddSeciliCoin);
+}
+
+function ddCoinDegisti() {
+  ddSeciliCoin = document.getElementById("dd-coin-sec").value;
+  ddYukle(ddSeciliCoin);
+}
+
+function ddRsiHesapla(closes, period) {
+  // Python'daki rsi_hesapla() ile BIREBIR ayni formul (Wilder's RSI)
+  if (period === undefined) period = 14;
+  if (closes.length < period + 1) return 50;
+  var deltas = [];
+  for (var i = 0; i < closes.length - 1; i++) deltas.push(closes[i + 1] - closes[i]);
+  var up = 0, down = 0;
+  for (var i = 0; i < period; i++) { up += Math.max(deltas[i], 0); down += Math.max(-deltas[i], 0); }
+  up /= period; down /= period;
+  for (var i = period; i < deltas.length; i++) {
+    up = (up * (period - 1) + Math.max(deltas[i], 0)) / period;
+    down = (down * (period - 1) + Math.max(-deltas[i], 0)) / period;
+  }
+  if (down === 0) return 100;
+  return Math.round((100 - (100 / (1 + (up / down)))) * 10) / 10;
+}
+
+function ddSeviyeSatiri(etiket, deger, renk) {
+  if (deger === null || deger === undefined) return "";
+  return '<div style="display:flex;justify-content:space-between;padding:3px 0">' +
+    '<span>' + etiket + '</span><span style="font-weight:600;color:' + (renk || "#e2e8f0") + '">' + deger + '</span></div>';
+}
+
+function ddYukle(symbol) {
+  var bilgiKutu = document.getElementById("dd-seviye-bilgi");
+  var chartKutu = document.getElementById("dd-chart");
+  if (!bilgiKutu || !chartKutu) return;
+
+  var klineUrl = "https://fapi.binance.com/fapi/v1/klines?symbol=" + symbol + "&interval=15m&limit=100";
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", klineUrl, true);
+  xhr.onload = function() {
+    if (xhr.status !== 200) { bilgiKutu.innerHTML = '<div class="empty">Binance verisi alinamadi</div>'; return; }
+    var mumlar;
+    try { mumlar = JSON.parse(xhr.responseText); } catch (e) { return; }
+    if (!Array.isArray(mumlar) || mumlar.length === 0) { bilgiKutu.innerHTML = '<div class="empty">Veri alinamadi</div>'; return; }
+
+    var closes = mumlar.map(function(m) { return parseFloat(m[4]); });
+    var son96 = closes.slice(-96);
+    var destek = Math.min.apply(null, son96);
+    var direnc = Math.max.apply(null, son96);
+    var rsi = ddRsiHesapla(closes, 14);
+    var guncelFiyat = closes[closes.length - 1];
+
+    var candleData = mumlar.map(function(m) {
+      return { time: Math.floor(m[0] / 1000), open: parseFloat(m[1]), high: parseFloat(m[2]), low: parseFloat(m[3]), close: parseFloat(m[4]) };
+    });
+
+    // Botun sinyal-tara() ile AYNI kosul: desteğe/dirence %0.3 yakinlik + RSI esigi
+    var sinyalKosulu = null;
+    if ((guncelFiyat - destek) / guncelFiyat < 0.003 && rsi <= 35) sinyalKosulu = "LONG (destek + RSI dusuk)";
+    else if ((direnc - guncelFiyat) / guncelFiyat < 0.003 && rsi >= 65) sinyalKosulu = "SHORT (direnc + RSI yuksek)";
+
+    ddGrafikCiz(candleData, destek, direnc);
+
+    // Bu coin icin su an ACIK bir Oda2 sinyali var mi - backend'den kontrol
+    var xhr2 = new XMLHttpRequest();
+    xhr2.open("GET", API + "/sinyaller/SINYAL_ODA_2", true);
+    xhr2.setRequestHeader("X-Auth-Token", authToken || "");
+    xhr2.onload = function() {
+      var acikSinyal = null;
+      if (xhr2.status === 200) {
+        try {
+          var veri = JSON.parse(xhr2.responseText);
+          var liste = veri.sinyaller || [];
+          for (var i = 0; i < liste.length; i++) {
+            if (liste[i].sembol === symbol && liste[i].durum === "aktif") { acikSinyal = liste[i]; break; }
+          }
+        } catch (e) {}
+      }
+
+      var html = "";
+      html += ddSeviyeSatiri("Güncel Fiyat", guncelFiyat, "#e2e8f0");
+      html += ddSeviyeSatiri("Destek (24s)", destek, "#3b82f6");
+      html += ddSeviyeSatiri("Direnç (24s)", direnc, "#f59e0b");
+      html += ddSeviyeSatiri("RSI (14)", rsi, rsi <= 35 ? "#4ade80" : (rsi >= 65 ? "#f87171" : "#e2e8f0"));
+      if (sinyalKosulu) html += ddSeviyeSatiri("Sinyal Koşulu", sinyalKosulu, "#fbbf24");
+
+      if (acikSinyal) {
+        html += '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #1e293b">' +
+          '<div style="color:#e2e8f0;font-weight:600;margin-bottom:4px">📍 Açık Sinyal: ' + acikSinyal.yon + '</div></div>';
+        html += ddSeviyeSatiri("Giriş/Maliyet", acikSinyal.maliyet, "#e2e8f0");
+        html += ddSeviyeSatiri("Hedef (TP)", acikSinyal.hedef, "#4ade80");
+        html += ddSeviyeSatiri("Stop", acikSinyal.stop, "#f87171");
+        html += ddSeviyeSatiri("E1", acikSinyal.e1, "#fbbf24");
+        html += ddSeviyeSatiri("E2", acikSinyal.e2, "#fbbf24");
+        html += ddSeviyeSatiri("E3", acikSinyal.e3, "#fbbf24");
+      } else {
+        html += '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #1e293b;color:#475569">Bu coin icin su an acik bir sinyal yok.</div>';
+      }
+      bilgiKutu.innerHTML = html;
+
+      ddPriceLinelerCiz(acikSinyal, destek, direnc);
+    };
+    xhr2.onerror = function() { bilgiKutu.innerHTML = '<div class="empty">Sinyal verisi alinamadi</div>'; };
+    xhr2.send();
+  };
+  xhr.onerror = function() { bilgiKutu.innerHTML = '<div class="empty">Binance verisi alinamadi</div>'; };
+  xhr.send();
+}
+
+function ddGrafikCiz(candleData, destek, direnc) {
+  var kutu = document.getElementById("dd-chart");
+  if (!ddChart) {
+    ddChart = LightweightCharts.createChart(kutu, {
+      layout: { background: { color: "#0a0f1e" }, textColor: "#94a3b8" },
+      grid: { vertLines: { color: "#141d33" }, horzLines: { color: "#141d33" } },
+      timeScale: { timeVisible: true, borderColor: "#1e293b" },
+      rightPriceScale: { borderColor: "#1e293b" },
+      width: kutu.clientWidth, height: 400
+    });
+    ddSeries = ddChart.addCandlestickSeries({
+      upColor: "#4ade80", downColor: "#f87171", borderVisible: false,
+      wickUpColor: "#4ade80", wickDownColor: "#f87171"
+    });
+    window.addEventListener("resize", function() { if (ddChart) ddChart.applyOptions({ width: kutu.clientWidth }); });
+  }
+  ddSeries.setData(candleData);
+}
+
+function ddPriceLinelerCiz(acikSinyal, destek, direnc) {
+  if (!ddSeries) return;
+  for (var i = 0; i < ddPriceLines.length; i++) { try { ddSeries.removePriceLine(ddPriceLines[i]); } catch (e) {} }
+  ddPriceLines = [];
+
+  function ekle(fiyat, renk, baslik, stil) {
+    if (fiyat === null || fiyat === undefined) return;
+    ddPriceLines.push(ddSeries.createPriceLine({
+      price: fiyat, color: renk, lineWidth: 1,
+      lineStyle: stil !== undefined ? stil : LightweightCharts.LineStyle.Dashed,
+      axisLabelVisible: true, title: baslik
+    }));
+  }
+
+  ekle(destek, "#3b82f6", "Destek");
+  ekle(direnc, "#f59e0b", "Direnç");
+
+  if (acikSinyal) {
+    ekle(acikSinyal.maliyet, "#e2e8f0", "Giriş", LightweightCharts.LineStyle.Solid);
+    ekle(acikSinyal.hedef, "#4ade80", "Hedef", LightweightCharts.LineStyle.Solid);
+    ekle(acikSinyal.stop, "#f87171", "Stop", LightweightCharts.LineStyle.Solid);
+    ekle(acikSinyal.e1, "#fbbf24", "E1", LightweightCharts.LineStyle.Dotted);
+    ekle(acikSinyal.e2, "#fbbf24", "E2", LightweightCharts.LineStyle.Dotted);
+    ekle(acikSinyal.e3, "#fbbf24", "E3", LightweightCharts.LineStyle.Dotted);
+  }
+}
+
 
 function altinFiyatFormatla(v) {
   return v.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
