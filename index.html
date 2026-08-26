@@ -592,6 +592,7 @@
   </div>
 
   <div id="yonetici" style="display:none">
+    <div id="yonetici-bakim-icerik" style="margin-bottom:14px"></div>
     <div id="yonetici-buyume-icerik"></div>
     <div id="yonetici-ziyaret-icerik"></div>
     <div id="yonetici-icerik"><div class="loading">Yukleniyor...</div></div>
@@ -844,6 +845,23 @@ function botAdi(bot) {
 var sonSinyalVerisiJSON = null;
 var sinyalVerisiDegistiMi = true; // ilk yuklemede her zaman ciz
 
+function bakimEkraniGoster() {
+  if (document.getElementById("bakim-overlay")) return;
+  var el = document.createElement("div");
+  el.id = "bakim-overlay";
+  el.style.cssText = "position:fixed;inset:0;background:#0a0f1e;z-index:99999;display:flex;" +
+    "align-items:center;justify-content:center;text-align:center;padding:24px";
+  el.innerHTML = '<div><div style="font-size:40px;margin-bottom:14px">🔧</div>' +
+    '<div style="color:#e2e8f0;font-size:16px;font-weight:600;max-width:320px;margin:0 auto">' +
+    'Sistem şu anda bakımda.<br>Kısa süre içinde tekrar hizmetinizdeyiz.</div></div>';
+  document.body.appendChild(el);
+}
+
+function bakimEkraniGizle() {
+  var el = document.getElementById("bakim-overlay");
+  if (el) el.remove();
+}
+
 function veriYukle() {
   canliYayinKontrolEt();
 
@@ -851,6 +869,8 @@ function veriYukle() {
   xhr.open("GET", API + "/sinyaller", true);
   xhr.setRequestHeader("X-Auth-Token", authToken || "");
   xhr.onload = function() {
+    if (xhr.status === 503) { bakimEkraniGoster(); return; }
+    bakimEkraniGizle();
     if (xhr.status === 200) {
       sinyalVerisiDegistiMi = (xhr.responseText !== sonSinyalVerisiJSON);
       sonSinyalVerisiJSON = xhr.responseText;
@@ -4220,11 +4240,48 @@ function sekmeAc(id, el) {
   // gostermek icin sekme her acildiginda render edilir, otomatik veri
   // cekmez (sadece kullanicinin kendi sorgusuyla tetiklenir).
   if (id === "analiz") { kriptoAnalizGoster(); hisseAnalizGoster(); bistAnalizGoster(); }
-  if (id === "yonetici") buyumePaneliGoster();
+  if (id === "yonetici") { buyumePaneliGoster(); bakimModuGoster(); }
   if (id === "piyasa") altinFiyatlariGoster();
   if (id === "genelbakis") genelBakisDoldur("genelbakis-icerik");
   if (id === "coinperformans") coinPerformansGoster();
   if (id === "destekdirenc") ddSekmeIlkYukle();
+}
+
+// ==================== BAKIM MODU (YONETICI) ====================
+function bakimModuGoster() {
+  var kutu = document.getElementById("yonetici-bakim-icerik");
+  if (!kutu) return;
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/admin/bakim-modu", true);
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status !== 200) { kutu.innerHTML = ""; return; }
+    var v = JSON.parse(xhr.responseText);
+    bakimModuCiz(v.bakim_modu);
+  };
+  xhr.send();
+}
+
+function bakimModuCiz(aktif) {
+  var kutu = document.getElementById("yonetici-bakim-icerik");
+  if (!kutu) return;
+  var renk = aktif ? "#ef4444" : "#22c55e";
+  var etiket = aktif ? "🔴 BAKIM MODU AÇIK (sadece siz erişebilirsiniz)" : "🟢 Site herkese açık";
+  kutu.innerHTML =
+    '<button onclick="bakimModuDegistir()" style="width:100%;background:' + renk + ';color:#fff;border:none;' +
+    'padding:14px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">' + etiket + '</button>';
+}
+
+function bakimModuDegistir() {
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/admin/bakim-modu/degistir", true);
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status !== 200) return;
+    var v = JSON.parse(xhr.responseText);
+    bakimModuCiz(v.bakim_modu);
+  };
+  xhr.send();
 }
 
 // ==================== DESTEK/DIRENÇ SEKMESİ ====================
