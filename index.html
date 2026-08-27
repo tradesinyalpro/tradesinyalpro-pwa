@@ -561,9 +561,17 @@
   </div>
 
   <div id="destekdirenc" style="display:none;padding:8px 12px">
-    <div style="margin-bottom:10px">
-      <select id="dd-coin-sec" onchange="ddCoinDegisti()"
-        style="width:100%;background:#0a0f1e;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px"></select>
+    <div style="position:relative;margin-bottom:10px">
+      <input id="dd-arama" type="text" placeholder="Coin ara (orn: BTC, ETH, SOL...)" autocomplete="off"
+        oninput="ddAramaFiltrele()" onfocus="ddAramaFiltrele()"
+        style="width:100%;background:#0a0f1e;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px">
+      <div id="dd-arama-sonuc" style="display:none;position:absolute;top:44px;left:0;right:0;max-height:280px;overflow-y:auto;background:#0f1729;border:1px solid #1e293b;border-radius:10px;z-index:50"></div>
+    </div>
+    <div id="dd-secili-coin" style="font-weight:700;font-size:16px;color:#e2e8f0;margin-bottom:8px"></div>
+    <div class="bot-filter" style="margin-bottom:10px">
+      <button class="bot-btn active" id="dd-zaman-15m" onclick="ddZamanDegistir('15m',this)">15 Dakika</button>
+      <button class="bot-btn" id="dd-zaman-1h" onclick="ddZamanDegistir('1h',this)">1 Saat</button>
+      <button class="bot-btn" id="dd-zaman-4h" onclick="ddZamanDegistir('4h',this)">4 Saat</button>
     </div>
     <div id="dd-seviye-bilgi" style="font-size:12.5px;color:#94a3b8;margin-bottom:10px;line-height:1.7"></div>
     <div id="dd-chart" style="width:100%;height:400px;border-radius:10px;overflow:hidden;background:#0a0f1e"></div>
@@ -4289,26 +4297,77 @@ function bakimModuDegistir() {
 // stratejisi burada AYNEN (bot koduyla birebir aynı formulle) JS'e
 // tasinir - boylece grafikte gosterilen seviyeler botun GERCEK mantigina
 // sadik kalir, uydurma/genel bir teknik analiz DEGILDIR.
-var DD_COINS = ["BTCUSDT","EGLDUSDT","ETHUSDT","SOLUSDT","LINKUSDT","AVAXUSDT","COMPUSDT",
-  "ETCUSDT","LTCUSDT","INJUSDT","BNBUSDT","ATOMUSDT","NEOUSDT","YFIUSDT","BCHUSDT",
-  "AAVEUSDT","OPUSDT","NMRUSDT","APTUSDT","TAOUSDT","HYPEUSDT","DOTUSDT","ADAUSDT",
-  "NEARUSDT","TIAUSDT","XMRUSDT","GASUSDT","DASHUSDT","XRPUSDT","ZENUSDT","ZECUSDT","ORDIUSDT"];
-var ddChart = null, ddSeries = null, ddPriceLines = [], ddSeciliCoin = "BTCUSDT", ddIlkYuklendi = false, ddSonCizilenCoin = null;
+var ddChart = null, ddSeries = null, ddPriceLines = [], ddSeciliCoin = "BTCUSDT", ddSeciliZaman = "15m",
+  ddIlkYuklendi = false, ddSonCizilenAnahtar = null, DD_TOP100 = [], DD_TOP100_YUKLENDI = false;
 
 function ddSekmeIlkYukle() {
   if (!ddIlkYuklendi) {
-    var sec = document.getElementById("dd-coin-sec");
-    var html = "";
-    for (var i = 0; i < DD_COINS.length; i++) html += '<option value="' + DD_COINS[i] + '">' + DD_COINS[i] + '</option>';
-    sec.innerHTML = html;
-    sec.value = ddSeciliCoin;
     ddIlkYuklendi = true;
+    document.getElementById("dd-secili-coin").textContent = ddSeciliCoin;
+    // Disariya tiklaninca arama sonuc kutusunu kapat
+    document.addEventListener("click", function(e) {
+      var kutu = document.getElementById("dd-arama-sonuc");
+      var girdi = document.getElementById("dd-arama");
+      if (!kutu || !girdi) return;
+      if (e.target !== kutu && e.target !== girdi && !kutu.contains(e.target)) kutu.style.display = "none";
+    });
   }
+  if (!DD_TOP100_YUKLENDI) ddTop100Yukle();
   ddYukle(ddSeciliCoin);
 }
 
-function ddCoinDegisti() {
-  ddSeciliCoin = document.getElementById("dd-coin-sec").value;
+function ddTop100Yukle() {
+  // Binance'in KENDI 24 saatlik hacim verisinden (harici bir kaynaga -orn.
+  // CoinGecko- ihtiyac duymadan, ekstra rate-limit riski almadan) hacme gore
+  // ilk 100 USDT-M perpetual sozlesmeyi ceker. "Binance'te bulunma sarti"
+  // bu sayede zaten otomatik saglanmis olur.
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", "https://fapi.binance.com/fapi/v1/ticker/24hr", true);
+  xhr.onload = function() {
+    if (xhr.status !== 200) return;
+    try {
+      var liste = JSON.parse(xhr.responseText);
+      var usdtli = liste.filter(function(x) { return x.symbol.endsWith("USDT"); });
+      usdtli.sort(function(a, b) { return parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume); });
+      DD_TOP100 = usdtli.slice(0, 100).map(function(x) { return x.symbol; });
+      DD_TOP100_YUKLENDI = true;
+    } catch (e) {}
+  };
+  xhr.send();
+}
+
+function ddAramaFiltrele() {
+  var kutu = document.getElementById("dd-arama-sonuc");
+  var deger = document.getElementById("dd-arama").value.trim().toUpperCase();
+  var liste = DD_TOP100.length ? DD_TOP100 : [ddSeciliCoin];
+  var filtreli = deger ? liste.filter(function(s) { return s.indexOf(deger) !== -1; }) : liste;
+  if (!filtreli.length) {
+    kutu.innerHTML = '<div style="padding:12px;color:#475569;font-size:13px">Sonuc bulunamadi</div>';
+  } else {
+    var html = "";
+    for (var i = 0; i < filtreli.length; i++) {
+      html += '<div onclick="ddCoinSec(\'' + filtreli[i] + '\')" ' +
+        'style="padding:11px 14px;cursor:pointer;border-bottom:1px solid #1e293b;color:#e2e8f0;font-size:13.5px">' +
+        filtreli[i] + '</div>';
+    }
+    kutu.innerHTML = html;
+  }
+  kutu.style.display = "block";
+}
+
+function ddCoinSec(symbol) {
+  ddSeciliCoin = symbol;
+  document.getElementById("dd-secili-coin").textContent = symbol;
+  document.getElementById("dd-arama").value = "";
+  document.getElementById("dd-arama-sonuc").style.display = "none";
+  ddYukle(ddSeciliCoin);
+}
+
+function ddZamanDegistir(zaman, el) {
+  ddSeciliZaman = zaman;
+  var butonlar = document.querySelectorAll("#destekdirenc .bot-btn");
+  for (var i = 0; i < butonlar.length; i++) butonlar[i].classList.remove("active");
+  el.classList.add("active");
   ddYukle(ddSeciliCoin);
 }
 
@@ -4340,7 +4399,7 @@ function ddYukle(symbol) {
   var chartKutu = document.getElementById("dd-chart");
   if (!bilgiKutu || !chartKutu) return;
 
-  var klineUrl = "https://fapi.binance.com/fapi/v1/klines?symbol=" + symbol + "&interval=15m&limit=288";
+  var klineUrl = "https://fapi.binance.com/fapi/v1/klines?symbol=" + symbol + "&interval=" + ddSeciliZaman + "&limit=288";
   var xhr = new XMLHttpRequest();
   xhr.open("GET", klineUrl, true);
   xhr.onload = function() {
@@ -4365,8 +4424,9 @@ function ddYukle(symbol) {
     if ((guncelFiyat - destek) / guncelFiyat < 0.003 && rsi <= 35) sinyalKosulu = "LONG (destek + RSI dusuk)";
     else if ((direnc - guncelFiyat) / guncelFiyat < 0.003 && rsi >= 65) sinyalKosulu = "SHORT (direnc + RSI yuksek)";
 
-    var coinDegisti = (symbol !== ddSonCizilenCoin);
-    ddSonCizilenCoin = symbol;
+    var anahtar = symbol + "_" + ddSeciliZaman;
+    var coinDegisti = (anahtar !== ddSonCizilenAnahtar);
+    ddSonCizilenAnahtar = anahtar;
     ddGrafikCiz(candleData, destek, direnc, coinDegisti);
 
     // Bu coin icin su an ACIK bir Oda2 sinyali var mi - backend'den kontrol
