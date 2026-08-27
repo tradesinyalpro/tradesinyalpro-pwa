@@ -571,6 +571,7 @@
     <div class="bot-filter" style="margin-bottom:10px">
       <button class="bot-btn active" id="dd-zaman-15m" onclick="ddZamanDegistir('15m',this)">15 Dakika</button>
       <button class="bot-btn" id="dd-zaman-1h" onclick="ddZamanDegistir('1h',this)">1 Saat</button>
+      <button class="bot-btn" onclick="olcumAraciToggle(this,'dd-chart')" title="Olcum araci: grafikte suruklayin">📏 Olcum</button>
     </div>
     <div id="dd-seviye-bilgi" style="font-size:12.5px;color:#94a3b8;margin-bottom:10px;line-height:1.7"></div>
     <div id="dd-chart" style="width:100%;height:400px;border-radius:10px;overflow:hidden;background:#0a0f1e"></div>
@@ -1420,6 +1421,105 @@ function zamanDilimiSec(btn) {
 // gizli olmayan bilgiler oldugu icin sorun yok.
 var kartChart = null, kartSeries = null, kartPriceLines = [], kartSonAnahtar = null, kartKutuRef = null;
 
+// ==================== PAYLASILAN OLCUM ARACI (Destek/Direnc + Kart grafikleri) ====================
+// Kutuphanenin (lightweight-charts) kendi ciziyicisi yok - fiyat/zaman
+// koordinatlarini elle okuyup, suruklerken kucuk bir bilgi kutusu (yuzde
+// fark, fiyat farki, sure) gosteren basit ama guvenilir bir uygulama.
+// Document seviyesindeki mousemove/mouseup/touch dinleyicileri SADECE BIR KEZ
+// eklenir (asagida) - her grafik yeniden olusturuldugunda (orn. kart her 10sn
+// yenilendiginde) TEKRAR document'a listener eklemek, eski (artik olu) grafik
+// instance'larina referans tutan listener'larin sonsuza kadar birikmesine
+// (bellek/performans sizintisi) yol acardi. Bunun yerine tek, paylasilan bir
+// "aktif surukleme" durumu tutulur; hangi kutu/chart/seri o an aktifse o
+// kullanilir.
+var OLCUM_DURUM = { suruklemede: false, baslangic: null, kutu: null, chartAl: null, seriAl: null, etiket: null };
+var OLCUM_DOCUMENT_KURULDU = false;
+
+function olcumNoktaAl(e, kutu, chartAl, seriAl) {
+  var rect = kutu.getBoundingClientRect();
+  var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  var clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  var x = clientX - rect.left, y = clientY - rect.top;
+  var chart = chartAl(), seri = seriAl();
+  if (!chart || !seri) return null;
+  var fiyat = seri.coordinateToPrice(y);
+  var zaman = chart.timeScale().coordinateToTime(x);
+  return { x: x, y: y, fiyat: fiyat, zaman: zaman };
+}
+
+function olcumEtiketGuncelle(b, s) {
+  var etiket = OLCUM_DURUM.etiket;
+  if (!etiket || b.fiyat == null || s.fiyat == null) return;
+  var fark = s.fiyat - b.fiyat;
+  var yuzde = (fark / b.fiyat) * 100;
+  var renk = fark >= 0 ? "#4ade80" : "#f87171";
+  var sureMetin = "";
+  if (b.zaman && s.zaman) {
+    var saniyeFark = Math.abs(s.zaman - b.zaman);
+    if (saniyeFark >= 3600) sureMetin = " · " + (saniyeFark / 3600).toFixed(1) + " sa";
+    else if (saniyeFark >= 60) sureMetin = " · " + Math.round(saniyeFark / 60) + " dk";
+  }
+  etiket.innerHTML = '<span style="color:' + renk + ';font-weight:700">' + (fark >= 0 ? "+" : "") +
+    yuzde.toFixed(2) + '%</span> (' + (fark >= 0 ? "+" : "") + fark.toFixed(5) + ')' + sureMetin;
+  etiket.style.left = Math.max(0, Math.min(b.x, s.x)) + "px";
+  etiket.style.top = Math.max(0, Math.min(b.y, s.y) - 34) + "px";
+  etiket.style.display = "block";
+}
+
+function olcumDocumentListenerlariKur() {
+  if (OLCUM_DOCUMENT_KURULDU) return;
+  OLCUM_DOCUMENT_KURULDU = true;
+  function surukle(e) {
+    if (!OLCUM_DURUM.suruklemede || !OLCUM_DURUM.baslangic) return;
+    var simdi = olcumNoktaAl(e, OLCUM_DURUM.kutu, OLCUM_DURUM.chartAl, OLCUM_DURUM.seriAl);
+    if (simdi) olcumEtiketGuncelle(OLCUM_DURUM.baslangic, simdi);
+  }
+  function birak() { OLCUM_DURUM.suruklemede = false; }
+  document.addEventListener("mousemove", surukle);
+  document.addEventListener("mouseup", birak);
+  document.addEventListener("touchmove", surukle, { passive: false });
+  document.addEventListener("touchend", birak);
+}
+
+function grafikOlcumAraciKur(kutuId, chartAl, seriAl) {
+  olcumDocumentListenerlariKur();
+  var kutu = document.getElementById(kutuId);
+  if (!kutu || kutu.getAttribute("data-olcum-kuruldu")) return;
+  kutu.setAttribute("data-olcum-kuruldu", "1");
+  kutu.style.position = "relative";
+
+  var etiket = document.createElement("div");
+  etiket.style.cssText = "position:absolute;display:none;background:#0f1729;border:1px solid #3b82f6;" +
+    "color:#e2e8f0;padding:6px 10px;border-radius:8px;font-size:12px;pointer-events:none;z-index:30;white-space:nowrap";
+  kutu.appendChild(etiket);
+
+  function basla(e) {
+    if (kutu.getAttribute("data-olcum-aktif") !== "1") return;
+    var b = olcumNoktaAl(e, kutu, chartAl, seriAl);
+    if (!b) return;
+    OLCUM_DURUM = { suruklemede: true, baslangic: b, kutu: kutu, chartAl: chartAl, seriAl: seriAl, etiket: etiket };
+    e.preventDefault();
+  }
+  // kutu (kapsayici) elemana eklenen bu dinleyiciler GUVENLIDIR - eleman
+  // DOM'dan kaldirilip cop toplandiginda (her yeniden render'da olan budur)
+  // bu dinleyiciler de onunla birlikte yok olur, document'a eklenenler gibi
+  // BIRIKMEZ.
+  kutu.addEventListener("mousedown", basla);
+  kutu.addEventListener("touchstart", basla, { passive: false });
+
+  kutu._olcumEtiketGizle = function() { etiket.style.display = "none"; OLCUM_DURUM.suruklemede = false; };
+}
+
+function olcumAraciToggle(btn, kutuId) {
+  var kutu = document.getElementById(kutuId);
+  if (!kutu) return;
+  var aktif = kutu.getAttribute("data-olcum-aktif") === "1";
+  aktif = !aktif;
+  kutu.setAttribute("data-olcum-aktif", aktif ? "1" : "0");
+  btn.classList.toggle("aktif", aktif);
+  if (!aktif && kutu._olcumEtiketGizle) kutu._olcumEtiketGizle();
+}
+
 function kartAktifSinyalBul() {
   if (!secilenKartAnahtari || !tumVeriler) return null;
   var parcalar = secilenKartAnahtari.split("|");
@@ -1489,6 +1589,7 @@ function kartLwGrafikGuncelle(sembol) {
         var k = document.getElementById("kart-lw-chart");
         if (kartChart && k) kartChart.applyOptions({ width: k.clientWidth });
       });
+      grafikOlcumAraciKur("kart-lw-chart", function() { return kartChart; }, function() { return kartSeries; });
     }
 
     if (yeniden) {
@@ -2943,7 +3044,7 @@ function sinyalleriGoster() {
     html += '<div class="sig-header"><div class="sig-symbol"><span class="sig-symbol-tikla" onclick="kartSec(\'' + kartAnahtari.replace(/'/g, "\\'") + '\')">#' + s.sembol + '</span>' + yildizHtml + takipHtml + gorselBtnHtml + kapatBtnHtml + '</div>';
     html += '<div class="sig-badges">' + pnlHtml + '<span class="badge ' + cls + '">' + yon + '</span>';
     html += '<span class="badge bot">' + botAdi(bot) + '</span>' + fundingRateHtml + '</div></div>';
-    html += canliFiyatHtml;
+    html += genisletilmisMi ? "" : canliFiyatHtml;
 
     var satirlar = [
       { etiket: "Giris", deger: (s.giris || s.maliyet || "-"), renk: "" },
@@ -2964,8 +3065,32 @@ function sinyalleriGoster() {
       satirlarHtml += '</div>';
     }
 
+    // Genisletilmis (tam ekran) kart, Destek/Direnc sekmesiyle GORSEL OLARAK
+    // BIREBIR AYNI liste stilini kullanir (ayni ddSeviyeSatiri() satir
+    // formati) - eski kutulu "ANLIK FIYAT/ROI" widget'i ve duz metin listesi
+    // yerine gecer. Sadece genisletilmis goruntude - kucuk/kapali kart hala
+    // eski, kompakt gorunumu (satirlarHtml) kullanmaya devam eder.
+    var genisBilgiHtml = "";
+    if (genisletilmisMi) {
+      var yonRengi = yon === "LONG" ? "#22c55e" : "#ef4444";
+      genisBilgiHtml += ddSeviyeSatiri("Guncel Fiyat", canliFiyat || "-", "#e2e8f0");
+      genisBilgiHtml += '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #1e293b">' +
+        '<div style="font-weight:700;margin-bottom:4px">📍 Acik Sinyal: <span style="color:' + yonRengi + '">' + yon + '</span></div></div>';
+      genisBilgiHtml += ddSeviyeSatiri("Giris/Maliyet", (s.giris || s.maliyet || "-"), "#e2e8f0");
+      genisBilgiHtml += ddSeviyeSatiri("Hedef (TP)", (s.hedef || "-"), "#4ade80");
+      genisBilgiHtml += ddSeviyeSatiri("Stop", (s.stop || "-"), "#f87171");
+      if (s.e1) genisBilgiHtml += ddSeviyeSatiri("E1", s.e1, "#fbbf24");
+      if (s.e2) genisBilgiHtml += ddSeviyeSatiri("E2", s.e2, "#fbbf24");
+      if (s.e3) genisBilgiHtml += ddSeviyeSatiri("E3", s.e3, "#fbbf24");
+      if (pnlYuzde !== null) {
+        genisBilgiHtml += '<div style="margin-top:6px;padding-top:6px;border-top:1px dashed #1e293b;display:flex;justify-content:space-between">' +
+          '<span>Pozisyon Durumu</span><span style="font-weight:700;color:' + (pnlPozitif ? "#4ade80" : "#f87171") + '">' +
+          (pnlPozitif ? "+ %" : "- %") + Math.abs(pnlYuzde).toFixed(1) + '</span></div>';
+      }
+    }
+
     html += '<div class="sig-stats-row">';
-    html += '<div class="sig-stats-left">' + satirlarHtml + '</div>';
+    html += '<div class="sig-stats-left">' + (genisletilmisMi ? genisBilgiHtml : satirlarHtml) + '</div>';
     html += '<div class="sig-stats-chart">';
     if (genisletilmisMi) {
       var aktifZaman = mumZamanDilimiAl(s.sembol);
@@ -2973,6 +3098,7 @@ function sinyalleriGoster() {
       html += '<button type="button" class="cizim-btn zaman-btn' + (aktifZaman === "15m" ? " aktif" : "") + '" data-interval="15m" data-sembol="' + s.sembol + '" onclick="zamanDilimiSec(this)">15dk</button>';
       html += '<button type="button" class="cizim-btn zaman-btn' + (aktifZaman === "1h" ? " aktif" : "") + '" data-interval="1h" data-sembol="' + s.sembol + '" onclick="zamanDilimiSec(this)">1sa</button>';
       html += '<button type="button" class="cizim-btn zaman-btn' + (aktifZaman === "4h" ? " aktif" : "") + '" data-interval="4h" data-sembol="' + s.sembol + '" onclick="zamanDilimiSec(this)">4sa</button>';
+      html += '<button type="button" class="cizim-btn" onclick="olcumAraciToggle(this,\'kart-lw-chart\')" title="Olcum araci: grafikte suruklayin">📏</button>';
       html += '</div>';
       html += '<div id="kart-lw-chart" data-sembol="' + s.sembol + '" style="width:100%;height:280px;border-radius:10px;overflow:hidden;background:#0a0f1e"></div>';
     } else {
@@ -4623,6 +4749,7 @@ function ddGrafikCiz(candleData, destek, direnc, coinDegisti) {
       wickUpColor: "#4ade80", wickDownColor: "#f87171"
     });
     window.addEventListener("resize", function() { if (ddChart) ddChart.applyOptions({ width: kutu.clientWidth }); });
+    grafikOlcumAraciKur("dd-chart", function() { return ddChart; }, function() { return ddSeries; });
   }
 
   if (coinDegisti || ilkOlusturma) {
