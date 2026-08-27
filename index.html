@@ -832,7 +832,7 @@ function kartKapat() {
   var kapananSembol = secilenKartAnahtari.split("|")[1];
   if (kapananSembol) delete mumZamanDilimi[kapananSembol];
   secilenKartAnahtari = null;
-  if (kartChart) { try { kartChart.remove(); } catch (e) {} kartChart = null; kartSeries = null; kartKutuRef = null; kartSonAnahtar = null; }
+  if (kartChart) { try { kartChart.remove(); } catch (e) {} kartChart = null; kartSeries = null; kartKutuRef = null; kartSonAnahtar = null; kartSonGorunenAralik = null; }
   kartBackdropGuncelle();
   sinyalleriGoster();
 }
@@ -1419,7 +1419,7 @@ function zamanDilimiSec(btn) {
 // ya uydurma ya da (gercek esikleri gostersek) stratejiyi ifsa eden bir sey
 // olurdu. Giris/Hedef/Stop/E1-E2-E3 zaten Veriler sekmesinde acikca gorunen,
 // gizli olmayan bilgiler oldugu icin sorun yok.
-var kartChart = null, kartSeries = null, kartPriceLines = [], kartSonAnahtar = null, kartKutuRef = null;
+var kartChart = null, kartSeries = null, kartPriceLines = [], kartSonAnahtar = null, kartKutuRef = null, kartSonGorunenAralik = null;
 
 // ==================== PAYLASILAN OLCUM ARACI (Destek/Direnc + Kart grafikleri) ====================
 // Kutuphanenin (lightweight-charts) kendi ciziyicisi yok - fiyat/zaman
@@ -1558,20 +1558,32 @@ function kartLwGrafikGuncelle(sembol) {
     });
 
     var anahtar = sembol + "_" + interval;
-    var yeniden = (anahtar !== kartSonAnahtar) || !kartChart || kartKutuRef !== kutu2;
-    kartSonAnahtar = anahtar;
+    var coinDegisti = (anahtar !== kartSonAnahtar);
 
     // Kart kapatilip acildiginda veya periyodik yenilemede DOM konteyneri
-    // BASTAN YARATILIYOR (sinyalleriGoster() innerHTML ile) - eski grafik
-    // instance'i artik kopmus (detached) bir node'a bagli kaliyordu. Bu
-    // yuzden konteynerin GERCEKTEN degisip degismedigini kontrol edip,
-    // degistiyse eski grafigi temizce yok edip yeniden olusturuyoruz.
+    // BASTAN YARATILIYOR (sinyalleriGoster() innerHTML ile) - bu, "kullanici
+    // GERCEKTEN farkli bir coin/zaman dilimi mi secti" sorusundan TAMAMEN
+    // BAGIMSIZ bir durum. Onceki halde bu ikisi karistirilmisti: DOM
+    // yenilendiginde (ki bu SIK sIK, her veri guncellemesinde oluyor) her
+    // seferinde sifirdan olceklemek yapiliyordu - kullanicinin yakinlastirdigi
+    // yer surekli sifirlaniyordu. Simdi: DOM node degistiyse (grafik
+    // instance'i yeniden kurulmasi ZORUNLU) once ESKI gorunen araligi
+    // kaydediyoruz (sadece coin/zaman AYNIYSA), yeni instance'ta o araligi
+    // GERI YUKLUYORUZ - boylece kullanicinin yakinlastirmasi, kartı KAPATIP
+    // ACANA kadar korunuyor.
     if (kartChart && kartKutuRef !== kutu2) {
+      if (!coinDegisti) {
+        try { kartSonGorunenAralik = kartChart.timeScale().getVisibleLogicalRange(); } catch (e) {}
+      } else {
+        kartSonGorunenAralik = null;
+      }
       try { kartChart.remove(); } catch (e) {}
       kartChart = null;
       kartSeries = null;
     }
+    var yeniKuruldu = !kartChart;
     kartKutuRef = kutu2;
+    kartSonAnahtar = anahtar;
 
     if (!kartChart) {
       kartChart = LightweightCharts.createChart(kutu2, {
@@ -1592,11 +1604,24 @@ function kartLwGrafikGuncelle(sembol) {
       grafikOlcumAraciKur("kart-lw-chart", function() { return kartChart; }, function() { return kartSeries; });
     }
 
-    if (yeniden) {
+    if (coinDegisti) {
+      // Gercekten farkli bir coin veya zaman dilimi secildi - sifirdan olcekle
+      kartSeries.priceScale().applyOptions({ autoScale: true });
+      kartSeries.setData(candleData);
+      kartChart.timeScale().fitContent();
+    } else if (yeniKuruldu && kartSonGorunenAralik) {
+      // Ayni coin/zaman ama DOM yeniden yaratildigi icin instance de yeniden
+      // kuruldu - kullanicinin ONCEKI yakinlastirma/kaydirma durumunu geri yukle
+      kartSeries.setData(candleData);
+      try { kartChart.timeScale().setVisibleLogicalRange(kartSonGorunenAralik); } catch (e) {}
+    } else if (yeniKuruldu) {
+      // Ayni coin/zaman, ilk kez aciliyor, kaydedilmis bir gorunum yok - normal fit
       kartSeries.priceScale().applyOptions({ autoScale: true });
       kartSeries.setData(candleData);
       kartChart.timeScale().fitContent();
     } else {
+      // Ayni coin/zaman, grafik instance'i HALA AYAKTA (DOM degismedi) -
+      // normal canli guncelleme, mevcut gorunumu aynen koru
       var gorunenAralik = kartChart.timeScale().getVisibleLogicalRange();
       kartSeries.setData(candleData);
       if (gorunenAralik) kartChart.timeScale().setVisibleLogicalRange(gorunenAralik);
