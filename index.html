@@ -1453,15 +1453,33 @@ function olcumEtiketGuncelle(b, s) {
   if (!etiket || b.fiyat == null || s.fiyat == null) return;
   var fark = s.fiyat - b.fiyat;
   var yuzde = (fark / b.fiyat) * 100;
-  var renk = fark >= 0 ? "#4ade80" : "#f87171";
+  var pozitif = fark >= 0;
+  var renk = pozitif ? "#4ade80" : "#f87171";
   var sureMetin = "";
   if (b.zaman && s.zaman) {
     var saniyeFark = Math.abs(s.zaman - b.zaman);
     if (saniyeFark >= 3600) sureMetin = " · " + (saniyeFark / 3600).toFixed(1) + " sa";
     else if (saniyeFark >= 60) sureMetin = " · " + Math.round(saniyeFark / 60) + " dk";
   }
-  etiket.innerHTML = '<span style="color:' + renk + ';font-weight:700">' + (fark >= 0 ? "+" : "") +
-    yuzde.toFixed(2) + '%</span> (' + (fark >= 0 ? "+" : "") + fark.toFixed(5) + ')' + sureMetin;
+
+  // TradingView'daki gibi baslangictan bitise kadar olan ALANI (dikdortgen)
+  // da gosteriyoruz - boylece nereden nereye olculdugu ACIKCA gorulur,
+  // sadece kayan bir etiket yeterli olmuyordu.
+  var dikdortgen = OLCUM_DURUM.dikdortgen;
+  if (dikdortgen) {
+    var solX = Math.min(b.x, s.x), sagX = Math.max(b.x, s.x);
+    var ustY = Math.min(b.y, s.y), altY = Math.max(b.y, s.y);
+    dikdortgen.style.left = solX + "px";
+    dikdortgen.style.top = ustY + "px";
+    dikdortgen.style.width = (sagX - solX) + "px";
+    dikdortgen.style.height = (altY - ustY) + "px";
+    dikdortgen.style.background = pozitif ? "rgba(74,222,128,0.12)" : "rgba(248,113,113,0.12)";
+    dikdortgen.style.borderColor = renk;
+    dikdortgen.style.display = "block";
+  }
+
+  etiket.innerHTML = '<span style="color:' + renk + ';font-weight:700">' + (pozitif ? "+" : "") +
+    yuzde.toFixed(2) + '%</span> (' + (pozitif ? "+" : "") + fark.toFixed(5) + ')' + sureMetin;
   etiket.style.left = Math.max(0, Math.min(b.x, s.x)) + "px";
   etiket.style.top = Math.max(0, Math.min(b.y, s.y) - 34) + "px";
   etiket.style.display = "block";
@@ -1501,11 +1519,17 @@ function grafikOlcumAraciKur(kutuId, chartAl, seriAl) {
     "color:#e2e8f0;padding:6px 10px;border-radius:8px;font-size:12px;pointer-events:none;z-index:30;white-space:nowrap";
   kutu.appendChild(etiket);
 
+  // TradingView benzeri secim dikdortgeni - baslangic ile bitis arasindaki
+  // ALANI gorsel olarak (golgeli + kenarlik) gosterir.
+  var dikdortgen = document.createElement("div");
+  dikdortgen.style.cssText = "position:absolute;display:none;border:1px dashed;pointer-events:none;z-index:25;box-sizing:border-box";
+  kutu.appendChild(dikdortgen);
+
   function basla(e) {
     if (kutu.getAttribute("data-olcum-aktif") !== "1") return;
     var b = olcumNoktaAl(e, kutu, chartAl, seriAl);
     if (!b) return;
-    OLCUM_DURUM = { suruklemede: true, baslangic: b, kutu: kutu, chartAl: chartAl, seriAl: seriAl, etiket: etiket };
+    OLCUM_DURUM = { suruklemede: true, baslangic: b, kutu: kutu, chartAl: chartAl, seriAl: seriAl, etiket: etiket, dikdortgen: dikdortgen };
     e.preventDefault();
     // lightweight-charts kendi fare/dokunma olaylarini (grafigi kaydirma/
     // yakinlastirma icin) AYNI elemanda dinliyor ve olasilikla stopPropagation
@@ -1535,7 +1559,7 @@ function grafikOlcumAraciKur(kutuId, chartAl, seriAl) {
   kutu.addEventListener("touchmove", olcumSurukleIsle, { passive: false, capture: true });
   kutu.addEventListener("touchend", olcumBirakIsle, true);
 
-  kutu._olcumEtiketGizle = function() { etiket.style.display = "none"; OLCUM_DURUM.suruklemede = false; };
+  kutu._olcumEtiketGizle = function() { etiket.style.display = "none"; dikdortgen.style.display = "none"; OLCUM_DURUM.suruklemede = false; };
 }
 
 function olcumAraciToggle(btn, kutuId) {
