@@ -4750,7 +4750,11 @@ function girisYap() {
       sessizSaatBaslangic = yanit.sessiz_saat_baslangic;
       sessizSaatBitis = yanit.sessiz_saat_bitis;
       localStorage.setItem("ts_token", authToken);
-      girisBasarili();
+      if (yanit.sifre_degistirme_zorunlu) {
+        zorunluSifreDegistirEkraniGoster(sifre);
+      } else {
+        girisBasarili();
+      }
     } else {
       hataEl.textContent = yanit.hata || "Giris basarisiz";
       hataEl.style.display = "block";
@@ -4904,6 +4908,59 @@ function cikisYap() {
   document.getElementById("auth-ekrani").style.display = "flex";
   formDegistir("giris");
   document.documentElement.classList.remove("admin-secim-acik");
+}
+
+function zorunluSifreDegistirEkraniGoster(eskiSifre) {
+  if (document.getElementById("zorunlu-sifre-overlay")) return;
+  var el = document.createElement("div");
+  el.id = "zorunlu-sifre-overlay";
+  el.style.cssText = "position:fixed;inset:0;background:#0a0f1e;z-index:99999;display:flex;" +
+    "align-items:center;justify-content:center;padding:24px";
+  el.innerHTML =
+    '<div style="max-width:320px;width:100%">' +
+    '<div style="font-size:36px;text-align:center;margin-bottom:10px">🔑</div>' +
+    '<div style="color:#e2e8f0;font-size:15px;font-weight:600;text-align:center;margin-bottom:18px">' +
+    'Yöneticiniz şifrenizi sıfırladı. Devam etmeden önce yeni bir şifre belirlemeniz gerekiyor.</div>' +
+    '<div class="auth-error" id="zorunlu-sifre-hata" style="display:none"></div>' +
+    '<input class="auth-input" id="zorunlu-sifre-yeni" type="password" placeholder="Yeni sifre (en az 6 karakter)">' +
+    '<input class="auth-input" id="zorunlu-sifre-tekrar" type="password" placeholder="Yeni sifre (tekrar)">' +
+    '<button class="auth-btn" onclick="zorunluSifreDegistirGonder()">Şifreyi Belirle ve Devam Et</button>' +
+    '</div>';
+  document.body.appendChild(el);
+  window._zorunluEskiSifre = eskiSifre;
+}
+
+function zorunluSifreDegistirGonder() {
+  var yeni = document.getElementById("zorunlu-sifre-yeni").value;
+  var tekrar = document.getElementById("zorunlu-sifre-tekrar").value;
+  var hataEl = document.getElementById("zorunlu-sifre-hata");
+  hataEl.style.display = "none";
+  if (yeni.length < 6) {
+    hataEl.textContent = "Yeni sifre en az 6 karakter olmalidir";
+    hataEl.style.display = "block";
+    return;
+  }
+  if (yeni !== tekrar) {
+    hataEl.textContent = "Sifreler eslesmiyor";
+    hataEl.style.display = "block";
+    return;
+  }
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/sifre_degistir", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      var el = document.getElementById("zorunlu-sifre-overlay");
+      if (el) el.remove();
+      girisBasarili();
+    } else {
+      var yanit; try { yanit = JSON.parse(xhr.responseText); } catch (e) { yanit = {}; }
+      hataEl.textContent = yanit.hata || "Bir hata olustu, tekrar deneyin";
+      hataEl.style.display = "block";
+    }
+  };
+  xhr.send(JSON.stringify({ eski_sifre: window._zorunluEskiSifre, yeni_sifre: yeni }));
 }
 
 function girisBasarili() {
