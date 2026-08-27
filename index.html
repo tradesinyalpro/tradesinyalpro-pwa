@@ -833,7 +833,7 @@ function kartKapat() {
   var kapananSembol = secilenKartAnahtari.split("|")[1];
   if (kapananSembol) delete mumZamanDilimi[kapananSembol];
   secilenKartAnahtari = null;
-  if (kartChart) { try { kartChart.remove(); } catch (e) {} kartChart = null; kartSeries = null; kartKutuRef = null; kartSonAnahtar = null; kartSonGorunenAralik = null; }
+  if (kartChart) { try { kartChart.remove(); } catch (e) {} kartChart = null; kartSeries = null; kartKutuRef = null; kartSonAnahtar = null; }
   kartBackdropGuncelle();
   sinyalleriGoster();
 }
@@ -1420,7 +1420,7 @@ function zamanDilimiSec(btn) {
 // ya uydurma ya da (gercek esikleri gostersek) stratejiyi ifsa eden bir sey
 // olurdu. Giris/Hedef/Stop/E1-E2-E3 zaten Veriler sekmesinde acikca gorunen,
 // gizli olmayan bilgiler oldugu icin sorun yok.
-var kartChart = null, kartSeries = null, kartPriceLines = [], kartSonAnahtar = null, kartKutuRef = null, kartSonGorunenAralik = null;
+var kartChart = null, kartSeries = null, kartPriceLines = [], kartSonAnahtar = null, kartKutuRef = null;
 
 // ==================== PAYLASILAN OLCUM ARACI (Destek/Direnc + Kart grafikleri) ====================
 // Kutuphanenin (lightweight-charts) kendi ciziyicisi yok - fiyat/zaman
@@ -1467,19 +1467,26 @@ function olcumEtiketGuncelle(b, s) {
   etiket.style.display = "block";
 }
 
+function olcumSurukleIsle(e) {
+  if (!OLCUM_DURUM.suruklemede || !OLCUM_DURUM.baslangic) return;
+  var simdi = olcumNoktaAl(e, OLCUM_DURUM.kutu, OLCUM_DURUM.chartAl, OLCUM_DURUM.seriAl);
+  if (simdi) olcumEtiketGuncelle(OLCUM_DURUM.baslangic, simdi);
+}
+function olcumBirakIsle() { OLCUM_DURUM.suruklemede = false; }
+
 function olcumDocumentListenerlariKur() {
   if (OLCUM_DOCUMENT_KURULDU) return;
   OLCUM_DOCUMENT_KURULDU = true;
-  function surukle(e) {
-    if (!OLCUM_DURUM.suruklemede || !OLCUM_DURUM.baslangic) return;
-    var simdi = olcumNoktaAl(e, OLCUM_DURUM.kutu, OLCUM_DURUM.chartAl, OLCUM_DURUM.seriAl);
-    if (simdi) olcumEtiketGuncelle(OLCUM_DURUM.baslangic, simdi);
-  }
-  function birak() { OLCUM_DURUM.suruklemede = false; }
-  document.addEventListener("mousemove", surukle);
-  document.addEventListener("mouseup", birak);
-  document.addEventListener("touchmove", surukle, { passive: false });
-  document.addEventListener("touchend", birak);
+  // Bunlar YEDEK/genel dinleyiciler - fare, olcum yapilan kutunun disina
+  // (surukleme sirasinda) cikarsa bile calismaya devam etmesi icin document
+  // seviyesinde. grafikOlcumAraciKur() ayrica kutu'nun kendi uzerine de
+  // CAPTURE asamasinda ayni fonksiyonlari ekler (asagida) - bu, lightweight-
+  // charts'in kendi surukleme/kaydirma dinleyicisi olayi durdursa (stopPropagation)
+  // bile bizim kodumuzun ONCE calismasini garanti eder.
+  document.addEventListener("mousemove", olcumSurukleIsle);
+  document.addEventListener("mouseup", olcumBirakIsle);
+  document.addEventListener("touchmove", olcumSurukleIsle, { passive: false });
+  document.addEventListener("touchend", olcumBirakIsle);
 }
 
 function grafikOlcumAraciKur(kutuId, chartAl, seriAl) {
@@ -1500,13 +1507,33 @@ function grafikOlcumAraciKur(kutuId, chartAl, seriAl) {
     if (!b) return;
     OLCUM_DURUM = { suruklemede: true, baslangic: b, kutu: kutu, chartAl: chartAl, seriAl: seriAl, etiket: etiket };
     e.preventDefault();
+    // lightweight-charts kendi fare/dokunma olaylarini (grafigi kaydirma/
+    // yakinlastirma icin) AYNI elemanda dinliyor ve olasilikla stopPropagation
+    // cagiriyor - bu da bizim olayimizin hic tetiklenmemesine ya da sadece
+    // "tek tikla kalma" gibi davranmasina yol aciyordu. stopPropagation ile
+    // olayin kutuphaneye ULASMASINI ENGELLIYORUZ (sadece olcum aktifken).
+    e.stopPropagation();
   }
-  // kutu (kapsayici) elemana eklenen bu dinleyiciler GUVENLIDIR - eleman
-  // DOM'dan kaldirilip cop toplandiginda (her yeniden render'da olan budur)
-  // bu dinleyiciler de onunla birlikte yok olur, document'a eklenenler gibi
-  // BIRIKMEZ.
-  kutu.addEventListener("mousedown", basla);
-  kutu.addEventListener("touchstart", basla, { passive: false });
+  // ONEMLI: mousedown/touchstart dinleyicileri CAPTURE ASAMASINDA (3. param
+  // = true) eklenir - boylece bizim kodumuz, lightweight-charts'in kendi
+  // (bubble asamasindaki) dinleyicisinden ONCE calisir ve yukaridaki
+  // stopPropagation'i kutuphaneye ULASMADAN once devreye sokabilir. Normal
+  // (bubble asamasi) dinleyici kullansaydik, kutuphane muhtemelen olayi
+  // BIZDEN ONCE yakalayip kendi surukleme/kaydirma davranisini
+  // baslatiyordu, bizim surukleme mantigimiz hic devreye giremiyordu.
+  //
+  // Bu dinleyiciler (kutu.addEventListener) GUVENLIDIR - eleman DOM'dan
+  // kaldirilip cop toplandiginda bu dinleyiciler de onunla birlikte yok
+  // olur, document'a eklenenler gibi BIRIKMEZ.
+  kutu.addEventListener("mousedown", basla, true);
+  kutu.addEventListener("touchstart", basla, { passive: false, capture: true });
+  // mousemove/mouseup icin de kutu-seviyesinde, capture asamasinda ek
+  // dinleyiciler - lightweight-charts'in kendi surukleme davranisi devreye
+  // girmeden ONCE bizim etiketimizin guncellenmesini garantiler.
+  kutu.addEventListener("mousemove", olcumSurukleIsle, true);
+  kutu.addEventListener("mouseup", olcumBirakIsle, true);
+  kutu.addEventListener("touchmove", olcumSurukleIsle, { passive: false, capture: true });
+  kutu.addEventListener("touchend", olcumBirakIsle, true);
 
   kutu._olcumEtiketGizle = function() { etiket.style.display = "none"; OLCUM_DURUM.suruklemede = false; };
 }
@@ -1561,19 +1588,18 @@ function kartLwGrafikGuncelle(sembol) {
     var anahtar = sembol + "_" + interval;
     var coinDegisti = (anahtar !== kartSonAnahtar);
 
-    // Kart kapatilip acildiginda veya periyodik yenilemede DOM konteyneri
-    // BASTAN YARATILIYOR (sinyalleriGoster() innerHTML ile, DOM yok
-    // edilmeden HEMEN ONCE gorunen aralik zaten yukarida kaydedildi) - bu,
-    // "kullanici GERCEKTEN farkli bir coin/zaman dilimi mi secti" sorusundan
-    // TAMAMEN BAGIMSIZ bir durum. Burada sadece: DOM node degistiyse eski
-    // (artik kopuk) grafik instance'ini temizce yok edip yeniden kuruyoruz.
+    // sinyalleriGoster() artik acik kartin grafik dugumunu (varsa) DOM'dan
+    // sokup ayni sembolse GERI TAKIYOR (bkz. o fonksiyondaki yorum) - bu
+    // sayede BURADA "kartKutuRef !== kutu2" NORMALDE artik yalnizca GERCEKTEN
+    // yeni bir kart acildiginda (ilk kez, ya da farkli bir coin secildiginde)
+    // dogru olur. Chart instance boylece coin/zaman degismedigi surece HIC
+    // yok edilip yeniden kurulmuyor - zoom/pan durumu dogal olarak korunur.
     if (kartChart && kartKutuRef !== kutu2) {
       try { kartChart.remove(); } catch (e) {}
       kartChart = null;
       kartSeries = null;
     }
-    if (coinDegisti) kartSonGorunenAralik = null;
-    var yeniKuruldu = !kartChart;
+    var yeniden = coinDegisti || !kartChart;
     kartKutuRef = kutu2;
     kartSonAnahtar = anahtar;
 
@@ -1583,7 +1609,7 @@ function kartLwGrafikGuncelle(sembol) {
         grid: { vertLines: { color: "#141d33" }, horzLines: { color: "#141d33" } },
         timeScale: { timeVisible: true, borderColor: "#1e293b" },
         rightPriceScale: { borderColor: "#1e293b" },
-        width: kutu2.clientWidth, height: 280
+        width: kutu2.clientWidth, height: 400
       });
       kartSeries = kartChart.addCandlestickSeries({
         upColor: "#4ade80", downColor: "#f87171", borderVisible: false,
@@ -1596,27 +1622,15 @@ function kartLwGrafikGuncelle(sembol) {
       grafikOlcumAraciKur("kart-lw-chart", function() { return kartChart; }, function() { return kartSeries; });
     }
 
-    if (coinDegisti) {
-      // Gercekten farkli bir coin veya zaman dilimi secildi - sifirdan olcekle
-      kartSeries.priceScale().applyOptions({ autoScale: true });
-      kartSeries.setData(candleData);
-      kartChart.timeScale().fitContent();
-    } else if (yeniKuruldu && kartSonGorunenAralik) {
-      // Ayni coin/zaman ama DOM yeniden yaratildigi icin instance de yeniden
-      // kuruldu - kullanicinin ONCEKI yakinlastirma/kaydirma durumunu geri yukle
-      kartSeries.setData(candleData);
-      try { kartChart.timeScale().setVisibleLogicalRange(kartSonGorunenAralik); } catch (e) {}
-    } else if (yeniKuruldu) {
-      // Ayni coin/zaman, ilk kez aciliyor, kaydedilmis bir gorunum yok - normal fit
+    if (yeniden) {
+      // Gercekten farkli bir coin/zaman dilimi secildi (ya da ilk acilis) - sifirdan olcekle
       kartSeries.priceScale().applyOptions({ autoScale: true });
       kartSeries.setData(candleData);
       kartChart.timeScale().fitContent();
     } else {
-      // Ayni coin/zaman, grafik instance'i HALA AYAKTA (DOM degismedi) -
-      // normal canli guncelleme, mevcut gorunumu aynen koru
-      var gorunenAralik = kartChart.timeScale().getVisibleLogicalRange();
+      // Ayni coin/zaman, AYNI chart instance hala ayakta - sadece veriyi
+      // guncelle, kullanicinin yakinlastirma/kaydirma durumuna DOKUNMA
       kartSeries.setData(candleData);
-      if (gorunenAralik) kartChart.timeScale().setVisibleLogicalRange(gorunenAralik);
     }
 
     for (var i = 0; i < kartPriceLines.length; i++) { try { kartSeries.removePriceLine(kartPriceLines[i]); } catch (e) {} }
@@ -3117,7 +3131,7 @@ function sinyalleriGoster() {
       html += '<button type="button" class="cizim-btn zaman-btn' + (aktifZaman === "4h" ? " aktif" : "") + '" data-interval="4h" data-sembol="' + s.sembol + '" onclick="zamanDilimiSec(this)">4sa</button>';
       html += '<button type="button" class="cizim-btn" onclick="olcumAraciToggle(this,\'kart-lw-chart\')" title="Olcum araci: grafikte suruklayin">📏</button>';
       html += '</div>';
-      html += '<div id="kart-lw-chart" data-sembol="' + s.sembol + '" style="width:100%;height:280px;border-radius:10px;overflow:hidden;background:#0a0f1e"></div>';
+      html += '<div id="kart-lw-chart" data-sembol="' + s.sembol + '" style="width:100%;height:400px;border-radius:10px;overflow:hidden;background:#0a0f1e"></div>';
     } else {
       html += '<div class="mum-grafik-yer" data-sembol="' + s.sembol + '" style="width:100%;min-height:40px;text-align:center"><span style="font-size:10px;color:#475569">Grafik yukleniyor...</span></div>';
     }
@@ -3149,20 +3163,36 @@ function sinyalleriGoster() {
     html += '<div class="sig-time">' + (s.zaman || "") + '</div></div>';
   }
   if (hepsi.length === 0) html = '<div class="empty">Su an aktif veri yok</div>';
-  // ONEMLI: DOM'u ("sinyal-listesi" icindeki her sey, grafik konteyneri
-  // dahil) yok etmeden HEMEN ONCE, acik olan grafik varsa GORUNEN ARALIGINI
-  // kaydediyoruz - cunku grafik DOM'dan koptuktan (asagidaki innerHTML
-  // atamasindan) SONRA bu bilgiyi okumaya calismak (eskiden XHR'in async
-  // callback'i icinde yapiliyordu) genellikle GECERSIZ/sifirlanmis bir
-  // deger dondurup yakinlastirmanin kaybolmasina yol aciyordu.
+  // ONEMLI: Acik bir grafik karti varsa, tum listeyi yok eden innerHTML
+  // atamasindan ONCE o TEK grafik dugumunu (canvas'i, zoom/pan durumuyla
+  // BIRLIKTE) DOM'dan sokup JS degiskeninde CANLI tutuyoruz - chart
+  // instance'i hic yok edilmiyor/yeniden kurulmuyor. innerHTML atamasindan
+  // SONRA, ayni yerde olusan YENI (bos) yer tutucuyu bu ESKI dugumle
+  // DEGISTIRIYORUZ. Boylece kullanicinin yakinlastirma/kaydirma durumu
+  // MUTLAK sekilde korunur - "araligi kaydet/geri yukle" gibi tahmine
+  // dayali bir yontem gerekmez, cunku nesnenin kendisi hic bozulmuyor.
+  var korunanGrafikDugumu = null;
   if (kartChart && secilenKartAnahtari) {
-    try { kartSonGorunenAralik = kartChart.timeScale().getVisibleLogicalRange(); } catch (e) {}
+    var oncekiKutu = document.getElementById("kart-lw-chart");
+    if (oncekiKutu) {
+      korunanGrafikDugumu = oncekiKutu;
+      oncekiKutu.remove();
+    }
   }
   document.getElementById("sinyal-listesi").innerHTML = html;
   mumGrafikleriYukle();
   if (secilenKartAnahtari) {
     var acikSembol = secilenKartAnahtari.split("|")[1];
-    if (acikSembol) kartLwGrafikGuncelle(acikSembol);
+    if (acikSembol) {
+      if (korunanGrafikDugumu && korunanGrafikDugumu.getAttribute("data-sembol") === acikSembol) {
+        var yeniYerTutucu = document.getElementById("kart-lw-chart");
+        if (yeniYerTutucu && yeniYerTutucu.parentNode) {
+          yeniYerTutucu.parentNode.replaceChild(korunanGrafikDugumu, yeniYerTutucu);
+          kartKutuRef = korunanGrafikDugumu;
+        }
+      }
+      kartLwGrafikGuncelle(acikSembol);
+    }
   }
 }
 
