@@ -1507,6 +1507,40 @@ function olcumDocumentListenerlariKur() {
   document.addEventListener("touchend", olcumBirakIsle);
 }
 
+function grafikOhlcBilgisiKur(kutuId, chartObj, seriesObj) {
+  var kutu = document.getElementById(kutuId);
+  if (!kutu || kutu.getAttribute("data-ohlc-kuruldu")) return;
+  kutu.setAttribute("data-ohlc-kuruldu", "1");
+  kutu.style.position = "relative";
+
+  var bilgiKutusu = document.createElement("div");
+  bilgiKutusu.style.cssText = "position:absolute;top:6px;left:8px;display:none;background:rgba(15,23,41,0.92);" +
+    "border:1px solid #1e293b;color:#e2e8f0;padding:6px 10px;border-radius:8px;font-size:11.5px;" +
+    "pointer-events:none;z-index:20;white-space:nowrap;line-height:1.6";
+  kutu.appendChild(bilgiKutusu);
+
+  chartObj.subscribeCrosshairMove(function(param) {
+    if (!param || !param.time || !param.seriesData || !param.seriesData.size) {
+      bilgiKutusu.style.display = "none";
+      return;
+    }
+    var veri = param.seriesData.get(seriesObj);
+    if (!veri || veri.open == null) { bilgiKutusu.style.display = "none"; return; }
+    var tarih = new Date(param.time * 1000);
+    var iki = function(n) { return String(n).padStart(2, "0"); };
+    var saatMetin = iki(tarih.getDate()) + "." + iki(tarih.getMonth() + 1) + " " + iki(tarih.getHours()) + ":" + iki(tarih.getMinutes());
+    var yukselis = veri.close >= veri.open;
+    var kapanisRenk = yukselis ? "#4ade80" : "#f87171";
+    bilgiKutusu.innerHTML =
+      '<div style="color:#94a3b8">' + saatMetin + '</div>' +
+      '<div>Açılış: <span style="color:#e2e8f0;font-weight:600">' + veri.open + '</span></div>' +
+      '<div>Yüksek: <span style="color:#4ade80;font-weight:600">' + veri.high + '</span></div>' +
+      '<div>Düşük: <span style="color:#f87171;font-weight:600">' + veri.low + '</span></div>' +
+      '<div>Kapanış: <span style="color:' + kapanisRenk + ';font-weight:600">' + veri.close + '</span></div>';
+    bilgiKutusu.style.display = "block";
+  });
+}
+
 function grafikOlcumAraciKur(kutuId, chartAl, seriAl) {
   olcumDocumentListenerlariKur();
   var kutu = document.getElementById(kutuId);
@@ -1644,6 +1678,7 @@ function kartLwGrafikGuncelle(sembol) {
         if (kartChart && k) kartChart.applyOptions({ width: k.clientWidth });
       });
       grafikOlcumAraciKur("kart-lw-chart", function() { return kartChart; }, function() { return kartSeries; });
+      grafikOhlcBilgisiKur("kart-lw-chart", kartChart, kartSeries);
     }
 
     if (yeniden) {
@@ -4908,6 +4943,7 @@ function ddGrafikCiz(candleData, destek, direnc, coinDegisti) {
     });
     window.addEventListener("resize", function() { if (ddChart) ddChart.applyOptions({ width: kutu.clientWidth }); });
     grafikOlcumAraciKur("dd-chart", function() { return ddChart; }, function() { return ddSeries; });
+    grafikOhlcBilgisiKur("dd-chart", ddChart, ddSeries);
   }
 
   if (coinDegisti || ilkOlusturma) {
