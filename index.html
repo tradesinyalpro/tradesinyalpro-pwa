@@ -603,6 +603,7 @@
     <div id="yonetici-bakim-icerik" style="margin-bottom:14px"></div>
     <div id="yonetici-buyume-icerik"></div>
     <div id="yonetici-ziyaret-icerik"></div>
+    <div id="yonetici-guvenlik-icerik"></div>
     <div id="yonetici-icerik"><div class="loading">Yukleniyor...</div></div>
   </div>
 
@@ -4516,7 +4517,7 @@ function sekmeAc(id, el) {
   // gostermek icin sekme her acildiginda render edilir, otomatik veri
   // cekmez (sadece kullanicinin kendi sorgusuyla tetiklenir).
   if (id === "analiz") { kriptoAnalizGoster(); hisseAnalizGoster(); bistAnalizGoster(); }
-  if (id === "yonetici") { buyumePaneliGoster(); bakimModuGoster(); }
+  if (id === "yonetici") { buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); }
   if (id === "piyasa") altinFiyatlariGoster();
   if (id === "genelbakis") genelBakisDoldur("genelbakis-icerik");
   if (id === "coinperformans") coinPerformansGoster();
@@ -4558,6 +4559,84 @@ function bakimModuDegistir() {
     bakimModuCiz(v.bakim_modu);
   };
   xhr.send();
+}
+
+// ==================== GUVENLIK PANELI (YONETICI) ====================
+// Misafir ziyaretleri (konum/cihaz), basarisiz giris denemeleri ve istek
+// sikligi (rate limit) ihlallerini gosterir - sadece admin gorebilir.
+function guvenlikBasligi(baslik) {
+  return '<div class="section-title" style="margin-top:16px">' + baslik + '</div>';
+}
+
+function guvenlikPaneliGoster() {
+  var kutu = document.getElementById("yonetici-guvenlik-icerik");
+  if (!kutu) return;
+  var html = '';
+
+  function istekAt(yol, isle) {
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", API + yol, true);
+    xhr.setRequestHeader("X-Auth-Token", authToken || "");
+    xhr.onload = function() { if (xhr.status === 200) isle(JSON.parse(xhr.responseText)); };
+    xhr.send();
+  }
+
+  // 1) Misafir ziyaretleri
+  istekAt("/admin/misafir-ziyaretleri", function(v) {
+    var h = guvenlikBasligi("Misafir Ziyaretleri (kayit olmadan giren/cikan) - son " + (v.misafirler || []).length);
+    if (!v.misafirler || !v.misafirler.length) {
+      h += '<div class="empty" style="padding:10px 0">Henuz misafir ziyareti kaydedilmedi</div>';
+    } else {
+      for (var i = 0; i < Math.min(v.misafirler.length, 50); i++) {
+        var m = v.misafirler[i];
+        h += '<div class="signal-card" style="margin-bottom:6px;padding:10px 14px">' +
+          '<div style="display:flex;justify-content:space-between;font-size:12.5px">' +
+          '<span>' + (m.sehir !== "-" ? m.sehir + ", " : "") + m.ulke + ' · ' + m.cihaz + '</span>' +
+          '<span style="color:#64748b">' + m.ip + '</span></div>' +
+          '<div class="sig-time">' + m.zaman + '</div></div>';
+      }
+    }
+    document.getElementById("guvenlik-misafir-icerik").innerHTML = h;
+  });
+
+  // 2) Basarisiz giris denemeleri
+  istekAt("/admin/basarisiz-girisler", function(v) {
+    var h = guvenlikBasligi("Basarisiz Giris Denemeleri");
+    if (!v.basarisiz_girisler || !v.basarisiz_girisler.length) {
+      h += '<div class="empty" style="padding:10px 0">Su an basarisiz deneme/kilit yok</div>';
+    } else {
+      for (var i = 0; i < v.basarisiz_girisler.length; i++) {
+        var b = v.basarisiz_girisler[i];
+        var kilitli = b.kilit_bitis ? '<span class="badge short">Kilitli: ' + b.kilit_bitis + '</span>' : '';
+        h += '<div class="signal-card" style="margin-bottom:6px;padding:10px 14px">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px">' +
+          '<span>' + b.kullanici_adi + ' · ' + b.sayac + ' deneme · IP: ' + (b.son_ip || "-") + '</span>' + kilitli + '</div></div>';
+      }
+    }
+    document.getElementById("guvenlik-basarisiz-icerik").innerHTML = h;
+  });
+
+  // 3) Rate limit ihlalleri
+  istekAt("/admin/rate-limit-ihlalleri", function(v) {
+    var h = guvenlikBasligi("Anormal Istek Yogunlugu (olasi saldiri/tarama)");
+    if (!v.ihlaller || !v.ihlaller.length) {
+      h += '<div class="empty" style="padding:10px 0">Su an isaretlenmis bir IP yok</div>';
+    } else {
+      for (var i = 0; i < v.ihlaller.length; i++) {
+        var r = v.ihlaller[i];
+        h += '<div class="signal-card" style="margin-bottom:6px;padding:10px 14px">' +
+          '<div style="display:flex;justify-content:space-between;font-size:12.5px">' +
+          '<span>IP: ' + r.ip + ' · ' + r.sayac + ' kez sinir asildi</span>' +
+          '<span style="color:#64748b">' + (r.son_zaman || "-") + '</span></div></div>';
+      }
+    }
+    document.getElementById("guvenlik-ratelimit-icerik").innerHTML = h;
+  });
+
+  kutu.innerHTML =
+    '<div id="guvenlik-basarisiz-icerik"></div>' +
+    '<div id="guvenlik-ratelimit-icerik"></div>' +
+    '<div id="guvenlik-misafir-icerik"></div>';
 }
 
 // ==================== DESTEK/DIRENÇ SEKMESİ ====================
@@ -5613,6 +5692,11 @@ function yoneticiPaneliGoster() {
       html += '<div class="sig-time">Kayit: ' + (u.olusturma_tarihi || "-") + '</div>';
       if (u.onay_tarihi) html += '<div class="sig-time">Onay: ' + u.onay_tarihi + '</div>';
       if (u.ilk_onay_no) html += '<div class="sig-time" style="color:#60a5fa">İlk üye #' + u.ilk_onay_no + '</div>';
+      if (u.son_giris_zaman) {
+        html += '<div class="sig-row"><span class="sig-key">Son Giris</span><span class="sig-val" style="font-size:11px">' +
+          (u.son_giris_sehir !== "-" ? u.son_giris_sehir + ", " : "") + (u.son_giris_ulke || "-") +
+          ' · ' + (u.son_giris_cihaz || "-") + ' · ' + u.son_giris_zaman + '</span></div>';
+      }
       if (u.durum === "bekliyor") {
         html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciDenemeBaslat(\'' + u.kullanici_adi + '\')">Deneme Baslat (3 Gun)</button></div>';
       }
