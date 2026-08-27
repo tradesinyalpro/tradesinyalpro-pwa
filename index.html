@@ -1562,26 +1562,17 @@ function kartLwGrafikGuncelle(sembol) {
     var coinDegisti = (anahtar !== kartSonAnahtar);
 
     // Kart kapatilip acildiginda veya periyodik yenilemede DOM konteyneri
-    // BASTAN YARATILIYOR (sinyalleriGoster() innerHTML ile) - bu, "kullanici
-    // GERCEKTEN farkli bir coin/zaman dilimi mi secti" sorusundan TAMAMEN
-    // BAGIMSIZ bir durum. Onceki halde bu ikisi karistirilmisti: DOM
-    // yenilendiginde (ki bu SIK sIK, her veri guncellemesinde oluyor) her
-    // seferinde sifirdan olceklemek yapiliyordu - kullanicinin yakinlastirdigi
-    // yer surekli sifirlaniyordu. Simdi: DOM node degistiyse (grafik
-    // instance'i yeniden kurulmasi ZORUNLU) once ESKI gorunen araligi
-    // kaydediyoruz (sadece coin/zaman AYNIYSA), yeni instance'ta o araligi
-    // GERI YUKLUYORUZ - boylece kullanicinin yakinlastirmasi, kartı KAPATIP
-    // ACANA kadar korunuyor.
+    // BASTAN YARATILIYOR (sinyalleriGoster() innerHTML ile, DOM yok
+    // edilmeden HEMEN ONCE gorunen aralik zaten yukarida kaydedildi) - bu,
+    // "kullanici GERCEKTEN farkli bir coin/zaman dilimi mi secti" sorusundan
+    // TAMAMEN BAGIMSIZ bir durum. Burada sadece: DOM node degistiyse eski
+    // (artik kopuk) grafik instance'ini temizce yok edip yeniden kuruyoruz.
     if (kartChart && kartKutuRef !== kutu2) {
-      if (!coinDegisti) {
-        try { kartSonGorunenAralik = kartChart.timeScale().getVisibleLogicalRange(); } catch (e) {}
-      } else {
-        kartSonGorunenAralik = null;
-      }
       try { kartChart.remove(); } catch (e) {}
       kartChart = null;
       kartSeries = null;
     }
+    if (coinDegisti) kartSonGorunenAralik = null;
     var yeniKuruldu = !kartChart;
     kartKutuRef = kutu2;
     kartSonAnahtar = anahtar;
@@ -3158,6 +3149,15 @@ function sinyalleriGoster() {
     html += '<div class="sig-time">' + (s.zaman || "") + '</div></div>';
   }
   if (hepsi.length === 0) html = '<div class="empty">Su an aktif veri yok</div>';
+  // ONEMLI: DOM'u ("sinyal-listesi" icindeki her sey, grafik konteyneri
+  // dahil) yok etmeden HEMEN ONCE, acik olan grafik varsa GORUNEN ARALIGINI
+  // kaydediyoruz - cunku grafik DOM'dan koptuktan (asagidaki innerHTML
+  // atamasindan) SONRA bu bilgiyi okumaya calismak (eskiden XHR'in async
+  // callback'i icinde yapiliyordu) genellikle GECERSIZ/sifirlanmis bir
+  // deger dondurup yakinlastirmanin kaybolmasina yol aciyordu.
+  if (kartChart && secilenKartAnahtari) {
+    try { kartSonGorunenAralik = kartChart.timeScale().getVisibleLogicalRange(); } catch (e) {}
+  }
   document.getElementById("sinyal-listesi").innerHTML = html;
   mumGrafikleriYukle();
   if (secilenKartAnahtari) {
