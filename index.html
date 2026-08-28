@@ -1539,12 +1539,24 @@ function grafikOhlcBilgisiKur(kutuId, chartObj, seriesObj) {
     var saatMetin = iki(tarih.getUTCDate()) + "." + iki(tarih.getUTCMonth() + 1) + " " + iki(tarih.getUTCHours()) + ":" + iki(tarih.getUTCMinutes());
     var yukselis = veri.close >= veri.open;
     var kapanisRenk = yukselis ? "#4ade80" : "#f87171";
+
+    // Aralik (Range) %: mumun tepe-dip arasindaki toplam fiyat hareketi,
+    // dip fiyata orani - mumun rengi ile ILISKILI DEGIL, her zaman notr renkte.
+    var araligYuzde = veri.low > 0 ? ((veri.high - veri.low) / veri.low * 100) : 0;
+
+    // Govde (Body) %: acilistan kapanisa kadar olan GERCEK fiyat degisimi -
+    // mum yesilse (yukselis) yesil, kirmizi ise (dususs) kirmizi gosterilir,
+    // yani mumun kendi rengiyle BIREBIR ayni mantik.
+    var govdeYuzde = veri.open > 0 ? ((veri.close - veri.open) / veri.open * 100) : 0;
+
     bilgiKutusu.innerHTML =
       '<div style="color:#94a3b8">' + saatMetin + '</div>' +
       '<div>Açılış: <span style="color:#e2e8f0;font-weight:600">' + veri.open + '</span></div>' +
       '<div>Yüksek: <span style="color:#4ade80;font-weight:600">' + veri.high + '</span></div>' +
       '<div>Düşük: <span style="color:#f87171;font-weight:600">' + veri.low + '</span></div>' +
-      '<div>Kapanış: <span style="color:' + kapanisRenk + ';font-weight:600">' + veri.close + '</span></div>';
+      '<div>Kapanış: <span style="color:' + kapanisRenk + ';font-weight:600">' + veri.close + '</span></div>' +
+      '<div style="margin-top:3px;padding-top:3px;border-top:1px solid #1e293b">Aralık: <span style="color:#94a3b8;font-weight:600">%' + araligYuzde.toFixed(2) + '</span></div>' +
+      '<div>Gövde: <span style="color:' + kapanisRenk + ';font-weight:600">' + (govdeYuzde >= 0 ? "+" : "") + '%' + govdeYuzde.toFixed(2) + '</span></div>';
     bilgiKutusu.style.display = "block";
   });
 }
