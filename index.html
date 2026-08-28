@@ -1555,8 +1555,8 @@ function grafikOhlcBilgisiKur(kutuId, chartObj, seriesObj) {
       '<div>Yüksek: <span style="color:#4ade80;font-weight:600">' + veri.high + '</span></div>' +
       '<div>Düşük: <span style="color:#f87171;font-weight:600">' + veri.low + '</span></div>' +
       '<div>Kapanış: <span style="color:' + kapanisRenk + ';font-weight:600">' + veri.close + '</span></div>' +
-      '<div style="margin-top:3px;padding-top:3px;border-top:1px solid #1e293b">Aralık: <span style="color:#94a3b8;font-weight:600">%' + araligYuzde.toFixed(2) + '</span></div>' +
-      '<div>Gövde: <span style="color:' + kapanisRenk + ';font-weight:600">' + (govdeYuzde >= 0 ? "+" : "") + '%' + govdeYuzde.toFixed(2) + '</span></div>';
+      '<div style="margin-top:3px;padding-top:3px;border-top:1px solid #1e293b">Range: <span style="color:#94a3b8;font-weight:600">%' + araligYuzde.toFixed(2) + '</span></div>' +
+      '<div>Değişim: <span style="color:' + kapanisRenk + ';font-weight:600">' + (govdeYuzde >= 0 ? "+" : "") + '%' + govdeYuzde.toFixed(2) + '</span></div>';
     bilgiKutusu.style.display = "block";
   });
 }
