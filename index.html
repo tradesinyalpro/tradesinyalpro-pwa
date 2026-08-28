@@ -1529,9 +1529,14 @@ function grafikOhlcBilgisiKur(kutuId, chartObj, seriesObj) {
     }
     var veri = param.seriesData.get(seriesObj);
     if (!veri || veri.open == null) { bilgiKutusu.style.display = "none"; return; }
+    // param.time, grafige verilirken TR saatine (UTC+3) gore KASITLI olarak
+    // kaydirilmis bir deger - bu yuzden burada getUTC*() kullanmak, HEM
+    // dogru Turkiye saatini verir HEM DE bu siteyi goruntuleyen kisinin
+    // KENDI tarayici saat diliminden TAMAMEN bagimsiz, her zaman ayni
+    // (dogru) sonucu uretir.
     var tarih = new Date(param.time * 1000);
     var iki = function(n) { return String(n).padStart(2, "0"); };
-    var saatMetin = iki(tarih.getDate()) + "." + iki(tarih.getMonth() + 1) + " " + iki(tarih.getHours()) + ":" + iki(tarih.getMinutes());
+    var saatMetin = iki(tarih.getUTCDate()) + "." + iki(tarih.getUTCMonth() + 1) + " " + iki(tarih.getUTCHours()) + ":" + iki(tarih.getUTCMinutes());
     var yukselis = veri.close >= veri.open;
     var kapanisRenk = yukselis ? "#4ade80" : "#f87171";
     bilgiKutusu.innerHTML =
@@ -1642,8 +1647,15 @@ function kartLwGrafikGuncelle(sembol) {
     var kutu2 = document.getElementById("kart-lw-chart");
     if (!kutu2 || kutu2.getAttribute("data-sembol") !== sembol) return;
 
+    // Kutuphane zaman damgalarini UTC olarak yorumlayip TARAYICININ YEREL
+    // saat dilimine gore etiketliyor - bu da Turkiye (UTC+3) disindaki bir
+    // sunucu/tarayici ortaminda grafigin 3 saat geriden gorunmesine yol
+    // aciyordu. Duzeltme: her mumun zaman damgasina TR_UTC_FARKI_SN (3 saat)
+    // ekleyip, kutuphaneye "sanki UTC+3'teymis gibi" bir deger veriyoruz -
+    // boylece etiketler dogru Turkiye saatini gosteriyor.
+    var TR_UTC_FARKI_SN = 3 * 60 * 60;
     var candleData = mumlar.map(function(m) {
-      return { time: Math.floor(m[0] / 1000), open: parseFloat(m[1]), high: parseFloat(m[2]), low: parseFloat(m[3]), close: parseFloat(m[4]) };
+      return { time: Math.floor(m[0] / 1000) + TR_UTC_FARKI_SN, open: parseFloat(m[1]), high: parseFloat(m[2]), low: parseFloat(m[3]), close: parseFloat(m[4]) };
     });
 
     var anahtar = sembol + "_" + interval;
@@ -4922,8 +4934,15 @@ function ddYukle(symbol) {
     var rsi = ddRsiHesapla(closes, 14);
     var guncelFiyat = closes[closes.length - 1];
 
+    // Kutuphane zaman damgalarini UTC olarak yorumlayip TARAYICININ YEREL
+    // saat dilimine gore etiketliyor - bu da Turkiye (UTC+3) disindaki bir
+    // sunucu/tarayici ortaminda grafigin 3 saat geriden gorunmesine yol
+    // aciyordu. Duzeltme: her mumun zaman damgasina TR_UTC_FARKI_SN (3 saat)
+    // ekleyip, kutuphaneye "sanki UTC+3'teymis gibi" bir deger veriyoruz -
+    // boylece etiketler dogru Turkiye saatini gosteriyor.
+    var TR_UTC_FARKI_SN = 3 * 60 * 60;
     var candleData = mumlar.map(function(m) {
-      return { time: Math.floor(m[0] / 1000), open: parseFloat(m[1]), high: parseFloat(m[2]), low: parseFloat(m[3]), close: parseFloat(m[4]) };
+      return { time: Math.floor(m[0] / 1000) + TR_UTC_FARKI_SN, open: parseFloat(m[1]), high: parseFloat(m[2]), low: parseFloat(m[3]), close: parseFloat(m[4]) };
     });
 
     // Botun sinyal-tara() ile AYNI kosul: desteğe/dirence %0.3 yakinlik + RSI esigi
