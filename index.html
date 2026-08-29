@@ -1767,6 +1767,7 @@ function kartLwGrafikGuncelle(sembol) {
 
     if (yeniden) {
       // Gercekten farkli bir coin/zaman dilimi secildi (ya da ilk acilis) - sifirdan olcekle
+      kartSeries.applyOptions({ priceFormat: fiyatPriceFormatAyari(candleData[candleData.length - 1].close) });
       kartSeries.priceScale().applyOptions({ autoScale: true });
       kartSeries.setData(candleData);
       kartChart.timeScale().fitContent();
@@ -2138,6 +2139,19 @@ function fiyatEtiketFormatla(v) {
   var s = v.toFixed(ondalik);
   if (s.indexOf(".") !== -1) s = s.replace(/0+$/, "").replace(/\.$/, "");
   return s;
+}
+
+// Mum grafiklerinde (lightweight-charts) fiyat ekseni ve price-line
+// etiketleri, hassasiyet belirtilmezse VARSAYILAN 2 basamak kullaniyor -
+// bu da INJUSDT gibi dusuk fiyatli coinlerde "5.13567" olan bir hedef
+// fiyatinin grafikte "5.14" gibi anlamsizca yuvarlanmasina yol aciyordu.
+// fiyatEtiketFormatla ile AYNI kademeli mantik (fiyat buyuklugune gore
+// degisen basamak sayisi - sabit 4 basamak BTC gibi buyuk fiyatlarda
+// gereksiz, 0.0001'lik coinlerde ise yetersiz kalirdi).
+function fiyatPriceFormatAyari(ornekFiyat) {
+  var v = parseFloat(ornekFiyat);
+  var n = (!v || isNaN(v)) ? 2 : (v >= 100 ? 2 : v >= 1 ? 4 : v >= 0.01 ? 5 : 8);
+  return { type: "price", precision: n, minMove: 1 / Math.pow(10, n) };
 }
 
 function mumBilgiFormatla(m) {
@@ -4115,7 +4129,8 @@ function replayAc(bot, sembol, acilisZaman) {
     });
     replayState.series = replayState.chart.addCandlestickSeries({
       upColor: "#4ade80", downColor: "#f87171", borderVisible: false,
-      wickUpColor: "#4ade80", wickDownColor: "#f87171"
+      wickUpColor: "#4ade80", wickDownColor: "#f87171",
+      priceFormat: fiyatPriceFormatAyari(parseFloat(replayState.giris) || replayState.candleData[replayState.candleData.length - 1].close)
     });
     var girisNum = parseFloat(replayState.giris);
     var cikisNum = parseFloat(replayState.cikisFiyat);
@@ -5633,7 +5648,11 @@ function ddGrafikCiz(candleData, destek, direnc, coinDegisti) {
     // otomatik olceklendirmeyi kullanici bir onceki coinde manuel kaydirmis/
     // yakinlastirmissa KALICI OLARAK KAPATMIS olabilir (orn. 250$'lik bir
     // coine gecince hala eski coinin 1-2$'lik araliginda kaliyordu) - bu
-    // yuzden coin degisiminde otomatik olcegi ZORLA yeniden aciyoruz.
+    // yuzden coin degisiminde otomatik olcegi ZORLA yeniden aciyoruz. Fiyat
+    // hassasiyeti de (priceFormat) coine gore yeniden ayarlanir - yoksa
+    // dusuk fiyatli coinlerde eksen/price-line etiketleri varsayilan 2
+    // basamaga yuvarlanip anlamsizlasiyordu.
+    ddSeries.applyOptions({ priceFormat: fiyatPriceFormatAyari(candleData[candleData.length - 1].close) });
     ddSeries.priceScale().applyOptions({ autoScale: true });
     ddSeries.setData(candleData);
     ddChart.timeScale().fitContent();
