@@ -609,10 +609,21 @@
   <div id="yonetici" style="display:none">
     <div id="yonetici-bakim-icerik" style="margin-bottom:14px"></div>
     <div id="yonetici-buyume-icerik"></div>
-    <div id="yonetici-ziyaret-icerik"></div>
-    <div id="yonetici-guvenlik-icerik"></div>
+    <div id="yonetici-ziyaret-ozet"></div>
+    <div style="display:flex;gap:12px;align-items:flex-start;margin:10px 0;flex-wrap:wrap">
+      <div id="yonetici-basliklar" style="flex:0 0 260px;max-width:100%;display:flex;flex-direction:column;gap:6px">
+        <div id="slot-kul-ziyaret"></div>
+        <div id="slot-guv-basarisiz"></div>
+        <div id="slot-guv-ratelimit"></div>
+        <div id="slot-guv-misafir"></div>
+        <div id="slot-kul-onayli"></div>
+      </div>
+      <div id="yonetici-detay-panel" style="flex:1;min-width:260px">
+        <div class="empty" style="padding:20px 0;text-align:center">Detaylari gormek icin soldan bir baslik secin</div>
+      </div>
+    </div>
     <div id="yonetici-harita-icerik"></div>
-    <div id="yonetici-icerik"><div class="loading">Yukleniyor...</div></div>
+    <div id="yonetici-bekleyen-icerik"><div class="loading">Yukleniyor...</div></div>
   </div>
 
   <div style="text-align:center;padding:18px 12px;margin-top:10px;border-top:1px solid #1e293b;font-size:10px;color:#475569;line-height:1.6">
@@ -4794,35 +4805,60 @@ function bakimModuDegistir() {
 // ==================== GUVENLIK PANELI (YONETICI) ====================
 // Misafir ziyaretleri (konum/cihaz), basarisiz giris denemeleri ve istek
 // sikligi (rate limit) ihlallerini gosterir - sadece admin gorebilir.
-// ==================== YONETICI PANELI - AKORDIYON BILESENI ====================
-// Bircok liste (kullanici bazinda ziyaret, basarisiz girisler, rate-limit
-// ihlalleri, misafir ziyaretleri, onayli kullanicilar) varsayilan olarak
-// KAPALI baslar - sadece baslik + toplam sayi gorunur, tiklaninca acilir.
-// Boylece admin sekmesi asagi dogru surekli uzamaz. Acik/kapali durumu
-// (yoneticiAcikBolumler) periyodik yenilemeler arasinda KORUNUR - her 10sn'de
-// bir HTML yeniden olusturulsa da, kullanicinin actigi bolum kendiliginden
-// kapanmaz.
-var yoneticiAcikBolumler = {};
+// ==================== YONETICI PANELI - USTA/DETAY (MASTER/DETAIL) ====================
+// Bes liste (kullanici bazinda ziyaret, basarisiz girisler, rate-limit
+// ihlalleri, misafir ziyaretleri, onayli kullanicilar) SOL DAR SUTUNDA
+// sadece baslik + toplam sayi olarak gorunur. Bir basliga tiklaninca o
+// listenin icerigi SAG GENIS SUTUNDAKI tek detay panelinde gosterilir -
+// eskisi gibi sayfayi asagi dogru uzatan iç ice acilir kutular yerine tek
+// bir yerde, liste halinde. Secili baslik durumu (yoneticiAktifBaslik) ve
+// her basligin en son cekilen icerigi (yoneticiDetayHTML) periyodik
+// yenilemeler arasinda KORUNUR.
+var yoneticiAktifBaslik = null;
+var yoneticiDetayHTML = {};
+var yoneticiBaslikListesi = ["kul-ziyaret", "guv-basarisiz", "guv-ratelimit", "guv-misafir", "kul-onayli"];
 
 function yoneticiAccordionBaslikHtml(id, baslik, sayi) {
-  var acik = !!yoneticiAcikBolumler[id];
+  var aktif = yoneticiAktifBaslik === id;
   var sayiMetin = (sayi === undefined || sayi === null) ? "…" : sayi;
-  return '<div class="signal-card" style="margin-bottom:0;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px 14px" onclick="yoneticiAccordionToggle(\'' + id + '\')">' +
+  return '<div id="' + id + '-baslik" class="signal-card" style="margin-bottom:0;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px 14px;' +
+    (aktif ? 'border:1px solid #3b82f6;background:rgba(59,130,246,0.12)' : '') + '" onclick="yoneticiBaslikSec(\'' + id + '\')">' +
     '<span style="font-weight:600;font-size:13px">' + baslik + '</span>' +
-    '<span style="color:#94a3b8;font-size:12px;white-space:nowrap"><span id="' + id + '-sayi">' + sayiMetin + '</span> &nbsp;<span id="' + id + '-ok">' + (acik ? "▲" : "▼") + '</span></span></div>';
+    '<span style="color:#94a3b8;font-size:12px;white-space:nowrap">' + sayiMetin + (aktif ? ' &nbsp;▶' : ' &nbsp;▾') + '</span></div>';
 }
 
-function yoneticiAccordionSayiGuncelle(id, sayi) {
-  var el = document.getElementById(id + "-sayi");
-  if (el) el.textContent = sayi;
+// Bir basligin listesini gunceller/depolar. O baslik su an acik/secili ise
+// sag paneli de hemen tazeler.
+function yoneticiDetaySakla(id, govdeHtml) {
+  yoneticiDetayHTML[id] = govdeHtml;
+  if (yoneticiAktifBaslik === id) yoneticiDetayCiz();
 }
 
-function yoneticiAccordionToggle(id) {
-  yoneticiAcikBolumler[id] = !yoneticiAcikBolumler[id];
-  var govdeEl = document.getElementById(id + "-govde");
-  var okEl = document.getElementById(id + "-ok");
-  if (govdeEl) govdeEl.style.display = yoneticiAcikBolumler[id] ? "block" : "none";
-  if (okEl) okEl.textContent = yoneticiAcikBolumler[id] ? "▲" : "▼";
+function yoneticiBaslikSec(id) {
+  yoneticiAktifBaslik = (yoneticiAktifBaslik === id) ? null : id;
+  for (var i = 0; i < yoneticiBaslikListesi.length; i++) {
+    var bid = yoneticiBaslikListesi[i];
+    var el = document.getElementById(bid + "-baslik");
+    if (!el) continue;
+    if (bid === yoneticiAktifBaslik) {
+      el.style.border = "1px solid #3b82f6";
+      el.style.background = "rgba(59,130,246,0.12)";
+    } else {
+      el.style.border = "";
+      el.style.background = "";
+    }
+  }
+  yoneticiDetayCiz();
+}
+
+function yoneticiDetayCiz() {
+  var panel = document.getElementById("yonetici-detay-panel");
+  if (!panel) return;
+  if (!yoneticiAktifBaslik) {
+    panel.innerHTML = '<div class="empty" style="padding:20px 0;text-align:center">Detaylari gormek icin soldan bir baslik secin</div>';
+    return;
+  }
+  panel.innerHTML = yoneticiDetayHTML[yoneticiAktifBaslik] || '<div class="loading">Yukleniyor...</div>';
 }
 
 function guvenlikBasligi(baslik) {
@@ -4830,8 +4866,14 @@ function guvenlikBasligi(baslik) {
 }
 
 function guvenlikPaneliGoster() {
-  var kutu = document.getElementById("yonetici-guvenlik-icerik");
-  if (!kutu) return;
+  function slotYaz(id, baslik, sayi) {
+    var el = document.getElementById("slot-" + id);
+    if (el) el.innerHTML = yoneticiAccordionBaslikHtml(id, baslik, sayi);
+  }
+
+  slotYaz("guv-basarisiz", "Başarısız Giriş Denemeleri");
+  slotYaz("guv-ratelimit", "Anormal İstek Yoğunluğu (olası saldırı/tarama)");
+  slotYaz("guv-misafir", "Misafir Ziyaretleri (kayıt olmadan giren/çıkan)");
 
   function istekAt(yol, isle) {
     var xhr = new XMLHttpRequest();
@@ -4840,14 +4882,6 @@ function guvenlikPaneliGoster() {
     xhr.onload = function() { if (xhr.status === 200) isle(JSON.parse(xhr.responseText)); };
     xhr.send();
   }
-
-  kutu.innerHTML =
-    yoneticiAccordionBaslikHtml("guv-basarisiz", "Başarısız Giriş Denemeleri") +
-    '<div id="guv-basarisiz-govde" style="display:' + (yoneticiAcikBolumler["guv-basarisiz"] ? "block" : "none") + ';margin:6px 0 14px"><div class="loading">Yukleniyor...</div></div>' +
-    yoneticiAccordionBaslikHtml("guv-ratelimit", "Anormal İstek Yoğunluğu (olası saldırı/tarama)") +
-    '<div id="guv-ratelimit-govde" style="display:' + (yoneticiAcikBolumler["guv-ratelimit"] ? "block" : "none") + ';margin:6px 0 14px"><div class="loading">Yukleniyor...</div></div>' +
-    yoneticiAccordionBaslikHtml("guv-misafir", "Misafir Ziyaretleri (kayıt olmadan giren/çıkan)") +
-    '<div id="guv-misafir-govde" style="display:' + (yoneticiAcikBolumler["guv-misafir"] ? "block" : "none") + ';margin:6px 0 14px"><div class="loading">Yukleniyor...</div></div>';
 
   istekAt("/admin/basarisiz-girisler", function(v) {
     var liste = v.basarisiz_girisler || [];
@@ -4859,8 +4893,8 @@ function guvenlikPaneliGoster() {
         '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px">' +
         '<span>' + b.kullanici_adi + ' · ' + b.sayac + ' deneme · IP: ' + (b.son_ip || "-") + '</span>' + kilitli + '</div></div>';
     }
-    document.getElementById("guv-basarisiz-govde").innerHTML = h;
-    yoneticiAccordionSayiGuncelle("guv-basarisiz", liste.length);
+    slotYaz("guv-basarisiz", "Başarısız Giriş Denemeleri", liste.length);
+    yoneticiDetaySakla("guv-basarisiz", h);
   });
 
   istekAt("/admin/rate-limit-ihlalleri", function(v) {
@@ -4873,8 +4907,8 @@ function guvenlikPaneliGoster() {
         '<span>IP: ' + r.ip + ' · ' + r.sayac + ' kez sinir asildi</span>' +
         '<span style="color:#64748b">' + (r.son_zaman || "-") + '</span></div></div>';
     }
-    document.getElementById("guv-ratelimit-govde").innerHTML = h;
-    yoneticiAccordionSayiGuncelle("guv-ratelimit", liste.length);
+    slotYaz("guv-ratelimit", "Anormal İstek Yoğunluğu (olası saldırı/tarama)", liste.length);
+    yoneticiDetaySakla("guv-ratelimit", h);
   });
 
   istekAt("/admin/misafir-ziyaretleri", function(v) {
@@ -4888,8 +4922,8 @@ function guvenlikPaneliGoster() {
         '<span style="color:#64748b">' + m.ip + '</span></div>' +
         '<div class="sig-time">' + m.zaman + '</div></div>';
     }
-    document.getElementById("guv-misafir-govde").innerHTML = h;
-    yoneticiAccordionSayiGuncelle("guv-misafir", liste.length);
+    slotYaz("guv-misafir", "Misafir Ziyaretleri (kayıt olmadan giren/çıkan)", liste.length);
+    yoneticiDetaySakla("guv-misafir", h);
   });
 }
 
@@ -5972,26 +6006,28 @@ function yoneticiPaneliGoster() {
   xhrZiyaret.onload = function() {
     if (xhrZiyaret.status !== 200) return;
     var veri = JSON.parse(xhrZiyaret.responseText);
-    var html = '<div class="section-title">Site Ziyaret Istatistikleri</div>';
-    html += '<div class="stats-grid">';
-    html += '<div class="stat-card"><div class="stat-label">Toplam Ziyaret</div><div class="stat-val">' + veri.toplam_ziyaret + '</div></div>';
-    html += '<div class="stat-card"><div class="stat-label">Farkli Kullanici</div><div class="stat-val blue">' + veri.farkli_kullanici_sayisi + '</div></div>';
-    html += '</div>';
+    var ozet = '<div class="section-title">Site Ziyaret Istatistikleri</div>';
+    ozet += '<div class="stats-grid">';
+    ozet += '<div class="stat-card"><div class="stat-label">Toplam Ziyaret</div><div class="stat-val">' + veri.toplam_ziyaret + '</div></div>';
+    ozet += '<div class="stat-card"><div class="stat-label">Farkli Kullanici</div><div class="stat-val blue">' + veri.farkli_kullanici_sayisi + '</div></div>';
+    ozet += '</div>';
+    document.getElementById("yonetici-ziyaret-ozet").innerHTML = ozet;
+
     var kullBazli = veri.kullanici_bazli || [];
-    html += yoneticiAccordionBaslikHtml("kul-ziyaret", "Kullanıcı Bazında Ziyaret", kullBazli.length);
-    html += '<div id="kul-ziyaret-govde" style="display:' + (yoneticiAcikBolumler["kul-ziyaret"] ? "block" : "none") + ';margin-top:8px">';
+    var slotEl = document.getElementById("slot-kul-ziyaret");
+    if (slotEl) slotEl.innerHTML = yoneticiAccordionBaslikHtml("kul-ziyaret", "Kullanıcı Bazında Ziyaret", kullBazli.length);
+    var govde = "";
     if (kullBazli.length > 0) {
       for (var i = 0; i < kullBazli.length; i++) {
         var k = kullBazli[i];
-        html += '<div class="signal-card" style="margin-bottom:6px">';
-        html += '<div class="sig-header"><div class="sig-symbol">' + k.kullanici_adi + '</div>';
-        html += '<span class="badge bot">' + k.ziyaret_sayisi + ' ziyaret</span></div></div>';
+        govde += '<div class="signal-card" style="margin-bottom:6px">';
+        govde += '<div class="sig-header"><div class="sig-symbol">' + k.kullanici_adi + '</div>';
+        govde += '<span class="badge bot">' + k.ziyaret_sayisi + ' ziyaret</span></div></div>';
       }
     } else {
-      html += '<div class="empty" style="padding:10px 0">Henuz ziyaret verisi yok</div>';
+      govde = '<div class="empty" style="padding:10px 0">Henuz ziyaret verisi yok</div>';
     }
-    html += '</div>';
-    document.getElementById("yonetici-ziyaret-icerik").innerHTML = html;
+    yoneticiDetaySakla("kul-ziyaret", govde);
   };
   xhrZiyaret.send();
 
@@ -6000,7 +6036,7 @@ function yoneticiPaneliGoster() {
   xhr.setRequestHeader("X-Auth-Token", authToken);
   xhr.onload = function() {
     if (xhr.status !== 200) {
-      document.getElementById("yonetici-icerik").innerHTML = '<div class="empty">Yetkisiz erisim</div>';
+      document.getElementById("yonetici-bekleyen-icerik").innerHTML = '<div class="empty">Yetkisiz erisim</div>';
       return;
     }
     var liste = JSON.parse(xhr.responseText);
@@ -6053,17 +6089,13 @@ function yoneticiPaneliGoster() {
         digerHtml += kart;
       }
     }
-    var html;
-    if (liste.length === 0) {
-      html = '<div class="empty">Henuz kayitli kullanici yok</div>';
-    } else {
-      html = digerHtml;
-      html += yoneticiAccordionBaslikHtml("kul-onayli", "Onaylı Kullanıcılar", onayliListe.length);
-      html += '<div id="kul-onayli-govde" style="display:' + (yoneticiAcikBolumler["kul-onayli"] ? "block" : "none") + ';margin-top:8px">';
-      html += onayliListe.length ? onayliListe.join("") : '<div class="empty" style="padding:10px 0">Onayli kullanici yok</div>';
-      html += '</div>';
-    }
-    document.getElementById("yonetici-icerik").innerHTML = html;
+    document.getElementById("yonetici-bekleyen-icerik").innerHTML =
+      liste.length === 0 ? '<div class="empty">Henuz kayitli kullanici yok</div>'
+      : (digerHtml || '<div class="empty">Islem bekleyen kullanici yok</div>');
+
+    var slotEl = document.getElementById("slot-kul-onayli");
+    if (slotEl) slotEl.innerHTML = yoneticiAccordionBaslikHtml("kul-onayli", "Onaylı Kullanıcılar", onayliListe.length);
+    yoneticiDetaySakla("kul-onayli", onayliListe.length ? onayliListe.join("") : '<div class="empty" style="padding:10px 0">Onayli kullanici yok</div>');
   };
   xhr.send();
 }
