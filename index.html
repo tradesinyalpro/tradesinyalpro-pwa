@@ -148,6 +148,19 @@
   .zaman-btn { width: auto !important; padding: 0 8px; font-size: 10px; font-weight: 600; }
   .kart-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.78); z-index: 8000; }
   .kart-backdrop.acik { display: block; }
+  .replay-modal {
+    position: fixed; top: 1vh; left: 3vw; right: 3vw; bottom: 1vh;
+    z-index: 8101; background: #0a0f1e; border: 1px solid #3b82f6; border-radius: 14px;
+    overflow-y: auto; box-shadow: 0 10px 44px rgba(0,0,0,0.65); padding: 14px;
+  }
+  #replay-backdrop { z-index: 8100; }
+  @media (max-width: 700px) {
+    .replay-modal { top: 0; left: 0; right: 0; bottom: 0; border-radius: 0; }
+  }
+  .replay-play-btn { background: #1e3a8a; border: 1px solid #3b82f6; color: #93c5fd; width: 44px; height: 44px; border-radius: 50%; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .replay-step-btn { background: #1e293b; border: 1px solid #334155; color: #e2e8f0; width: 38px; height: 38px; border-radius: 50%; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .replay-hiz-btn { background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 4px 10px; border-radius: 14px; font-size: 11px; cursor: pointer; }
+  .replay-hiz-btn.aktif { background: #1e3a8a; border-color: #3b82f6; color: #93c5fd; }
   .sig-symbol-tikla { cursor: pointer; }
   .signal-card.kart-genisletilmis {
     position: fixed; top: 1vh; left: 3vw; right: 3vw; bottom: 1vh;
@@ -369,6 +382,9 @@
     </div>
     <div id="gecmis-icerik"><div class="loading">Yukleniyor...</div></div>
   </div>
+
+  <div id="replay-backdrop" class="kart-backdrop" onclick="replayKapat()"></div>
+  <div id="replay-modal" class="replay-modal" style="display:none"></div>
 
   <div id="coinperformans" style="display:none">
     <div style="margin-bottom:10px">
@@ -809,6 +825,10 @@ var sonSohbetMesajlari = [];
 var sonPortfoy = { kayitlar: [], ozet: {} };
 var takipDurumu = {};
 var secilenKartAnahtari = null;
+var replayState = null;
+var REPLAY_PRE_MUM = 30;
+var REPLAY_POST_MUM = 20;
+var REPLAY_INTERVAL_MS = { "5m": 300000, "15m": 900000, "1h": 3600000, "4h": 14400000, "1d": 86400000 };
 
 function kartGenisletilmisMi(sembol) {
   if (!secilenKartAnahtari) return false;
@@ -3995,13 +4015,244 @@ function gecmisGoster() {
     html += '<span class="badge bot">' + botAdi(bot) + '</span></div></div>';
     html += '<div class="sig-row"><span class="sig-key">Yon</span><span class="badge ' + yonCls + '">' + yon + '</span></div>';
     html += '<div class="sig-row"><span class="sig-key">Giris</span><span class="sig-val">' + (s.giris || s.maliyet || "-") + eklemeHtml + '</span></div>';
-    html += '<div class="sig-time">' + (s.sonuc_zamani || s.zaman || "") + '</div></div>';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center">';
+    html += '<div class="sig-time">' + (s.sonuc_zamani || s.zaman || "") + '</div>';
+    html += '<span onclick="replayAc(\'' + bot + '\',\'' + s.sembol + '\',\'' + (s.zaman || "") + '\')" style="cursor:pointer;font-size:11px;color:#60a5fa;background:#0f1a2e;border:1px solid #1e3a5f;padding:4px 10px;border-radius:20px">▶ Replay</span>';
+    html += '</div></div>';
   }
   if (hepsi.length === 0) {
     html = arama ? ('<div class="empty">"' + arama + '" icin gecmis kayit bulunamadi</div>') : '<div class="empty">Henuz tamamlanmis islem yok</div>';
   }
   document.getElementById("gecmis-icerik").innerHTML = html;
 }
+
+// ==================== GRAFİK REPLAY MODU (Gecmis > kapanmis sinyal) ====================
+// Kapanmis bir sinyali, acildigi ana kadar geri sarip mum mum ileriye
+// oynatir - Binance'in kendi gecmis mum (kline) verisini, sinyalin
+// acilis/kapanis zaman damgalari araligina gore ceker (+ REPLAY_PRE_MUM
+// kadar acilis oncesi baglam, + REPLAY_POST_MUM kadar kapanis sonrasi
+// fiyatin GERCEKTE nereye gittigini gostermek icin). Zaman araligina gore
+// (kisa surmus sinyal -> kucuk mum, uzun surmus sinyal -> buyuk mum)
+// otomatik interval secilir, boylece hem cok az hem cok fazla mum
+// cekilmesi onlenir.
+function replayAralikSec(sureMs) {
+  if (sureMs <= 6 * 60 * 60 * 1000) return "5m";
+  if (sureMs <= 24 * 60 * 60 * 1000) return "15m";
+  if (sureMs <= 4 * 24 * 60 * 60 * 1000) return "1h";
+  if (sureMs <= 20 * 24 * 60 * 60 * 1000) return "4h";
+  return "1d";
+}
+
+function replayAc(bot, sembol, acilisZaman) {
+  var liste = (tumVeriler[bot] || {}).sinyaller || [];
+  var sinyal = null;
+  for (var i = 0; i < liste.length; i++) {
+    if (liste[i].sembol === sembol && liste[i].zaman === acilisZaman) { sinyal = liste[i]; break; }
+  }
+  if (!sinyal || (sinyal.durum !== "tp" && sinyal.durum !== "stop")) {
+    alert("Bu sinyal icin replay verisi bulunamadi.");
+    return;
+  }
+  var acilisMs = turkiyeZamanindanMs(sinyal.zaman);
+  var kapanisMs = turkiyeZamanindanMs(sinyal.sonuc_zamani || sinyal.zaman);
+  if (kapanisMs < acilisMs) kapanisMs = acilisMs;
+  var interval = replayAralikSec(kapanisMs - acilisMs);
+  var intervalMs = REPLAY_INTERVAL_MS[interval];
+  var startTime = acilisMs - REPLAY_PRE_MUM * intervalMs;
+  var endTime = kapanisMs + REPLAY_POST_MUM * intervalMs;
+
+  replayState = {
+    sinyal: sinyal, bot: bot, durum: sinyal.durum,
+    giris: sinyal.giris || sinyal.maliyet, cikisFiyat: sinyal.durum === "tp" ? sinyal.hedef : sinyal.stop,
+    yon: sinyal.yon, timer: null, hiz: 1, chart: null, series: null,
+    candleData: [], girisIndex: 0, kapanisIndex: 0, sonIndex: 0, index: 0
+  };
+
+  document.getElementById("replay-modal").style.display = "block";
+  document.getElementById("replay-backdrop").classList.add("acik");
+  document.getElementById("replay-modal").innerHTML = '<div class="loading" style="padding:60px 0;text-align:center">Mum verileri yukleniyor...</div>';
+
+  var url = "https://fapi.binance.com/fapi/v1/klines?symbol=" + sembol + "&interval=" + interval +
+    "&startTime=" + startTime + "&endTime=" + endTime + "&limit=1500";
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", url, true);
+  xhr.onload = function() {
+    if (!replayState) return; // kullanici bu arada replay'i kapatmis olabilir
+    if (xhr.status !== 200) { document.getElementById("replay-modal").innerHTML = '<div class="empty" style="padding:40px 0;text-align:center">Binance verisi alinamadi</div>'; return; }
+    var mumlarRaw;
+    try { mumlarRaw = JSON.parse(xhr.responseText); } catch (e) { mumlarRaw = null; }
+    if (!Array.isArray(mumlarRaw) || mumlarRaw.length === 0) {
+      document.getElementById("replay-modal").innerHTML = '<div class="empty" style="padding:40px 0;text-align:center">Bu zaman araligi icin mum verisi bulunamadi</div>';
+      return;
+    }
+    // Kutuphane zaman damgalarini UTC olarak yorumlayip tarayicinin yerel
+    // saat dilimine gore etiketliyor - ddYukle'deki ayni duzeltmeyi burada
+    // da uyguluyoruz (bkz. o fonksiyondaki aciklama).
+    var TR_UTC_FARKI_SN = 3 * 60 * 60;
+    var candleData = mumlarRaw.map(function(m) {
+      return { time: Math.floor(m[0] / 1000) + TR_UTC_FARKI_SN, open: parseFloat(m[1]), high: parseFloat(m[2]), low: parseFloat(m[3]), close: parseFloat(m[4]) };
+    });
+    var girisIndex = 0;
+    for (var gi = 0; gi < mumlarRaw.length; gi++) { if (mumlarRaw[gi][0] <= acilisMs) girisIndex = gi; }
+    var kapanisIndex = girisIndex;
+    for (var ki = 0; ki < mumlarRaw.length; ki++) { if (mumlarRaw[ki][0] <= kapanisMs) kapanisIndex = ki; }
+    var sonIndex = Math.min(mumlarRaw.length - 1, kapanisIndex + REPLAY_POST_MUM);
+
+    replayState.candleData = candleData;
+    replayState.girisIndex = girisIndex;
+    replayState.kapanisIndex = kapanisIndex;
+    replayState.sonIndex = sonIndex;
+    replayState.index = girisIndex;
+
+    replayModalCiz();
+    var chartKutu = document.getElementById("replay-chart");
+    replayState.chart = LightweightCharts.createChart(chartKutu, {
+      layout: { background: { color: "#0a0f1e" }, textColor: "#94a3b8" },
+      grid: { vertLines: { color: "#141d33" }, horzLines: { color: "#141d33" } },
+      timeScale: { timeVisible: true, borderColor: "#1e293b" },
+      rightPriceScale: { borderColor: "#1e293b" },
+      width: chartKutu.clientWidth, height: 360
+    });
+    replayState.series = replayState.chart.addCandlestickSeries({
+      upColor: "#4ade80", downColor: "#f87171", borderVisible: false,
+      wickUpColor: "#4ade80", wickDownColor: "#f87171"
+    });
+    var girisNum = parseFloat(replayState.giris);
+    var cikisNum = parseFloat(replayState.cikisFiyat);
+    if (girisNum) replayState.series.createPriceLine({ price: girisNum, color: "#60a5fa", lineWidth: 1, lineStyle: 2, title: "Giriş" });
+    if (cikisNum) replayState.series.createPriceLine({ price: cikisNum, color: replayState.durum === "tp" ? "#4ade80" : "#f87171", lineWidth: 1, lineStyle: 2, title: replayState.durum === "tp" ? "Hedef" : "Stop" });
+    replayGuncelle();
+  };
+  xhr.onerror = function() {
+    if (!replayState) return;
+    document.getElementById("replay-modal").innerHTML = '<div class="empty" style="padding:40px 0;text-align:center">Binance verisi alinamadi</div>';
+  };
+  xhr.send();
+}
+
+function replayModalCiz() {
+  var modal = document.getElementById("replay-modal");
+  if (!modal || !replayState) return;
+  var s = replayState.sinyal;
+  var yonRengi = replayState.yon === "LONG" ? "#22c55e" : "#ef4444";
+  var sonucRengi = replayState.durum === "tp" ? "#4ade80" : "#f87171";
+  var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+    '<div><span style="font-weight:700;font-size:16px">#' + s.sembol + '</span> ' +
+    '<span class="badge" style="background:' + (replayState.yon === "LONG" ? "#052e16" : "#2d0a0a") + ';color:' + yonRengi + ';margin-left:6px">' + replayState.yon + '</span> ' +
+    '<span class="badge bot" style="margin-left:6px">' + botAdi(replayState.bot) + '</span></div>' +
+    '<span onclick="replayKapat()" style="cursor:pointer;font-size:22px;color:#94a3b8;line-height:1">&times;</span></div>';
+  html += '<div style="font-size:11px;color:#64748b;margin-bottom:10px">Giriş: ' + replayState.giris + ' &nbsp;·&nbsp; ' +
+    (replayState.durum === "tp" ? "Hedef" : "Stop") + ': ' + replayState.cikisFiyat + ' &nbsp;·&nbsp; Sonuç: <span style="color:' +
+    sonucRengi + ';font-weight:600">' + (replayState.durum === "tp" ? "BAŞARILI" : "BAŞARISIZ") + '</span></div>';
+  html += '<div id="replay-chart" style="width:100%;height:360px;border-radius:10px;overflow:hidden;background:#0a0f1e"></div>';
+  html += '<div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-top:14px">' +
+    '<span class="replay-step-btn" onclick="replayGeri()" title="Bir mum geri">◀</span>' +
+    '<span class="replay-play-btn" id="replay-oynat-btn" onclick="replayOynatDurdur()" title="Oynat/Durdur">▶</span>' +
+    '<span class="replay-step-btn" onclick="replayIleri()" title="Bir mum ileri">▶</span></div>';
+  html += '<div style="text-align:center;margin-top:8px;font-size:11px;color:#64748b" id="replay-ilerleme">0 / 0</div>';
+  html += '<div style="display:flex;justify-content:center;gap:6px;margin-top:10px">' +
+    '<span class="replay-hiz-btn aktif" id="replay-hiz-1" onclick="replayHizSec(1)">1x</span>' +
+    '<span class="replay-hiz-btn" id="replay-hiz-2" onclick="replayHizSec(2)">2x</span>' +
+    '<span class="replay-hiz-btn" id="replay-hiz-4" onclick="replayHizSec(4)">4x</span></div>';
+  html += '<div style="font-size:10px;color:#475569;margin-top:12px;text-align:center;line-height:1.5">Bu bir GECMIS VERI IZLEME aracidir, gercek zamanli degildir. Kapanistan sonraki mumlar, fiyatin gercekte nereye gittigini gostermek icin eklenmistir.</div>';
+  modal.innerHTML = html;
+}
+
+function replayGuncelle() {
+  if (!replayState || !replayState.series) return;
+  var dilim = replayState.candleData.slice(0, replayState.index + 1);
+  replayState.series.setData(dilim);
+  if (replayState.index >= replayState.kapanisIndex) {
+    replayState.series.setMarkers([{
+      time: replayState.candleData[replayState.kapanisIndex].time,
+      position: replayState.durum === "tp" ? "aboveBar" : "belowBar",
+      color: replayState.durum === "tp" ? "#4ade80" : "#f87171",
+      shape: replayState.durum === "tp" ? "arrowUp" : "arrowDown",
+      text: replayState.durum === "tp" ? "BAŞARILI" : "BAŞARISIZ"
+    }]);
+  } else {
+    replayState.series.setMarkers([]);
+  }
+  replayState.chart.timeScale().fitContent();
+  var ilerlemeEl = document.getElementById("replay-ilerleme");
+  if (ilerlemeEl) {
+    var toplamAdim = replayState.sonIndex - replayState.girisIndex;
+    var suAnkiAdim = replayState.index - replayState.girisIndex;
+    ilerlemeEl.textContent = suAnkiAdim + " / " + toplamAdim;
+  }
+  if (replayState.index >= replayState.sonIndex) replayDurdur();
+}
+
+function replayIleri() {
+  if (!replayState) return;
+  if (replayState.index < replayState.sonIndex) {
+    replayState.index++;
+    replayGuncelle();
+  } else {
+    replayDurdur();
+  }
+}
+
+function replayGeri() {
+  if (!replayState) return;
+  if (replayState.index > replayState.girisIndex) {
+    replayState.index--;
+    replayGuncelle();
+  }
+}
+
+function replayOynatDurdur() {
+  if (!replayState) return;
+  if (replayState.timer) {
+    replayDurdur();
+    return;
+  }
+  replayState.timer = setInterval(replayIleri, Math.round(700 / replayState.hiz));
+  var btn = document.getElementById("replay-oynat-btn");
+  if (btn) btn.innerHTML = "⏸";
+}
+
+function replayDurdur() {
+  if (replayState && replayState.timer) {
+    clearInterval(replayState.timer);
+    replayState.timer = null;
+  }
+  var btn = document.getElementById("replay-oynat-btn");
+  if (btn) btn.innerHTML = "▶";
+}
+
+function replayHizSec(katsayi) {
+  if (!replayState) return;
+  replayState.hiz = katsayi;
+  ["1", "2", "4"].forEach(function(h) {
+    var el = document.getElementById("replay-hiz-" + h);
+    if (el) el.classList.toggle("aktif", parseInt(h, 10) === katsayi);
+  });
+  if (replayState.timer) {
+    clearInterval(replayState.timer);
+    replayState.timer = setInterval(replayIleri, Math.round(700 / replayState.hiz));
+  }
+}
+
+function replayKapat() {
+  if (replayState && replayState.timer) clearInterval(replayState.timer);
+  if (replayState && replayState.chart) { try { replayState.chart.remove(); } catch (e) {} }
+  replayState = null;
+  document.getElementById("replay-modal").style.display = "none";
+  document.getElementById("replay-modal").innerHTML = "";
+  document.getElementById("replay-backdrop").classList.remove("acik");
+}
+
+window.addEventListener("resize", function() {
+  if (replayState && replayState.chart) {
+    var kutu = document.getElementById("replay-chart");
+    if (kutu) replayState.chart.applyOptions({ width: kutu.clientWidth });
+  }
+});
+
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Escape" && replayState) replayKapat();
+});
 
 function raporGoster() {
   if (!tumRaporlar || tumRaporlar.length === 0) {
