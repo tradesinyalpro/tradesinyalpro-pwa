@@ -4794,6 +4794,37 @@ function bakimModuDegistir() {
 // ==================== GUVENLIK PANELI (YONETICI) ====================
 // Misafir ziyaretleri (konum/cihaz), basarisiz giris denemeleri ve istek
 // sikligi (rate limit) ihlallerini gosterir - sadece admin gorebilir.
+// ==================== YONETICI PANELI - AKORDIYON BILESENI ====================
+// Bircok liste (kullanici bazinda ziyaret, basarisiz girisler, rate-limit
+// ihlalleri, misafir ziyaretleri, onayli kullanicilar) varsayilan olarak
+// KAPALI baslar - sadece baslik + toplam sayi gorunur, tiklaninca acilir.
+// Boylece admin sekmesi asagi dogru surekli uzamaz. Acik/kapali durumu
+// (yoneticiAcikBolumler) periyodik yenilemeler arasinda KORUNUR - her 10sn'de
+// bir HTML yeniden olusturulsa da, kullanicinin actigi bolum kendiliginden
+// kapanmaz.
+var yoneticiAcikBolumler = {};
+
+function yoneticiAccordionBaslikHtml(id, baslik, sayi) {
+  var acik = !!yoneticiAcikBolumler[id];
+  var sayiMetin = (sayi === undefined || sayi === null) ? "…" : sayi;
+  return '<div class="signal-card" style="margin-bottom:0;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px 14px" onclick="yoneticiAccordionToggle(\'' + id + '\')">' +
+    '<span style="font-weight:600;font-size:13px">' + baslik + '</span>' +
+    '<span style="color:#94a3b8;font-size:12px;white-space:nowrap"><span id="' + id + '-sayi">' + sayiMetin + '</span> &nbsp;<span id="' + id + '-ok">' + (acik ? "▲" : "▼") + '</span></span></div>';
+}
+
+function yoneticiAccordionSayiGuncelle(id, sayi) {
+  var el = document.getElementById(id + "-sayi");
+  if (el) el.textContent = sayi;
+}
+
+function yoneticiAccordionToggle(id) {
+  yoneticiAcikBolumler[id] = !yoneticiAcikBolumler[id];
+  var govdeEl = document.getElementById(id + "-govde");
+  var okEl = document.getElementById(id + "-ok");
+  if (govdeEl) govdeEl.style.display = yoneticiAcikBolumler[id] ? "block" : "none";
+  if (okEl) okEl.textContent = yoneticiAcikBolumler[id] ? "▲" : "▼";
+}
+
 function guvenlikBasligi(baslik) {
   return '<div class="section-title" style="margin-top:16px">' + baslik + '</div>';
 }
@@ -4801,7 +4832,6 @@ function guvenlikBasligi(baslik) {
 function guvenlikPaneliGoster() {
   var kutu = document.getElementById("yonetici-guvenlik-icerik");
   if (!kutu) return;
-  var html = '';
 
   function istekAt(yol, isle) {
     var xhr = new XMLHttpRequest();
@@ -4811,62 +4841,56 @@ function guvenlikPaneliGoster() {
     xhr.send();
   }
 
-  // 1) Misafir ziyaretleri
-  istekAt("/admin/misafir-ziyaretleri", function(v) {
-    var h = guvenlikBasligi("Misafir Ziyaretleri (kayit olmadan giren/cikan) - son " + (v.misafirler || []).length);
-    if (!v.misafirler || !v.misafirler.length) {
-      h += '<div class="empty" style="padding:10px 0">Henuz misafir ziyareti kaydedilmedi</div>';
-    } else {
-      for (var i = 0; i < Math.min(v.misafirler.length, 50); i++) {
-        var m = v.misafirler[i];
-        h += '<div class="signal-card" style="margin-bottom:6px;padding:10px 14px">' +
-          '<div style="display:flex;justify-content:space-between;font-size:12.5px">' +
-          '<span>' + (m.sehir !== "-" ? m.sehir + ", " : "") + m.ulke + ' · ' + m.cihaz + '</span>' +
-          '<span style="color:#64748b">' + m.ip + '</span></div>' +
-          '<div class="sig-time">' + m.zaman + '</div></div>';
-      }
-    }
-    document.getElementById("guvenlik-misafir-icerik").innerHTML = h;
-  });
-
-  // 2) Basarisiz giris denemeleri
-  istekAt("/admin/basarisiz-girisler", function(v) {
-    var h = guvenlikBasligi("Basarisiz Giris Denemeleri");
-    if (!v.basarisiz_girisler || !v.basarisiz_girisler.length) {
-      h += '<div class="empty" style="padding:10px 0">Su an basarisiz deneme/kilit yok</div>';
-    } else {
-      for (var i = 0; i < v.basarisiz_girisler.length; i++) {
-        var b = v.basarisiz_girisler[i];
-        var kilitli = b.kilit_bitis ? '<span class="badge short">Kilitli: ' + b.kilit_bitis + '</span>' : '';
-        h += '<div class="signal-card" style="margin-bottom:6px;padding:10px 14px">' +
-          '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px">' +
-          '<span>' + b.kullanici_adi + ' · ' + b.sayac + ' deneme · IP: ' + (b.son_ip || "-") + '</span>' + kilitli + '</div></div>';
-      }
-    }
-    document.getElementById("guvenlik-basarisiz-icerik").innerHTML = h;
-  });
-
-  // 3) Rate limit ihlalleri
-  istekAt("/admin/rate-limit-ihlalleri", function(v) {
-    var h = guvenlikBasligi("Anormal Istek Yogunlugu (olasi saldiri/tarama)");
-    if (!v.ihlaller || !v.ihlaller.length) {
-      h += '<div class="empty" style="padding:10px 0">Su an isaretlenmis bir IP yok</div>';
-    } else {
-      for (var i = 0; i < v.ihlaller.length; i++) {
-        var r = v.ihlaller[i];
-        h += '<div class="signal-card" style="margin-bottom:6px;padding:10px 14px">' +
-          '<div style="display:flex;justify-content:space-between;font-size:12.5px">' +
-          '<span>IP: ' + r.ip + ' · ' + r.sayac + ' kez sinir asildi</span>' +
-          '<span style="color:#64748b">' + (r.son_zaman || "-") + '</span></div></div>';
-      }
-    }
-    document.getElementById("guvenlik-ratelimit-icerik").innerHTML = h;
-  });
-
   kutu.innerHTML =
-    '<div id="guvenlik-basarisiz-icerik"></div>' +
-    '<div id="guvenlik-ratelimit-icerik"></div>' +
-    '<div id="guvenlik-misafir-icerik"></div>';
+    yoneticiAccordionBaslikHtml("guv-basarisiz", "Başarısız Giriş Denemeleri") +
+    '<div id="guv-basarisiz-govde" style="display:' + (yoneticiAcikBolumler["guv-basarisiz"] ? "block" : "none") + ';margin:6px 0 14px"><div class="loading">Yukleniyor...</div></div>' +
+    yoneticiAccordionBaslikHtml("guv-ratelimit", "Anormal İstek Yoğunluğu (olası saldırı/tarama)") +
+    '<div id="guv-ratelimit-govde" style="display:' + (yoneticiAcikBolumler["guv-ratelimit"] ? "block" : "none") + ';margin:6px 0 14px"><div class="loading">Yukleniyor...</div></div>' +
+    yoneticiAccordionBaslikHtml("guv-misafir", "Misafir Ziyaretleri (kayıt olmadan giren/çıkan)") +
+    '<div id="guv-misafir-govde" style="display:' + (yoneticiAcikBolumler["guv-misafir"] ? "block" : "none") + ';margin:6px 0 14px"><div class="loading">Yukleniyor...</div></div>';
+
+  istekAt("/admin/basarisiz-girisler", function(v) {
+    var liste = v.basarisiz_girisler || [];
+    var h = liste.length ? "" : '<div class="empty" style="padding:10px 0">Su an basarisiz deneme/kilit yok</div>';
+    for (var i = 0; i < liste.length; i++) {
+      var b = liste[i];
+      var kilitli = b.kilit_bitis ? '<span class="badge short">Kilitli: ' + b.kilit_bitis + '</span>' : '';
+      h += '<div class="signal-card" style="margin-bottom:6px;padding:10px 14px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px">' +
+        '<span>' + b.kullanici_adi + ' · ' + b.sayac + ' deneme · IP: ' + (b.son_ip || "-") + '</span>' + kilitli + '</div></div>';
+    }
+    document.getElementById("guv-basarisiz-govde").innerHTML = h;
+    yoneticiAccordionSayiGuncelle("guv-basarisiz", liste.length);
+  });
+
+  istekAt("/admin/rate-limit-ihlalleri", function(v) {
+    var liste = v.ihlaller || [];
+    var h = liste.length ? "" : '<div class="empty" style="padding:10px 0">Su an isaretlenmis bir IP yok</div>';
+    for (var i = 0; i < liste.length; i++) {
+      var r = liste[i];
+      h += '<div class="signal-card" style="margin-bottom:6px;padding:10px 14px">' +
+        '<div style="display:flex;justify-content:space-between;font-size:12.5px">' +
+        '<span>IP: ' + r.ip + ' · ' + r.sayac + ' kez sinir asildi</span>' +
+        '<span style="color:#64748b">' + (r.son_zaman || "-") + '</span></div></div>';
+    }
+    document.getElementById("guv-ratelimit-govde").innerHTML = h;
+    yoneticiAccordionSayiGuncelle("guv-ratelimit", liste.length);
+  });
+
+  istekAt("/admin/misafir-ziyaretleri", function(v) {
+    var liste = v.misafirler || [];
+    var h = liste.length ? "" : '<div class="empty" style="padding:10px 0">Henuz misafir ziyareti kaydedilmedi</div>';
+    for (var i = 0; i < liste.length; i++) {
+      var m = liste[i];
+      h += '<div class="signal-card" style="margin-bottom:6px;padding:10px 14px">' +
+        '<div style="display:flex;justify-content:space-between;font-size:12.5px">' +
+        '<span>' + (m.sehir !== "-" ? m.sehir + ", " : "") + m.ulke + ' · ' + m.cihaz + '</span>' +
+        '<span style="color:#64748b">' + m.ip + '</span></div>' +
+        '<div class="sig-time">' + m.zaman + '</div></div>';
+    }
+    document.getElementById("guv-misafir-govde").innerHTML = h;
+    yoneticiAccordionSayiGuncelle("guv-misafir", liste.length);
+  });
 }
 
 // ==================== GUVENLIK HARITASI (YONETICI) ====================
@@ -5953,15 +5977,20 @@ function yoneticiPaneliGoster() {
     html += '<div class="stat-card"><div class="stat-label">Toplam Ziyaret</div><div class="stat-val">' + veri.toplam_ziyaret + '</div></div>';
     html += '<div class="stat-card"><div class="stat-label">Farkli Kullanici</div><div class="stat-val blue">' + veri.farkli_kullanici_sayisi + '</div></div>';
     html += '</div>';
-    if (veri.kullanici_bazli && veri.kullanici_bazli.length > 0) {
-      html += '<div class="section-title">Kullanici Bazinda Ziyaret</div>';
-      for (var i = 0; i < veri.kullanici_bazli.length; i++) {
-        var k = veri.kullanici_bazli[i];
+    var kullBazli = veri.kullanici_bazli || [];
+    html += yoneticiAccordionBaslikHtml("kul-ziyaret", "Kullanıcı Bazında Ziyaret", kullBazli.length);
+    html += '<div id="kul-ziyaret-govde" style="display:' + (yoneticiAcikBolumler["kul-ziyaret"] ? "block" : "none") + ';margin-top:8px">';
+    if (kullBazli.length > 0) {
+      for (var i = 0; i < kullBazli.length; i++) {
+        var k = kullBazli[i];
         html += '<div class="signal-card" style="margin-bottom:6px">';
         html += '<div class="sig-header"><div class="sig-symbol">' + k.kullanici_adi + '</div>';
         html += '<span class="badge bot">' + k.ziyaret_sayisi + ' ziyaret</span></div></div>';
       }
+    } else {
+      html += '<div class="empty" style="padding:10px 0">Henuz ziyaret verisi yok</div>';
     }
+    html += '</div>';
     document.getElementById("yonetici-ziyaret-icerik").innerHTML = html;
   };
   xhrZiyaret.send();
@@ -5975,10 +6004,8 @@ function yoneticiPaneliGoster() {
       return;
     }
     var liste = JSON.parse(xhr.responseText);
-    var html = "";
-    if (liste.length === 0) {
-      html = '<div class="empty">Henuz kayitli kullanici yok</div>';
-    }
+    var digerHtml = "";
+    var onayliListe = [];
     for (var i = 0; i < liste.length; i++) {
       var u = liste[i];
       var durumRozet = u.durum === "bekliyor" ? '<span class="badge seviye-buyuk">Onay Bekliyor</span>'
@@ -5986,34 +6013,54 @@ function yoneticiPaneliGoster() {
                       : u.durum === "deneme_bitti" ? '<span class="badge seviye-buyuk">Deneme Bitti</span>'
                       : u.durum === "onayli" ? '<span class="badge long">Onayli</span>'
                       : '<span class="badge short">Suresi Doldu</span>';
-      html += '<div class="signal-card" style="margin-bottom:8px">';
-      html += '<div class="sig-header"><div class="sig-symbol">' + u.kullanici_adi + '</div>' + durumRozet + '</div>';
-      html += '<div class="sig-row"><span class="sig-key">Telegram</span><span class="sig-val">' + (u.telegram || "-") + '</span></div>';
-      html += '<div class="sig-row"><span class="sig-key">Email</span><span class="sig-val">' + (u.email || "-") + '</span></div>';
+      var kart = '<div class="signal-card" style="margin-bottom:8px">';
+      kart += '<div class="sig-header"><div class="sig-symbol">' + u.kullanici_adi + '</div>' + durumRozet + '</div>';
+      kart += '<div class="sig-row"><span class="sig-key">Telegram</span><span class="sig-val">' + (u.telegram || "-") + '</span></div>';
+      kart += '<div class="sig-row"><span class="sig-key">Email</span><span class="sig-val">' + (u.email || "-") + '</span></div>';
       if (u.durum === "deneme" && u.kalan_gun !== null && u.kalan_gun !== undefined) {
-        html += '<div class="sig-row"><span class="sig-key">Kalan Deneme</span><span class="sig-val">' + u.kalan_gun + ' gün</span></div>';
+        kart += '<div class="sig-row"><span class="sig-key">Kalan Deneme</span><span class="sig-val">' + u.kalan_gun + ' gün</span></div>';
       } else if (u.durum === "onayli" && u.kalan_gun !== null && u.kalan_gun !== undefined) {
-        html += '<div class="sig-row"><span class="sig-key">Kalan Süre</span><span class="sig-val">' + u.kalan_gun + ' gün</span></div>';
+        kart += '<div class="sig-row"><span class="sig-key">Kalan Süre</span><span class="sig-val">' + u.kalan_gun + ' gün</span></div>';
       }
-      html += '<div class="sig-time">Kayit: ' + (u.olusturma_tarihi || "-") + '</div>';
-      if (u.onay_tarihi) html += '<div class="sig-time">Onay: ' + u.onay_tarihi + '</div>';
-      if (u.ilk_onay_no) html += '<div class="sig-time" style="color:#60a5fa">İlk üye #' + u.ilk_onay_no + '</div>';
+      kart += '<div class="sig-time">Kayit: ' + (u.olusturma_tarihi || "-") + '</div>';
+      if (u.onay_tarihi) kart += '<div class="sig-time">Onay: ' + u.onay_tarihi + '</div>';
+      if (u.ilk_onay_no) kart += '<div class="sig-time" style="color:#60a5fa">İlk üye #' + u.ilk_onay_no + '</div>';
       if (u.son_giris_zaman) {
-        html += '<div class="sig-row"><span class="sig-key">Son Giris</span><span class="sig-val" style="font-size:11px">' +
+        kart += '<div class="sig-row"><span class="sig-key">Son Giris</span><span class="sig-val" style="font-size:11px">' +
           (u.son_giris_sehir !== "-" ? u.son_giris_sehir + ", " : "") + (u.son_giris_ulke || "-") +
           ' · ' + (u.son_giris_cihaz || "-") + ' · ' + u.son_giris_zaman + '</span></div>';
       }
       if (u.durum === "bekliyor") {
-        html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciDenemeBaslat(\'' + u.kullanici_adi + '\')">Deneme Baslat (3 Gun)</button></div>';
+        kart += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciDenemeBaslat(\'' + u.kullanici_adi + '\')">Deneme Baslat (3 Gun)</button></div>';
       }
       if (u.durum !== "onayli") {
         var butonYazisi = u.durum === "suresi_dolmus" ? "Yenile (30 Gun)" : "Direkt Onayla (30 Gun)";
-        html += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciOnayla(\'' + u.kullanici_adi + '\')">' + butonYazisi + '</button></div>';
+        kart += '<div style="text-align:center;margin-top:8px"><button class="refresh-btn" onclick="kullaniciOnayla(\'' + u.kullanici_adi + '\')">' + butonYazisi + '</button></div>';
       }
-      html += '<div style="text-align:center;margin-top:8px;display:flex;gap:8px;justify-content:center">' +
+      kart += '<div style="text-align:center;margin-top:8px;display:flex;gap:8px;justify-content:center">' +
         '<button class="refresh-btn" style="background:#22c55e;color:#052e16;font-weight:700" onclick="kullaniciGercekSifreSifirla(\'' + u.kullanici_adi + '\')">Sifre Sifirla (Kaydi Silmez)</button>' +
         '<button class="refresh-btn" onclick="kullaniciSifreSifirla(\'' + u.kullanici_adi + '\')">Sifre Sifirla (Kaydi Sil)</button>' +
         '</div>';
+      kart += '</div>';
+
+      // "Onayli" durumundaki kullanicilar AYRI, kapanabilir bir bolume
+      // (Onayli Kullanicilar) toplanir - islem BEKLEYEN (bekliyor/deneme/
+      // suresi dolmus) kullanicilar ise admin'in mudahalesi gerektigi icin
+      // HER ZAMAN dogrudan gorunur kalir, akordiyonun disinda.
+      if (u.durum === "onayli") {
+        onayliListe.push(kart);
+      } else {
+        digerHtml += kart;
+      }
+    }
+    var html;
+    if (liste.length === 0) {
+      html = '<div class="empty">Henuz kayitli kullanici yok</div>';
+    } else {
+      html = digerHtml;
+      html += yoneticiAccordionBaslikHtml("kul-onayli", "Onaylı Kullanıcılar", onayliListe.length);
+      html += '<div id="kul-onayli-govde" style="display:' + (yoneticiAcikBolumler["kul-onayli"] ? "block" : "none") + ';margin-top:8px">';
+      html += onayliListe.length ? onayliListe.join("") : '<div class="empty" style="padding:10px 0">Onayli kullanici yok</div>';
       html += '</div>';
     }
     document.getElementById("yonetici-icerik").innerHTML = html;
