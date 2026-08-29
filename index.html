@@ -594,9 +594,11 @@
     <div class="bot-filter" style="margin-bottom:10px">
       <button class="bot-btn active" id="portfoy-alt-takip" onclick="portfoyAltSekmeSec('takip')">Benim Takibim</button>
       <button class="bot-btn" id="portfoy-alt-simulasyon" onclick="portfoyAltSekmeSec('simulasyon')">Oda Simülasyonu</button>
+      <button class="bot-btn" id="portfoy-alt-paper" onclick="portfoyAltSekmeSec('paper')">Paper Trading</button>
     </div>
     <div id="portfoy-icerik"><div class="loading">Yukleniyor...</div></div>
     <div id="portfoy-simulasyon-icerik" style="display:none"></div>
+    <div id="portfoy-paper-icerik" style="display:none"></div>
   </div>
 
   <div id="iletisim" style="display:none">
@@ -1018,7 +1020,7 @@ function veriYukle() {
         takipDurumu[k.bot + "|" + k.sembol + "|" + k.zaman] = true;
       }
       if (aktifSekme === "sinyaller") sinyalleriGoster();
-      if (aktifSekme === "portfoy") { if (portfoyAltSekme === "simulasyon") simHesapla(); else portfoyGoster(); }
+      if (aktifSekme === "portfoy") { if (portfoyAltSekme === "simulasyon") simHesapla(); else if (portfoyAltSekme === "paper") paperTradingGoster(); else portfoyGoster(); }
     }
   };
   xhr10.send();
@@ -2707,9 +2709,13 @@ function portfoyAltSekmeSec(tip) {
   portfoyAltSekme = tip;
   document.getElementById("portfoy-alt-takip").classList.toggle("active", tip === "takip");
   document.getElementById("portfoy-alt-simulasyon").classList.toggle("active", tip === "simulasyon");
+  document.getElementById("portfoy-alt-paper").classList.toggle("active", tip === "paper");
   document.getElementById("portfoy-icerik").style.display = tip === "takip" ? "" : "none";
   document.getElementById("portfoy-simulasyon-icerik").style.display = tip === "simulasyon" ? "" : "none";
-  if (tip === "takip") portfoyGoster(); else portfoySimulasyonGoster();
+  document.getElementById("portfoy-paper-icerik").style.display = tip === "paper" ? "" : "none";
+  if (tip === "takip") portfoyGoster();
+  else if (tip === "simulasyon") portfoySimulasyonGoster();
+  else paperTradingGoster();
 }
 
 // Odanin TUM gecmis (kapanmis) sinyallerinden, bileşik (compounding) bir
@@ -2848,6 +2854,122 @@ function simHesapla() {
   simChart.timeScale().fitContent();
 }
 
+// ==================== PAPER TRADING (Portfoyum > Paper Trading) ====================
+// Oda Simulasyonu'nun (gecmise donuk backtest) CANLI, bugunden itibaren
+// ileriye dogru versiyonu. Sunucu, bir sinyal TP/STOP oldugunda o odanin
+// KALICI paper-trading bakiyesini gunceller (main.py / paper_trading_kapat) -
+// burada sadece o veriyi cekip 4 odayi TEK bir grafikte karsilastirmali
+// gosteriyoruz + basit bir liderlik siralamasi cikariyoruz.
+var paperChart = null, paperSeriesMap = {};
+var PAPER_RENK = {
+  "SINYAL_ODA_1": "#60a5fa",
+  "SINYAL_ODA_2": "#4ade80",
+  "SINYAL_ODA_3": "#fbbf24",
+  "SINYAL_ODA_4": "#f472b6"
+};
+
+function paperTradingGoster() {
+  var kutu = document.getElementById("portfoy-paper-icerik");
+  if (!kutu || !authToken) return;
+  if (!document.getElementById("paper-kartlar")) {
+    kutu.innerHTML =
+      '<div style="font-size:10.5px;color:#64748b;margin-bottom:10px;line-height:1.5">Her oda 1000 TL sanal bakiye ile bu ozelligin yayina girdigi andan itibaren CANLI takip edilir. Her sinyal kapandiginda (BAŞARILI/BAŞARISIZ), bakiyenin %2\'si risk edilip 8x sabit kaldirac varsayimiyla bilesik olarak guncellenir - Oda Simulasyonu ile ayni formul, ama gecmise degil bugunden itibaren ileriye bakar. Bu bir SIMULASYONDUR, gercek islem degildir.</div>' +
+      '<div id="paper-kartlar" class="stats-grid" style="grid-template-columns:repeat(2,1fr)"></div>' +
+      '<div id="paper-chart" style="width:100%;height:300px;border-radius:10px;overflow:hidden;background:#0a0f1e;margin-top:10px"></div>' +
+      '<div id="paper-siralama" style="margin-top:14px"></div>';
+  }
+
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/paper-trading", true);
+  xhr.setRequestHeader("X-Auth-Token", authToken);
+  xhr.onload = function() {
+    if (xhr.status !== 200) return;
+    var veri = JSON.parse(xhr.responseText);
+    var odalar = Object.keys(BOT_ADLARI).filter(function(b) { return veri[b]; });
+
+    // --- Kartlar ---
+    var kartHtml = "";
+    var siralamaListesi = [];
+    for (var i = 0; i < odalar.length; i++) {
+      var bot = odalar[i];
+      var d = veri[bot];
+      var getiriYuzde = d.baslangic > 0 ? ((d.bakiye - d.baslangic) / d.baslangic * 100) : 0;
+      var renk = getiriYuzde >= 0 ? "#4ade80" : "#f87171";
+      kartHtml += '<div class="stat-card" style="border-left:3px solid ' + PAPER_RENK[bot] + '">' +
+        '<div class="stat-label">' + botAdi(bot) + '</div>' +
+        '<div class="stat-val" style="color:' + renk + '">' + d.bakiye.toFixed(2) + ' TL</div>' +
+        '<div style="font-size:11px;color:' + renk + ';margin-top:2px">%' + (getiriYuzde >= 0 ? "+" : "") + getiriYuzde.toFixed(1) + '</div>' +
+        '<div style="font-size:10px;color:#64748b;margin-top:4px">' + d.tp + ' BAŞARILI / ' + d.stop + ' BAŞARISIZ</div></div>';
+      siralamaListesi.push({ bot: bot, getiri: getiriYuzde, bakiye: d.bakiye });
+    }
+    document.getElementById("paper-kartlar").innerHTML = kartHtml;
+
+    // --- Liderlik siralamasi (basitce guncel getiriye gore) ---
+    siralamaListesi.sort(function(a, b) { return b.getiri - a.getiri; });
+    var siraHtml = '<div class="section-title">Liderlik Sirasi</div>';
+    for (var r = 0; r < siralamaListesi.length; r++) {
+      var it = siralamaListesi[r];
+      var itRenk = it.getiri >= 0 ? "#4ade80" : "#f87171";
+      siraHtml += '<div class="signal-card" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;margin-bottom:6px">' +
+        '<div style="display:flex;align-items:center;gap:10px">' +
+        '<span style="font-weight:700;color:#64748b;width:18px">#' + (r + 1) + '</span>' +
+        '<span style="width:10px;height:10px;border-radius:50%;background:' + PAPER_RENK[it.bot] + ';display:inline-block"></span>' +
+        '<span style="font-weight:600;font-size:13px">' + botAdi(it.bot) + '</span></div>' +
+        '<span style="color:' + itRenk + ';font-weight:600">%' + (it.getiri >= 0 ? "+" : "") + it.getiri.toFixed(1) + '</span></div>';
+    }
+    document.getElementById("paper-siralama").innerHTML = siraHtml;
+
+    // --- Grafik (4 oda tek grafikte, karsilastirmali) ---
+    var chartKutu = document.getElementById("paper-chart");
+    var herhangiVeri = odalar.some(function(b) { return (veri[b].egri || []).length > 0; });
+    if (!herhangiVeri) {
+      if (paperChart) { try { paperChart.remove(); } catch (e) {} paperChart = null; paperSeriesMap = {}; }
+      chartKutu.innerHTML = '<div class="empty" style="padding:30px 0;text-align:center">Henuz hicbir odada kapanmis (BAŞARILI/BAŞARISIZ) sinyal yok</div>';
+      return;
+    }
+    if (!paperChart) {
+      chartKutu.innerHTML = "";
+      paperChart = LightweightCharts.createChart(chartKutu, {
+        layout: { background: { color: "#0a0f1e" }, textColor: "#94a3b8" },
+        grid: { vertLines: { color: "#141d33" }, horzLines: { color: "#141d33" } },
+        timeScale: { timeVisible: true, borderColor: "#1e293b" },
+        rightPriceScale: { borderColor: "#1e293b" },
+        width: chartKutu.clientWidth, height: 300
+      });
+      window.addEventListener("resize", function() { if (paperChart) paperChart.applyOptions({ width: chartKutu.clientWidth }); });
+    }
+    for (var oi = 0; oi < odalar.length; oi++) {
+      var obot = odalar[oi];
+      var egri = veri[obot].egri || [];
+      if (!egri.length) continue;
+      if (!paperSeriesMap[obot]) {
+        paperSeriesMap[obot] = paperChart.addLineSeries({ color: PAPER_RENK[obot], lineWidth: 2, title: botAdi(obot) });
+      }
+      var noktalar = [];
+      for (var ei = 0; ei < egri.length; ei++) {
+        var e = egri[ei];
+        var zSaniye = e.zaman ? Math.floor(new Date(e.zaman.replace(" ", "T")).getTime() / 1000) : (Math.floor(Date.now() / 1000) + ei);
+        noktalar.push({ time: zSaniye, value: e.bakiye });
+      }
+      // Ayni saniyeye denk gelen art arda noktalari birlestir (Oda Simulasyonu'ndaki
+      // ayni asctan-siralama sorunu burada da olusabilir - bkz. simHesapla).
+      var temiz = [];
+      for (var ti = 0; ti < noktalar.length; ti++) {
+        if (temiz.length && temiz[temiz.length - 1].time === noktalar[ti].time) {
+          temiz[temiz.length - 1].value = noktalar[ti].value;
+        } else {
+          temiz.push(noktalar[ti]);
+        }
+      }
+      try {
+        paperSeriesMap[obot].setData(temiz);
+      } catch (e2) {}
+    }
+    paperChart.timeScale().fitContent();
+  };
+  xhr.send();
+}
+
 function portfoyGoster() {
   var alan = document.getElementById("portfoy-icerik");
   if (!alan) return;
@@ -2953,7 +3075,7 @@ function guncelle() {
   if (aktifSekme === "balina") balinaGoster();
   if (aktifSekme === "haberler") haberleriGoster();
   if (aktifSekme === "yonetici") yoneticiPaneliGoster();
-  if (aktifSekme === "portfoy") { if (portfoyAltSekme === "simulasyon") simHesapla(); else portfoyGoster(); }
+  if (aktifSekme === "portfoy") { if (portfoyAltSekme === "simulasyon") simHesapla(); else if (portfoyAltSekme === "paper") paperTradingGoster(); else portfoyGoster(); }
   if (aktifSekme === "destekdirenc") ddYukle(ddSeciliCoin);
 }
 
