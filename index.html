@@ -2723,9 +2723,10 @@ function portfoySimulasyonGoster() {
       '<div style="display:flex;gap:8px">' +
       '<input id="sim-bakiye" type="number" value="1000" placeholder="Baslangic Bakiyesi" ' +
       'style="flex:1;background:#0a0f1e;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:13px">' +
-      '<input id="sim-risk" type="number" value="10" placeholder="Islem Basina Risk %" ' +
+      '<input id="sim-risk" type="number" value="2" placeholder="Islem Basina Risk %" ' +
       'style="flex:1;background:#0a0f1e;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:13px">' +
       '</div>' +
+      '<div style="font-size:10.5px;color:#64748b;margin-top:6px">⚠️ Yüksek risk oranları, yüzlerce/binlerce işlem üzerinden bileşik etkiyle gerçekçi olmayan (aşırı büyük) sonuçlar üretir - düşük bir oranla (örn. %1-2) başlamanız önerilir.</div>' +
       '<button class="refresh-btn" style="width:100%;margin-top:8px" onclick="simHesapla()">Hesapla</button>' +
       '</div>' +
       '<div id="sim-ozet"></div>' +
@@ -2740,7 +2741,7 @@ function simHesapla() {
   if (!botSecEl) return;
   var bot = botSecEl.value;
   var baslangic = parseFloat(document.getElementById("sim-bakiye").value) || 1000;
-  var riskYuzde = parseFloat(document.getElementById("sim-risk").value) || 10;
+  var riskYuzde = parseFloat(document.getElementById("sim-risk").value) || 2;
   var botVerisi = tumVeriler[bot];
   var sinyaller = (botVerisi && botVerisi.sinyaller) || [];
   var kapalilar = sinyaller.filter(function(s) { return s.durum === "tp" || s.durum === "stop"; });
