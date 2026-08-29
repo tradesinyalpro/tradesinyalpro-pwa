@@ -625,6 +625,7 @@
   </div>
 
   <div id="yonetici" style="display:none">
+    <div id="yonetici-bot-durumu-icerik" style="margin-bottom:14px"></div>
     <div id="yonetici-bakim-icerik" style="margin-bottom:14px"></div>
     <div id="yonetici-buyume-icerik"></div>
     <div id="yonetici-ziyaret-ozet"></div>
@@ -5181,7 +5182,7 @@ function sekmeAc(id, el) {
   // gostermek icin sekme her acildiginda render edilir, otomatik veri
   // cekmez (sadece kullanicinin kendi sorgusuyla tetiklenir).
   if (id === "analiz") { kriptoAnalizGoster(); hisseAnalizGoster(); bistAnalizGoster(); }
-  if (id === "yonetici") { buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); guvenlikHaritasiGoster(); }
+  if (id === "yonetici") { botDurumuGoster(); buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); guvenlikHaritasiGoster(); }
   if (id === "piyasa") altinFiyatlariGoster();
   if (id === "genelbakis") genelBakisDoldur("genelbakis-icerik");
   if (id === "coinperformans") coinPerformansGoster();
@@ -5286,6 +5287,47 @@ function yoneticiDetayCiz() {
 
 function guvenlikBasligi(baslik) {
   return '<div class="section-title" style="margin-top:16px">' + baslik + '</div>';
+}
+
+// ==================== BOT CANLILIK (HEARTBEAT) DURUMU (YONETICI) ====================
+// Botlar duzenli araliklarla backend'e "hala calisiyorum" (heartbeat)
+// gonderir - burada her botun SON GORULME zamanini ve canli/sessiz
+// durumunu gosteriyoruz. Bu, "Aktif Sinyal Sayisi" gibi is-tabanli
+// metriklerden FARKLI: bir bot uzun sure yeni sinyal uretmese bile
+// (piyasa uygun firsat vermiyor olabilir) heartbeat gelmeye devam
+// ediyorsa hala saglikli sayilir; heartbeat kesilmesi botun GERCEKTEN
+// coktugunu/durdugunu gosterir.
+function botDurumuGoster() {
+  var kutu = document.getElementById("yonetici-bot-durumu-icerik");
+  if (!kutu) return;
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/admin/bot-durumu", true);
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status !== 200) return;
+    var veri = JSON.parse(xhr.responseText);
+    var botlar = Object.keys(veri);
+    if (botlar.length === 0) {
+      kutu.innerHTML = '<div class="section-title">Bot Canlılık Durumu</div>' +
+        '<div class="empty" style="padding:10px 0">Henuz hicbir bottan heartbeat alinmadi (bot kodlarina heartbeat eklenmemis olabilir)</div>';
+      return;
+    }
+    var html = '<div class="section-title">Bot Canlılık Durumu</div><div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">';
+    for (var i = 0; i < botlar.length; i++) {
+      var b = veri[botlar[i]];
+      var canliMi = b.durum === "canli";
+      var renk = canliMi ? "#4ade80" : "#f87171";
+      var dakika = Math.floor(b.gecen_saniye / 60);
+      var gecenYazi = dakika < 1 ? "az once" : (dakika + " dk once");
+      html += '<div class="stat-card" style="border-left:3px solid ' + renk + '">' +
+        '<div class="stat-label">' + b.isim + '</div>' +
+        '<div class="stat-val" style="color:' + renk + ';font-size:14px">' + (canliMi ? "🟢 Canlı" : "🔴 Sessiz") + '</div>' +
+        '<div style="font-size:10px;color:#64748b;margin-top:4px">Son görülme: ' + gecenYazi + '</div></div>';
+    }
+    html += '</div>';
+    kutu.innerHTML = html;
+  };
+  xhr.send();
 }
 
 function guvenlikPaneliGoster() {
