@@ -591,7 +591,12 @@
   </div>
 
   <div id="portfoy" style="display:none">
+    <div class="bot-filter" style="margin-bottom:10px">
+      <button class="bot-btn active" id="portfoy-alt-takip" onclick="portfoyAltSekmeSec('takip')">Benim Takibim</button>
+      <button class="bot-btn" id="portfoy-alt-simulasyon" onclick="portfoyAltSekmeSec('simulasyon')">Oda Simülasyonu</button>
+    </div>
     <div id="portfoy-icerik"><div class="loading">Yukleniyor...</div></div>
+    <div id="portfoy-simulasyon-icerik" style="display:none"></div>
   </div>
 
   <div id="iletisim" style="display:none">
@@ -1002,7 +1007,7 @@ function veriYukle() {
         takipDurumu[k.bot + "|" + k.sembol + "|" + k.zaman] = true;
       }
       if (aktifSekme === "sinyaller") sinyalleriGoster();
-      if (aktifSekme === "portfoy") portfoyGoster();
+      if (aktifSekme === "portfoy") { if (portfoyAltSekme === "simulasyon") simHesapla(); else portfoyGoster(); }
     }
   };
   xhr10.send();
@@ -2684,6 +2689,118 @@ function referansLinkKopyala() {
   }
 }
 
+// ==================== PORTFOY ALT SEKMELERI (Benim Takibim / Oda Simulasyonu) ====================
+var portfoyAltSekme = "takip";
+
+function portfoyAltSekmeSec(tip) {
+  portfoyAltSekme = tip;
+  document.getElementById("portfoy-alt-takip").classList.toggle("active", tip === "takip");
+  document.getElementById("portfoy-alt-simulasyon").classList.toggle("active", tip === "simulasyon");
+  document.getElementById("portfoy-icerik").style.display = tip === "takip" ? "" : "none";
+  document.getElementById("portfoy-simulasyon-icerik").style.display = tip === "simulasyon" ? "" : "none";
+  if (tip === "takip") portfoyGoster(); else portfoySimulasyonGoster();
+}
+
+// Odanin TUM gecmis (kapanmis) sinyallerinden, bileşik (compounding) bir
+// bakiye egrisi hesaplar: "1000 TL ile bu odayi bastan takip etseydim,
+// bugun elimde ne olurdu" sorusuna cevap verir. "Benim Takibim"den FARKLI -
+// o kullanicinin KENDI SECTIGI birkac sinyali takip ediyordu, bu ise odanin
+// TUM GECMISINI, kullanici hicbir sey secmeden, otomatik hesaplar.
+var simChart = null, simSeries = null;
+
+function portfoySimulasyonGoster() {
+  var kutu = document.getElementById("portfoy-simulasyon-icerik");
+  if (!kutu) return;
+  if (!document.getElementById("sim-oda-sec")) {
+    kutu.innerHTML =
+      '<div style="margin-bottom:10px">' +
+      '<select id="sim-oda-sec" onchange="simHesapla()" style="width:100%;background:#0a0f1e;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px;margin-bottom:8px">' +
+      '<option value="SINYAL_ODA_1">Oda 1</option>' +
+      '<option value="SINYAL_ODA_2">Oda 2</option>' +
+      '<option value="SINYAL_ODA_3">Oda 3</option>' +
+      '<option value="SINYAL_ODA_4">Oda 4</option>' +
+      '</select>' +
+      '<div style="display:flex;gap:8px">' +
+      '<input id="sim-bakiye" type="number" value="1000" placeholder="Baslangic Bakiyesi" ' +
+      'style="flex:1;background:#0a0f1e;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:13px">' +
+      '<input id="sim-risk" type="number" value="10" placeholder="Islem Basina Risk %" ' +
+      'style="flex:1;background:#0a0f1e;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:13px">' +
+      '</div>' +
+      '<button class="refresh-btn" style="width:100%;margin-top:8px" onclick="simHesapla()">Hesapla</button>' +
+      '</div>' +
+      '<div id="sim-ozet"></div>' +
+      '<div id="sim-chart" style="width:100%;height:320px;border-radius:10px;overflow:hidden;background:#0a0f1e;margin-top:10px"></div>' +
+      '<div style="font-size:10.5px;color:#475569;margin-top:8px;line-height:1.5">Bu bir SIMULASYONDUR, gercek islem degildir. Her sinyalde bakiyenin belirttiginiz yuzdesinin risk edildigi ve 8x sabit kaldirac (odanin kendi seviyeleri uzerinden) varsayilarak GECMISE DONUK hesaplanmistir. Gecmis performans gelecegi garanti etmez, kisisel yatirim tavsiyesi degildir.</div>';
+  }
+  simHesapla();
+}
+
+function simHesapla() {
+  var botSecEl = document.getElementById("sim-oda-sec");
+  if (!botSecEl) return;
+  var bot = botSecEl.value;
+  var baslangic = parseFloat(document.getElementById("sim-bakiye").value) || 1000;
+  var riskYuzde = parseFloat(document.getElementById("sim-risk").value) || 10;
+  var botVerisi = tumVeriler[bot];
+  var sinyaller = (botVerisi && botVerisi.sinyaller) || [];
+  var kapalilar = sinyaller.filter(function(s) { return s.durum === "tp" || s.durum === "stop"; });
+  kapalilar.sort(function(a, b) {
+    var za = a.sonuc_zamani || a.zaman || "";
+    var zb = b.sonuc_zamani || b.zaman || "";
+    return za.localeCompare(zb);
+  });
+
+  var bakiye = baslangic;
+  var egriVeri = [];
+  var tp = 0, stop = 0;
+  for (var i = 0; i < kapalilar.length; i++) {
+    var s = kapalilar[i];
+    var giris = parseFloat(s.giris || s.maliyet);
+    var cikis = parseFloat(s.durum === "tp" ? s.hedef : s.stop);
+    if (!giris || !cikis) continue;
+    var hamYuzde = s.yon === "LONG" ? (cikis - giris) / giris * 100 : (giris - cikis) / giris * 100;
+    var roiYuzde = hamYuzde * 8;
+    bakiye = bakiye + (bakiye * (riskYuzde / 100) * (roiYuzde / 100));
+    if (s.durum === "tp") tp++; else stop++;
+    var zamanStr = s.sonuc_zamani || s.zaman;
+    var zamanSaniye = zamanStr ? Math.floor(new Date(zamanStr.replace(" ", "T")).getTime() / 1000) : (Math.floor(Date.now() / 1000) + i);
+    egriVeri.push({ time: zamanSaniye, value: Math.round(bakiye * 100) / 100 });
+  }
+
+  var toplamGetiriYuzde = baslangic > 0 ? ((bakiye - baslangic) / baslangic * 100) : 0;
+  var renk = toplamGetiriYuzde >= 0 ? "#4ade80" : "#f87171";
+
+  document.getElementById("sim-ozet").innerHTML =
+    '<div class="stats-grid">' +
+    '<div class="stat-card"><div class="stat-label">Başlangıç</div><div class="stat-val">' + baslangic.toFixed(0) + '</div></div>' +
+    '<div class="stat-card"><div class="stat-label">Güncel Bakiye</div><div class="stat-val" style="color:' + renk + '">' + bakiye.toFixed(2) + '</div></div>' +
+    '<div class="stat-card"><div class="stat-label">Toplam Getiri</div><div class="stat-val" style="color:' + renk + '">%' + (toplamGetiriYuzde >= 0 ? "+" : "") + toplamGetiriYuzde.toFixed(1) + '</div></div>' +
+    '<div class="stat-card"><div class="stat-label">İşlem (B/B)</div><div class="stat-val">' + tp + ' / ' + stop + '</div></div>' +
+    '</div>';
+
+  var chartKutu = document.getElementById("sim-chart");
+  if (!egriVeri.length) {
+    if (simChart) { try { simChart.remove(); } catch (e) {} simChart = null; simSeries = null; }
+    chartKutu.innerHTML = '<div class="empty" style="padding:30px 0;text-align:center">Bu oda için henüz kapanmış (BAŞARILI/BAŞARISIZ) sinyal yok</div>';
+    return;
+  }
+  if (!simChart) {
+    chartKutu.innerHTML = "";
+    simChart = LightweightCharts.createChart(chartKutu, {
+      layout: { background: { color: "#0a0f1e" }, textColor: "#94a3b8" },
+      grid: { vertLines: { color: "#141d33" }, horzLines: { color: "#141d33" } },
+      timeScale: { timeVisible: true, borderColor: "#1e293b" },
+      rightPriceScale: { borderColor: "#1e293b" },
+      width: chartKutu.clientWidth, height: 320
+    });
+    simSeries = simChart.addLineSeries({ color: renk, lineWidth: 2 });
+    window.addEventListener("resize", function() { if (simChart) simChart.applyOptions({ width: chartKutu.clientWidth }); });
+  }
+  simSeries.applyOptions({ color: renk });
+  simSeries.setData(egriVeri);
+  simChart.timeScale().fitContent();
+}
+
 function portfoyGoster() {
   var alan = document.getElementById("portfoy-icerik");
   if (!alan) return;
@@ -2789,7 +2906,7 @@ function guncelle() {
   if (aktifSekme === "balina") balinaGoster();
   if (aktifSekme === "haberler") haberleriGoster();
   if (aktifSekme === "yonetici") yoneticiPaneliGoster();
-  if (aktifSekme === "portfoy") portfoyGoster();
+  if (aktifSekme === "portfoy") { if (portfoyAltSekme === "simulasyon") simHesapla(); else portfoyGoster(); }
   if (aktifSekme === "destekdirenc") ddYukle(ddSeciliCoin);
 }
 
