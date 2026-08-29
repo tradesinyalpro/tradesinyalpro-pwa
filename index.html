@@ -2782,6 +2782,24 @@ function simHesapla() {
   var toplamGetiriYuzde = baslangic > 0 ? ((bakiye - baslangic) / baslangic * 100) : 0;
   var renk = toplamGetiriYuzde >= 0 ? "#4ade80" : "#f87171";
 
+  // Ayni saniyeye denk gelen art arda kapanislar (kaynak veride sadece
+  // dakika hassasiyeti oldugu icin ayni dakika icinde birden fazla sinyal
+  // kapanirsa ayni "time" degeri olusabiliyor) LightweightCharts'in "zaman
+  // kesinlikle artan olmali" kuralini bozuyor ve setData'yi SESSIZCE
+  // basarisiz kiliyordu - bu yuzden Oda 2/3/4 gibi daha yogun odalara
+  // gecince grafik guncellenmeyip onceki odanin cizgisinde takili kaliyordu.
+  // Ayni zaman damgali art arda noktalari birlestirip (en gunceli tutarak)
+  // zamani kesin artan hale getiriyoruz.
+  var temizEgri = [];
+  for (var ti = 0; ti < egriVeri.length; ti++) {
+    if (temizEgri.length && temizEgri[temizEgri.length - 1].time === egriVeri[ti].time) {
+      temizEgri[temizEgri.length - 1].value = egriVeri[ti].value;
+    } else {
+      temizEgri.push(egriVeri[ti]);
+    }
+  }
+  egriVeri = temizEgri;
+
   document.getElementById("sim-ozet").innerHTML =
     '<div class="stats-grid">' +
     '<div class="stat-card"><div class="stat-label">Başlangıç</div><div class="stat-val">' + baslangic.toFixed(0) + '</div></div>' +
@@ -2809,7 +2827,24 @@ function simHesapla() {
     window.addEventListener("resize", function() { if (simChart) simChart.applyOptions({ width: chartKutu.clientWidth }); });
   }
   simSeries.applyOptions({ color: renk });
-  simSeries.setData(egriVeri);
+  try {
+    simSeries.setData(egriVeri);
+  } catch (e) {
+    // Beklenmeyen bir veri sirasi hatasi olursa grafigi sifirdan kurup
+    // tekrar deniyoruz, boylece ekran eski odanin cizgisinde takili kalmiyor.
+    try { simChart.remove(); } catch (e2) {}
+    simChart = null; simSeries = null;
+    chartKutu.innerHTML = "";
+    simChart = LightweightCharts.createChart(chartKutu, {
+      layout: { background: { color: "#0a0f1e" }, textColor: "#94a3b8" },
+      grid: { vertLines: { color: "#141d33" }, horzLines: { color: "#141d33" } },
+      timeScale: { timeVisible: true, borderColor: "#1e293b" },
+      rightPriceScale: { borderColor: "#1e293b" },
+      width: chartKutu.clientWidth, height: 320
+    });
+    simSeries = simChart.addLineSeries({ color: renk, lineWidth: 2 });
+    simSeries.setData(egriVeri);
+  }
   simChart.timeScale().fitContent();
 }
 
