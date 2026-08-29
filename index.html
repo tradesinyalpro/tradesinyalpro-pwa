@@ -1498,16 +1498,17 @@ function olcumBirakIsle() { OLCUM_DURUM.suruklemede = false; }
 function olcumDocumentListenerlariKur() {
   if (OLCUM_DOCUMENT_KURULDU) return;
   OLCUM_DOCUMENT_KURULDU = true;
-  // Bunlar YEDEK/genel dinleyiciler - fare, olcum yapilan kutunun disina
-  // (surukleme sirasinda) cikarsa bile calismaya devam etmesi icin document
-  // seviyesinde. grafikOlcumAraciKur() ayrica kutu'nun kendi uzerine de
-  // CAPTURE asamasinda ayni fonksiyonlari ekler (asagida) - bu, lightweight-
-  // charts'in kendi surukleme/kaydirma dinleyicisi olayi durdursa (stopPropagation)
-  // bile bizim kodumuzun ONCE calismasini garanti eder.
+  // SADECE fare (mouse) icin kalici, document seviyesinde yedek dinleyiciler -
+  // fare surukleme sirasinda kutunun disina cikarsa bile calismaya devam
+  // etmesi icin gerekli, ve mousemove/mouseup'in {passive:false} gibi bir
+  // kaydirma-performansi sorunu YOK (bu sadece dokunmatik/touch olaylari
+  // icin gecerli bir kavram). Dokunmatik (touchmove/touchend) dinleyicileri
+  // ARTIK burada DEGIL - grafikOlcumAraciKur() icinde, SADECE surukleme
+  // gercekten basladigi an dinamik olarak eklenip bitince kaldiriliyor
+  // (bkz. oradaki detayli not) - boylece olcum araci kullanilmadigi surece
+  // (kullanicilarin buyuk cogunlugu) sayfa kaydirmasi hic etkilenmiyor.
   document.addEventListener("mousemove", olcumSurukleIsle);
   document.addEventListener("mouseup", olcumBirakIsle);
-  document.addEventListener("touchmove", olcumSurukleIsle, { passive: false });
-  document.addEventListener("touchend", olcumBirakIsle);
 }
 
 function grafikOhlcBilgisiKur(kutuId, chartObj, seriesObj) {
@@ -1579,6 +1580,13 @@ function grafikOlcumAraciKur(kutuId, chartAl, seriAl) {
   dikdortgen.style.cssText = "position:absolute;display:none;border:1px dashed;pointer-events:none;z-index:25;box-sizing:border-box";
   kutu.appendChild(dikdortgen);
 
+  function birakVeTemizle() {
+    olcumBirakIsle();
+    kutu.removeEventListener("mousemove", olcumSurukleIsle, true);
+    kutu.removeEventListener("touchmove", olcumSurukleIsle, true);
+    document.removeEventListener("touchmove", olcumSurukleIsle, { passive: false });
+  }
+
   function basla(e) {
     if (kutu.getAttribute("data-olcum-aktif") !== "1") return;
     var b = olcumNoktaAl(e, kutu, chartAl, seriAl);
@@ -1591,6 +1599,19 @@ function grafikOlcumAraciKur(kutuId, chartAl, seriAl) {
     // "tek tikla kalma" gibi davranmasina yol aciyordu. stopPropagation ile
     // olayin kutuphaneye ULASMASINI ENGELLIYORUZ (sadece olcum aktifken).
     e.stopPropagation();
+
+    // ONEMLI PERFORMANS DUZELTMESI: mousemove/touchmove dinleyicilerini
+    // KALICI olarak eklemek yerine, SADECE surukleme gercekten basladigi an
+    // (burada) ekleyip, surukleme bittiginde (asagida) hemen kaldiriyoruz.
+    // Ozellikle touchmove'un {passive:false} olmasi, kalici eklendiginde
+    // TARAYICININ PASIF/AKICI KAYDIRMA OPTIMIZASYONUNU o alan uzerinde HER
+    // ZAMAN devre disi birakiyordu - olcum araci kapaliyken bile. Dinamik
+    // ekle/kaldir sayesinde, olcum yapilmadigi surece (kullanicilarin
+    // %99'u zamaninin cogunda) grafik alani da dahil TUM SAYFA normal,
+    // akici sekilde kaydirilabiliyor.
+    kutu.addEventListener("mousemove", olcumSurukleIsle, true);
+    kutu.addEventListener("touchmove", olcumSurukleIsle, { passive: false, capture: true });
+    document.addEventListener("touchmove", olcumSurukleIsle, { passive: false });
   }
   // ONEMLI: mousedown/touchstart dinleyicileri CAPTURE ASAMASINDA (3. param
   // = true) eklenir - boylece bizim kodumuz, lightweight-charts'in kendi
@@ -1599,21 +1620,19 @@ function grafikOlcumAraciKur(kutuId, chartAl, seriAl) {
   // (bubble asamasi) dinleyici kullansaydik, kutuphane muhtemelen olayi
   // BIZDEN ONCE yakalayip kendi surukleme/kaydirma davranisini
   // baslatiyordu, bizim surukleme mantigimiz hic devreye giremiyordu.
+  // mousedown/touchstart TEK SEFERLIK (surekli degil) olaylar oldugu icin
+  // kalici eklenmeleri kaydirma performansini ETKILEMEZ - sadece move/end
+  // turu SUREKLI olaylar dinamik ekle/kaldir gerektiriyordu.
   //
   // Bu dinleyiciler (kutu.addEventListener) GUVENLIDIR - eleman DOM'dan
   // kaldirilip cop toplandiginda bu dinleyiciler de onunla birlikte yok
   // olur, document'a eklenenler gibi BIRIKMEZ.
   kutu.addEventListener("mousedown", basla, true);
   kutu.addEventListener("touchstart", basla, { passive: false, capture: true });
-  // mousemove/mouseup icin de kutu-seviyesinde, capture asamasinda ek
-  // dinleyiciler - lightweight-charts'in kendi surukleme davranisi devreye
-  // girmeden ONCE bizim etiketimizin guncellenmesini garantiler.
-  kutu.addEventListener("mousemove", olcumSurukleIsle, true);
-  kutu.addEventListener("mouseup", olcumBirakIsle, true);
-  kutu.addEventListener("touchmove", olcumSurukleIsle, { passive: false, capture: true });
-  kutu.addEventListener("touchend", olcumBirakIsle, true);
+  kutu.addEventListener("mouseup", birakVeTemizle, true);
+  kutu.addEventListener("touchend", birakVeTemizle, true);
 
-  kutu._olcumEtiketGizle = function() { etiket.style.display = "none"; dikdortgen.style.display = "none"; OLCUM_DURUM.suruklemede = false; };
+  kutu._olcumEtiketGizle = function() { etiket.style.display = "none"; dikdortgen.style.display = "none"; birakVeTemizle(); };
 }
 
 function olcumAraciToggle(btn, kutuId) {
@@ -1916,17 +1935,11 @@ document.addEventListener("pointerdown", function(e) {
   if (tutamac.setPointerCapture) { try { tutamac.setPointerCapture(e.pointerId); } catch (err) {} }
 }, { passive: false });
 
-document.addEventListener("pointermove", function(e) {
-  if (!cizimTasima) return;
-  e.preventDefault();
-  var olcek = cizimOlcek[cizimTasima.sembol];
-  if (!olcek) return;
-  var nokta = svgKoordCoz(cizimTasima.svg, e.clientX, e.clientY, olcek);
-  if (!nokta) return; // eleman gecici olarak kopuk - bu hareketi atla, mevcut konumu bozma
-  var dx = nokta.x - cizimTasima.baslangicNokta.x;
-  var dy = nokta.y - cizimTasima.baslangicNokta.y;
-  cizimTasimaGuncelle(cizimTasima.sembol, cizimTasima.index, dx, dy, olcek);
-}, { passive: false });
+// NOT: buradaki eski "document.addEventListener('pointermove', ...)" (cizimTasima
+// icin) kaldirildi - artik hicbir UI elemani cizimTasima'yi ASLA true yapmiyordu
+// (cizimAraciSec cagrilan bir yer kalmamisti), yani sürekli calisan, TUM SAYFADA
+// kaydirmayi ({passive:false} nedeniyle) yavaslatan bu dinleyici %100 OLU KOD idi -
+// site genelinde sekme gecisi/kaydirma donmasinin ana sebeplerinden biriydi.
 
 document.addEventListener("pointerup", function(e) {
   if (!cizimTasima) return;
@@ -1950,12 +1963,12 @@ document.addEventListener("selectstart", function(e) {
   if (cizimSurukleme || cizimTasima) e.preventDefault();
 });
 
-// Ek guvenlik: bazi Android WebView'lerde touch-action:none tek basina
-// yetmeyip tarayici yine de sayfayi kaydirmaya calisabiliyor. Bir cizim/
-// tasima aktifken dokunma hareketini de dogrudan engelliyoruz.
-document.addEventListener("touchmove", function(e) {
-  if (cizimSurukleme || cizimTasima) e.preventDefault();
-}, { passive: false });
+// NOT: buradaki eski TUM SAYFA genelinde calisan "touchmove" engelleyicisi
+// KALDIRILDI - cizimSurukleme/cizimTasima artik hicbir zaman true olamiyordu
+// (asagidaki not ile ayni sebep), yani bu, HER DOKUNMA HAREKETINDE (sayfanin
+// HERHANGI bir yerinde, grafikten uzak olsa bile) gereksiz yere calisip
+// tarayicinin PASIF (duz, akici) kaydirma optimizasyonunu devre disi
+// birakan, saf performans yuku olan bir kod parcasiydi.
 
 function cizimSuruklemeyiTemizle() {
   if (cizimSurukleme && cizimSurukleme.onizlemeEls) {
@@ -2050,25 +2063,8 @@ function cizimOlcumOnizlemeGuncelle(sur, olcek) {
   satir2.textContent = bilgi.satir2;
 }
 
-document.addEventListener("pointermove", function(e) {
-  if (!cizimSurukleme) return;
-  e.preventDefault();
-  var sembol = cizimSurukleme.sembol;
-  var olcek = cizimOlcek[sembol];
-  if (!olcek) return;
-  var nokta = svgKoordCoz(cizimSurukleme.svg, e.clientX, e.clientY, olcek);
-  if (!nokta) return; // eleman gecici olarak kopuk - bu hareketi atla, son gecerli konumu koru
-  cizimSurukleme.x2 = nokta.x;
-  cizimSurukleme.y2 = nokta.y;
-  if (cizimSurukleme.tip === "trend") {
-    var cizgi = cizimSurukleme.onizlemeEls[0];
-    if (cizgi) { cizgi.setAttribute("x2", nokta.x); cizgi.setAttribute("y2", nokta.y); }
-  } else if (cizimSurukleme.tip === "olcum") {
-    var olcumCizgi2 = cizimSurukleme.onizlemeEls[0];
-    if (olcumCizgi2) { olcumCizgi2.setAttribute("x2", nokta.x); olcumCizgi2.setAttribute("y2", nokta.y); }
-    cizimOlcumOnizlemeGuncelle(cizimSurukleme, olcek);
-  }
-}, { passive: false });
+// NOT: buradaki uçuncu (son) olu, tum sayfayi bloke eden "pointermove"
+// dinleyicisi de ayni sebeple kaldirildi (bkz. yukaridaki iki not).
 
 function cizimSuruklemeyiSonlandir() {
   if (!cizimSurukleme) return;
