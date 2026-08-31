@@ -1749,6 +1749,9 @@ function silgiAraciToggle(btn, kutuId) { araciToggle(btn, kutuId, "silgi"); }
 // (bkz. kartCizimleriKaydet/Yukle) - cihazlar arasi senkron olur.
 var TREND_MARKER_YARICAP = 22; // px
 var FIB_SEVIYELERI = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+// TradingView'daki gibi HER seviye farkli bir renk - FIB_SEVIYELERI ile
+// AYNI SIRADA (indeksleri eslesir).
+var FIB_RENKLERI = ["#9ca3af", "#f87171", "#fb923c", "#facc15", "#4ade80", "#22d3ee", "#a78bfa"];
 
 function trendCizgisiOlustur(b, s, sunucuyaKaydet) {
   var chart = (kartChart), seri = kartSeries;
@@ -1783,9 +1786,9 @@ function fibCizimiOlustur(b, s, sunucuyaKaydet) {
     var fiyat = b.fiyat + L * (s.fiyat - b.fiyat);
     seviyeFiyatlari.push(fiyat);
     priceLines.push(kartSeries.createPriceLine({
-      price: fiyat, color: "#fbbf24", lineWidth: 1,
+      price: fiyat, color: FIB_RENKLERI[i], lineWidth: 1,
       lineStyle: (L === 0 || L === 1) ? LightweightCharts.LineStyle.Solid : LightweightCharts.LineStyle.Dashed,
-      axisLabelVisible: true, title: "Fib " + (L * 100).toFixed(1) + "%"
+      axisLabelVisible: true, title: String(L)
     }));
   }
   var p1 = { time: b.zaman, value: b.fiyat }, p2 = { time: s.zaman, value: s.fiyat };
