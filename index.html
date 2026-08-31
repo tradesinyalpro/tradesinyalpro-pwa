@@ -1426,6 +1426,13 @@ var ZAMAN_DILIMI_AYARLARI = {
   "1h": { sayi: 72, etiket: "1sa" },
   "4h": { sayi: 72, etiket: "4sa" }
 };
+// SADECE tam ekran kart grafigi (kartLwGrafikGuncelle) icin - liste
+// gorunumundeki kucuk mini-grafikler (sparkline, ZAMAN_DILIMI_AYARLARI
+// kullanir) BUNDAN ETKILENMEZ, kasitli olarak ayri tutuldu. Destek/Direnc
+// sekmesiyle AYNI standart (288 mum) - uzaklastirinca grafigin "yarim"
+// gorunmesini onlemek ve destek/direnc seviyelerini daha rahat okuyabilmek
+// icin.
+var KART_ZAMAN_DILIMI_SAYI = { "15m": 288, "1h": 288, "4h": 288 };
 
 function mumZamanDilimiAl(sembol) {
   return mumZamanDilimi[sembol] || "1h";
@@ -1702,7 +1709,7 @@ function kartLwGrafikGuncelle(sembol) {
   if (!kutu || kutu.getAttribute("data-sembol") !== sembol) return;
 
   var interval = mumZamanDilimiAl(sembol);
-  var sayi = (ZAMAN_DILIMI_AYARLARI[interval] || ZAMAN_DILIMI_AYARLARI["1h"]).sayi;
+  var sayi = KART_ZAMAN_DILIMI_SAYI[interval] || 288;
   var klineUrl = "https://fapi.binance.com/fapi/v1/klines?symbol=" + sembol + "&interval=" + interval + "&limit=" + sayi;
 
   var xhr = new XMLHttpRequest();
