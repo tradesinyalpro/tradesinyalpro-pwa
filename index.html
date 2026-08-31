@@ -1478,7 +1478,10 @@ function zamanDilimiSec(btn) {
 // olurdu. Giris/Hedef/Stop/E1-E2-E3 zaten Veriler sekmesinde acikca gorunen,
 // gizli olmayan bilgiler oldugu icin sorun yok.
 var kartChart = null, kartSeries = null, kartPriceLines = [], kartSonAnahtar = null, kartKutuRef = null;
-var kartTrendCizgileri = []; // [{series, p1:{time,value}, p2:{time,value}}] - SADECE tam ekran kart
+// kartCizimler: kullanicinin cizdigi TUM kalici cizimler (trend/yatay/fib) -
+// SADECE tam ekran kart. Her kayit: {tip:"trend", seri, p1, p2} |
+// {tip:"yatay", priceLine, price} | {tip:"fib", priceLines:[...], seviyeFiyatlari:[...], p1, p2}
+var kartCizimler = [];
 var kartFiyatCizgileriGizliMi = false; // Giris/Hedef/Stop/Ekleme cizgileri (SADECE grafikte) gizli mi
 
 // ==================== PAYLASILAN OLCUM ARACI (Destek/Direnc + Kart grafikleri) ====================
@@ -1712,38 +1715,88 @@ function araciToggle(btn, kutuId, aracAdi) {
   // yari-tamamlanmis onizlemesini/isaretini temizle - iki arac birbirine
   // karisip "hayalet" cizgi/etiket birakmasin.
   if (yeni !== "olcum" && kutu._olcumEtiketGizle) kutu._olcumEtiketGizle();
-  if (yeni !== "trend" && kutu._trendOnizlemeTemizle) kutu._trendOnizlemeTemizle();
+  if ((yeni !== "trend" && yeni !== "yatay" && yeni !== "fib") && kutu._cizimOnizlemeTemizle) kutu._cizimOnizlemeTemizle();
 }
 
 function olcumAraciToggle(btn, kutuId) { araciToggle(btn, kutuId, "olcum"); }
 function trendAraciToggle(btn, kutuId) { araciToggle(btn, kutuId, "trend"); }
+function yatayAraciToggle(btn, kutuId) { araciToggle(btn, kutuId, "yatay"); }
+function fibAraciToggle(btn, kutuId) { araciToggle(btn, kutuId, "fib"); }
 function silgiAraciToggle(btn, kutuId) { araciToggle(btn, kutuId, "silgi"); }
 
-// ==================== TREND CIZGISI ARACI (SADECE Veriler > tam ekran kart) ====================
+// ==================== CIZIM ARACLARI: TREND / YATAY CIZGI / FIBONACCI ====================
+// (SADECE Veriler > tam ekran kart)
 // Olcum araciyla AYNI mimari: capture-phase mousedown/touchstart, sadece
-// arac aktifken (data-aktif-arac==="trend") yakalar, move dinleyicileri
-// SADECE surukleme sirasinda dinamik eklenir/kaldirilir - boylece arac
-// kapaliyken (varsayilan) sayfa kaydirma/yakinlastirma HICBIR SEKILDE
-// etkilenmez (masaustunde de mobilde de).
+// ilgili arac aktifken (data-aktif-arac==="trend"|"yatay"|"fib") yakalar,
+// move dinleyicileri SADECE surukleme sirasinda dinamik eklenir/kaldirilir -
+// boylece hicbir arac aktif degilken (varsayilan durum) sayfa kaydirma/
+// yakinlastirma HICBIR SEKILDE etkilenmez (masaustunde de mobilde de).
 //
-// MASAUSTU: sol tik basili tutunca cizim baslar, surukleyip birakinca biter
-// (klasik surukle-birak) - tipki olcum araci gibi.
-// MOBIL: ilk dokunus sadece bir ISARET birakir (cizgi henuz baslamaz).
-// O isaretin YARI CAPI icine (TREND_MARKER_YARICAP) tekrar dokunulursa
-// cizim o noktadan baslar ve parmak surukledikce cizilir. Isaretin disina
-// yeni bir dokunus, isareti sadece o yeni yere tasir. Boylece rastgele bir
-// dokunus/kaydirma asla yanlislikla cizgi baslatmaz.
+// MASAUSTU: sol tik basili tutunca cizim baslar, surukleyip birakinca biter.
+// MOBIL (trend/fib - IKI noktali araclar): ilk dokunus sadece bir ISARET
+// birakir (cizgi henuz baslamaz). O isaretin YARI CAPI icine
+// (TREND_MARKER_YARICAP) tekrar dokunulursa cizim o noktadan baslar ve
+// parmak surukledikce cizilir. Isaretin disina yeni bir dokunus, isareti
+// sadece o yeni yere tasir. Boylece rastgele bir dokunus/kaydirma asla
+// yanlislikla cizgi baslatmaz.
+// MOBIL (yatay - TEK noktali arac): tek dokunus + surukleyip birakma yeterli
+// (ikinci nokta gerekmedigi icin "isaretle-sonra-uzat" adimina gerek yok).
 //
-// Cizgiler GERCEK grafik serisi (2 noktali LineSeries, fiyat/zaman
+// Cizimler GERCEK grafik ogeleri (LineSeries / PriceLine, fiyat-zaman
 // koordinatli) olarak eklenir - ekran pikseline degil, boylece grafik
-// kaydirilip/yakinlastirilinca ya da zaman dilimi degisince cizgi dogru
-// yerde kalir (TradingView'daki gibi).
+// kaydirilip/yakinlastirilinca ya da zaman dilimi degisince yerinde kalir
+// (TradingView'daki gibi). Ayrica hesaba bagli olarak SUNUCUDA saklanir
+// (bkz. kartCizimleriKaydet/Yukle) - cihazlar arasi senkron olur.
 var TREND_MARKER_YARICAP = 22; // px
+var FIB_SEVIYELERI = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
 
-function grafikTrendAraciKur(kutuId, chartAl, seriAl) {
+function trendCizgisiOlustur(b, s, sunucuyaKaydet) {
+  var chart = (kartChart), seri = kartSeries;
+  if (!chart || !seri || b.zaman == null || s.zaman == null || b.fiyat == null || s.fiyat == null) return;
+  if (b.zaman === s.zaman) return; // ayni noktaya tiklama/tap - anlamsiz cizgi olusturma
+  var yeniSeri = chart.addLineSeries({
+    color: "#60a5fa", lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false
+  });
+  var p1 = { time: b.zaman, value: b.fiyat }, p2 = { time: s.zaman, value: s.fiyat };
+  var noktalar = b.zaman < s.zaman ? [p1, p2] : [p2, p1];
+  yeniSeri.setData(noktalar);
+  kartCizimler.push({ tip: "trend", seri: yeniSeri, p1: p1, p2: p2 });
+  if (sunucuyaKaydet !== false) kartCizimleriKaydet();
+}
+
+function yatayCizgisiOlustur(fiyat, sunucuyaKaydet) {
+  if (!kartSeries || fiyat == null) return;
+  var pl = kartSeries.createPriceLine({
+    price: fiyat, color: "#a78bfa", lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid,
+    axisLabelVisible: true, title: "―"
+  });
+  kartCizimler.push({ tip: "yatay", priceLine: pl, price: fiyat });
+  if (sunucuyaKaydet !== false) kartCizimleriKaydet();
+}
+
+function fibCizimiOlustur(b, s, sunucuyaKaydet) {
+  if (!kartSeries || b.zaman == null || s.zaman == null || b.fiyat == null || s.fiyat == null) return;
+  if (b.zaman === s.zaman) return;
+  var priceLines = [], seviyeFiyatlari = [];
+  for (var i = 0; i < FIB_SEVIYELERI.length; i++) {
+    var L = FIB_SEVIYELERI[i];
+    var fiyat = b.fiyat + L * (s.fiyat - b.fiyat);
+    seviyeFiyatlari.push(fiyat);
+    priceLines.push(kartSeries.createPriceLine({
+      price: fiyat, color: "#fbbf24", lineWidth: 1,
+      lineStyle: (L === 0 || L === 1) ? LightweightCharts.LineStyle.Solid : LightweightCharts.LineStyle.Dashed,
+      axisLabelVisible: true, title: "Fib " + (L * 100).toFixed(1) + "%"
+    }));
+  }
+  var p1 = { time: b.zaman, value: b.fiyat }, p2 = { time: s.zaman, value: s.fiyat };
+  kartCizimler.push({ tip: "fib", priceLines: priceLines, seviyeFiyatlari: seviyeFiyatlari, p1: p1, p2: p2 });
+  if (sunucuyaKaydet !== false) kartCizimleriKaydet();
+}
+
+function grafikCizimAraciKur(kutuId, chartAl, seriAl) {
   var kutu = document.getElementById(kutuId);
-  if (!kutu || kutu.getAttribute("data-trend-kuruldu")) return;
-  kutu.setAttribute("data-trend-kuruldu", "1");
+  if (!kutu || kutu.getAttribute("data-cizim-kuruldu")) return;
+  kutu.setAttribute("data-cizim-kuruldu", "1");
   kutu.style.position = "relative";
 
   var svg = document.createElementNS(SVG_NS, "svg");
@@ -1763,12 +1816,22 @@ function grafikTrendAraciKur(kutuId, chartAl, seriAl) {
   svg.appendChild(isaretNokta);
   kutu.appendChild(svg);
 
-  var beklemedeNokta = null;     // mobil: ilk dokunusla birakilan, henuz cizgiye donusmemis isaret
-  var suruklemeBaslangic = null; // aktif surukleme (masaustu ya da mobil 2. dokunus) baslangici
+  var beklemedeNokta = null;     // mobil (trend/fib): ilk dokunusla birakilan, henuz cizgiye donusmemis isaret
+  var suruklemeBaslangic = null; // aktif surukleme baslangici
+  var suruklemeAraci = null;     // surukleme basladigi andaki aktif arac ("trend"|"yatay"|"fib")
 
   function onizlemeGoster(b, s) {
-    onizlemeCizgi.setAttribute("x1", b.x); onizlemeCizgi.setAttribute("y1", b.y);
-    onizlemeCizgi.setAttribute("x2", s.x); onizlemeCizgi.setAttribute("y2", s.y);
+    if (suruklemeAraci === "yatay") {
+      // Yatay cizgi TEK boyutlu (sadece fiyat/Y onemli) - onizleme, SURUKLEMENIN
+      // GUNCEL konumunu (s.y) takip etmeli, sabit baslangic noktasini degil.
+      onizlemeCizgi.setAttribute("x1", 0);
+      onizlemeCizgi.setAttribute("y1", s.y);
+      onizlemeCizgi.setAttribute("x2", kutu.clientWidth);
+      onizlemeCizgi.setAttribute("y2", s.y);
+    } else {
+      onizlemeCizgi.setAttribute("x1", b.x); onizlemeCizgi.setAttribute("y1", b.y);
+      onizlemeCizgi.setAttribute("x2", s.x); onizlemeCizgi.setAttribute("y2", s.y);
+    }
     onizlemeCizgi.style.display = "block";
   }
   function isaretGoster(b) {
@@ -1780,21 +1843,9 @@ function grafikTrendAraciKur(kutuId, chartAl, seriAl) {
     isaretNokta.style.display = "none";
     beklemedeNokta = null;
     suruklemeBaslangic = null;
+    suruklemeAraci = null;
   }
-  kutu._trendOnizlemeTemizle = temizle;
-
-  function cizgiyiKaydet(b, s) {
-    var chart = chartAl(), seri = seriAl();
-    if (!chart || !seri || b.zaman == null || s.zaman == null || b.fiyat == null || s.fiyat == null) return;
-    if (b.zaman === s.zaman) return; // ayni noktaya tiklama/tap - anlamsiz cizgi olusturma
-    var yeniSeri = chart.addLineSeries({
-      color: "#60a5fa", lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false
-    });
-    var p1 = { time: b.zaman, value: b.fiyat }, p2 = { time: s.zaman, value: s.fiyat };
-    var noktalar = b.zaman < s.zaman ? [p1, p2] : [p2, p1];
-    yeniSeri.setData(noktalar);
-    kartTrendCizgileri.push({ series: yeniSeri, p1: p1, p2: p2 });
-  }
+  kutu._cizimOnizlemeTemizle = temizle;
 
   function hareket(e) {
     if (!suruklemeBaslangic) return;
@@ -1813,22 +1864,27 @@ function grafikTrendAraciKur(kutuId, chartAl, seriAl) {
   function birak(e) {
     if (suruklemeBaslangic) {
       var son = olcumNoktaAl(e, kutu, chartAl, seriAl) || suruklemeBaslangic;
-      cizgiyiKaydet(suruklemeBaslangic, son);
+      if (suruklemeAraci === "trend") trendCizgisiOlustur(suruklemeBaslangic, son);
+      else if (suruklemeAraci === "yatay") yatayCizgisiOlustur(son.fiyat); // SON (birakilan) fiyat - baslangic degil
+      else if (suruklemeAraci === "fib") fibCizimiOlustur(suruklemeBaslangic, son);
     }
     temizle();
     dinleyicileriKaldir();
   }
 
   function basla(e) {
-    if (kutu.getAttribute("data-aktif-arac") !== "trend") return;
+    var arac = kutu.getAttribute("data-aktif-arac");
+    if (arac !== "trend" && arac !== "yatay" && arac !== "fib") return;
     var nokta = olcumNoktaAl(e, kutu, chartAl, seriAl);
     if (!nokta) return;
     e.preventDefault();
     e.stopPropagation();
 
     if (!e.touches) {
-      // MASAUSTU: basili tutunca hemen baslar
+      // MASAUSTU: basili tutunca hemen baslar (yatay icin de gecerli - tek
+      // nokta oldugu icin surukleme sadece Y'yi/fiyati ayarlamaya yarar)
       suruklemeBaslangic = nokta;
+      suruklemeAraci = arac;
       onizlemeGoster(nokta, nokta);
       kutu.addEventListener("mousemove", hareket, true);
       document.addEventListener("mousemove", hareket);
@@ -1836,11 +1892,23 @@ function grafikTrendAraciKur(kutuId, chartAl, seriAl) {
       return;
     }
 
-    // MOBIL: bekleyen bir isaret varsa VE bu dokunus onun uzerindeyse -> cizmeye basla
+    if (arac === "yatay") {
+      // MOBIL - YATAY: tek noktali arac, iki asamali isaretlemeye GEREK YOK
+      suruklemeBaslangic = nokta;
+      suruklemeAraci = arac;
+      onizlemeGoster(nokta, nokta);
+      kutu.addEventListener("touchmove", hareket, { passive: false, capture: true });
+      document.addEventListener("touchmove", hareket, { passive: false });
+      return;
+    }
+
+    // MOBIL - TREND/FIB: bekleyen bir isaret varsa VE bu dokunus onun
+    // uzerindeyse -> cizmeye basla
     if (beklemedeNokta) {
       var mesafe = Math.hypot(nokta.x - beklemedeNokta.x, nokta.y - beklemedeNokta.y);
       if (mesafe <= TREND_MARKER_YARICAP) {
         suruklemeBaslangic = beklemedeNokta;
+        suruklemeAraci = arac;
         beklemedeNokta = null;
         onizlemeGoster(suruklemeBaslangic, nokta);
         kutu.addEventListener("touchmove", hareket, { passive: false, capture: true });
@@ -1860,11 +1928,12 @@ function grafikTrendAraciKur(kutuId, chartAl, seriAl) {
 }
 
 // ==================== SILGI ARACI (SADECE Veriler > tam ekran kart) ====================
-// Tek bir dokunus/tik ile en yakin trend cizgisini siler - once o cizginin
-// GUNCEL (mevcut kaydirma/yakinlastirmaya gore yeniden hesaplanmis) ekran
-// piksel konumunu bulur, tiklanan noktaya olan mesafesini olcer, esigin
-// (TREND_SILGI_ESIK) altindaysa siler. Esigin disinda hicbir cizgi yoksa
-// hicbir sey olmaz (yanlislikla baska bir seyi silmez).
+// Tek bir dokunus/tik ile en yakin cizimi (trend/yatay/fib - hepsini)
+// siler - once o cizimin GUNCEL (mevcut kaydirma/yakinlastirmaya gore
+// yeniden hesaplanmis) ekran piksel konumunu bulur, tiklanan noktaya olan
+// mesafesini olcer, esigin (TREND_SILGI_ESIK) altindaysa siler. Esigin
+// disinda hicbir cizim yoksa hicbir sey olmaz (yanlislikla baska bir seyi
+// silmez). Fibonacci'de tum seviyeler TEK bir cizim olarak birlikte silinir.
 var TREND_SILGI_ESIK = 10; // px
 
 function grafikSilgiAraciKur(kutuId, chartAl, seriAl) {
@@ -1881,10 +1950,43 @@ function grafikSilgiAraciKur(kutuId, chartAl, seriAl) {
     return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
   }
 
+  // Bir cizim kaydinin GUNCEL ekran mesafesini hesaplar - tipine gore
+  // (trend: segment mesafesi, yatay: tek yatay cizgiye dikey mesafe,
+  // fib: en yakin seviyeye dikey mesafe).
+  function cizimMesafesi(kayit, chart, seri, px, py) {
+    if (kayit.tip === "trend") {
+      var x1 = chart.timeScale().timeToCoordinate(kayit.p1.time);
+      var y1 = kayit.seri.priceToCoordinate(kayit.p1.value);
+      var x2 = chart.timeScale().timeToCoordinate(kayit.p2.time);
+      var y2 = kayit.seri.priceToCoordinate(kayit.p2.value);
+      if (x1 == null || y1 == null || x2 == null || y2 == null) return Infinity;
+      return noktaSegmentMesafesi(px, py, x1, y1, x2, y2);
+    }
+    if (kayit.tip === "yatay") {
+      var y = seri.priceToCoordinate(kayit.price);
+      return y == null ? Infinity : Math.abs(py - y);
+    }
+    if (kayit.tip === "fib") {
+      var enKucuk = Infinity;
+      for (var i = 0; i < kayit.seviyeFiyatlari.length; i++) {
+        var yy = seri.priceToCoordinate(kayit.seviyeFiyatlari[i]);
+        if (yy != null) enKucuk = Math.min(enKucuk, Math.abs(py - yy));
+      }
+      return enKucuk;
+    }
+    return Infinity;
+  }
+
+  function cizimSil(kayit, chart, seri) {
+    if (kayit.tip === "trend") { try { chart.removeSeries(kayit.seri); } catch (e) {} }
+    else if (kayit.tip === "yatay") { try { seri.removePriceLine(kayit.priceLine); } catch (e) {} }
+    else if (kayit.tip === "fib") { for (var i = 0; i < kayit.priceLines.length; i++) { try { seri.removePriceLine(kayit.priceLines[i]); } catch (e) {} } }
+  }
+
   function tikla(e) {
     if (kutu.getAttribute("data-aktif-arac") !== "silgi") return;
-    var chart = chartAl();
-    if (!chart) return;
+    var chart = chartAl(), seri = seriAl();
+    if (!chart || !seri) return;
     var rect = kutu.getBoundingClientRect();
     var tut = e.changedTouches ? e.changedTouches[0] : e;
     var px = tut.clientX - rect.left, py = tut.clientY - rect.top;
@@ -1892,19 +1994,14 @@ function grafikSilgiAraciKur(kutuId, chartAl, seriAl) {
     e.stopPropagation();
 
     var enYakinIdx = -1, enYakinMesafe = TREND_SILGI_ESIK + 1;
-    for (var i = 0; i < kartTrendCizgileri.length; i++) {
-      var c = kartTrendCizgileri[i];
-      var x1 = chart.timeScale().timeToCoordinate(c.p1.time);
-      var y1 = c.series.priceToCoordinate(c.p1.value);
-      var x2 = chart.timeScale().timeToCoordinate(c.p2.time);
-      var y2 = c.series.priceToCoordinate(c.p2.value);
-      if (x1 == null || y1 == null || x2 == null || y2 == null) continue;
-      var mesafe = noktaSegmentMesafesi(px, py, x1, y1, x2, y2);
+    for (var i = 0; i < kartCizimler.length; i++) {
+      var mesafe = cizimMesafesi(kartCizimler[i], chart, seri, px, py);
       if (mesafe < enYakinMesafe) { enYakinMesafe = mesafe; enYakinIdx = i; }
     }
     if (enYakinIdx !== -1) {
-      try { chart.removeSeries(kartTrendCizgileri[enYakinIdx].series); } catch (err) {}
-      kartTrendCizgileri.splice(enYakinIdx, 1);
+      cizimSil(kartCizimler[enYakinIdx], chart, seri);
+      kartCizimler.splice(enYakinIdx, 1);
+      kartCizimleriKaydet();
     }
   }
 
@@ -1925,6 +2022,64 @@ function kartFiyatCizgileriToggle(btn) {
       kartPriceLines[i].applyOptions({ lineVisible: !kartFiyatCizgileriGizliMi, axisLabelVisible: !kartFiyatCizgileriGizliMi });
     } catch (e) {}
   }
+}
+
+// ==================== CIZIM SENKRONU (SUNUCU - CIHAZLAR ARASI) ====================
+// Kullanicinin hesabina bagli olarak Railway'de saklanir (kullanicilar[kadi]
+// icinde, mevcut kalici kayit altyapisina "sizmis" halde - ayrica bir kalici
+// depo kurmaya gerek kalmadi). Her cizim eklendiginde/silindiginde o coinin
+// GUNCEL TAM listesi sunucuya gonderilir; kart acildiginda o coinin listesi
+// sunucudan cekilip cizimler sifirdan yeniden olusturulur. authToken yoksa
+// (giris yapilmamissa) sessizce atlanir - cizim yine de LOKAL olarak calisir,
+// sadece senkronlanmaz.
+function kartCizimleriSerilestir() {
+  var liste = [];
+  for (var i = 0; i < kartCizimler.length; i++) {
+    var k = kartCizimler[i];
+    if (k.tip === "trend" || k.tip === "fib") liste.push({ tip: k.tip, t1: k.p1.time, v1: k.p1.value, t2: k.p2.time, v2: k.p2.value });
+    else if (k.tip === "yatay") liste.push({ tip: "yatay", v: k.price });
+  }
+  return liste;
+}
+
+var kartCizimKaydetZamanlayici = null;
+function kartCizimleriKaydet() {
+  if (!authToken || !kartKutuRef) return;
+  var sembol = kartKutuRef.getAttribute("data-sembol");
+  if (!sembol) return;
+  // Art arda hizli eklenen/silinen cizimlerde (nadir ama olabilir) her
+  // birinde ayri istek atmak yerine kisa bir gecikmeyle TEK istek atalim.
+  if (kartCizimKaydetZamanlayici) clearTimeout(kartCizimKaydetZamanlayici);
+  kartCizimKaydetZamanlayici = setTimeout(function() {
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", API + "/cizimler/kaydet", true);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.setRequestHeader("X-Auth-Token", authToken);
+    xhr.send(JSON.stringify({ sembol: sembol, cizimler: kartCizimleriSerilestir() }));
+  }, 400);
+}
+
+function kartCizimleriYukle(sembol) {
+  if (!authToken || !sembol) return;
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/cizimler/al?sembol=" + encodeURIComponent(sembol), true);
+  xhr.setRequestHeader("X-Auth-Token", authToken);
+  xhr.onload = function() {
+    if (xhr.status !== 200) return;
+    // Kullanici bu XHR beklerken karti kapatmis ya da baska bir coine
+    // gecmis olabilir - o zaman bu eski cevabi UYGULAMA (yanlis coine
+    // cizim ekleme riski).
+    if (!kartKutuRef || kartKutuRef.getAttribute("data-sembol") !== sembol) return;
+    var veri = JSON.parse(xhr.responseText);
+    var liste = veri.cizimler || [];
+    for (var i = 0; i < liste.length; i++) {
+      var k = liste[i];
+      if (k.tip === "trend") trendCizgisiOlustur({ zaman: k.t1, fiyat: k.v1 }, { zaman: k.t2, fiyat: k.v2 }, false);
+      else if (k.tip === "yatay") yatayCizgisiOlustur(k.v, false);
+      else if (k.tip === "fib") fibCizimiOlustur({ zaman: k.t1, fiyat: k.v1 }, { zaman: k.t2, fiyat: k.v2 }, false);
+    }
+  };
+  xhr.send();
 }
 
 function kartAktifSinyalBul() {
@@ -1991,10 +2146,10 @@ function kartLwGrafikGuncelle(sembol) {
 
     if (!kartChart) {
       // Yeni bir kart acildi (kartKapat() bir onceki kartta kartChart'i
-      // null'lamisti) - trend cizgileri VE fiyat-cizgisi-gizleme durumu bu
+      // null'lamisti) - cizimler VE fiyat-cizgisi-gizleme durumu bu
       // "oturuma" ozel, yeni acilan kartta sifirdan baslamali (bir onceki
       // kapatilan kartin cizimleri/gizleme durumu buraya SIZMAMALI).
-      kartTrendCizgileri = [];
+      kartCizimler = [];
       kartFiyatCizgileriGizliMi = false;
       kartChart = LightweightCharts.createChart(kutu2, {
         layout: { background: { color: "#0a0f1e" }, textColor: "#94a3b8" },
@@ -2012,9 +2167,12 @@ function kartLwGrafikGuncelle(sembol) {
         if (kartChart && k) kartChart.applyOptions({ width: k.clientWidth });
       });
       grafikOlcumAraciKur("kart-lw-chart", function() { return kartChart; }, function() { return kartSeries; });
-      grafikTrendAraciKur("kart-lw-chart", function() { return kartChart; }, function() { return kartSeries; });
+      grafikCizimAraciKur("kart-lw-chart", function() { return kartChart; }, function() { return kartSeries; });
       grafikSilgiAraciKur("kart-lw-chart", function() { return kartChart; }, function() { return kartSeries; });
       grafikOhlcBilgisiKur("kart-lw-chart", kartChart, kartSeries);
+      // Bu coin icin daha once (bu cihazda ya da BASKA bir cihazda) kaydedilmis
+      // cizimleri sunucudan cek ve yeniden olustur - cihazlar arasi senkron.
+      kartCizimleriYukle(sembol);
     }
 
     if (yeniden) {
@@ -3788,7 +3946,9 @@ function sinyalleriGoster() {
       html += '<button type="button" class="cizim-btn zaman-btn' + (aktifZaman === "1w" ? " aktif" : "") + '" data-interval="1w" data-sembol="' + s.sembol + '" onclick="zamanDilimiSec(this)">Haftalık</button>';
       html += '<button type="button" class="cizim-btn" data-arac-tipi="tool" onclick="olcumAraciToggle(this,\'kart-lw-chart\')" title="Olcum araci: grafikte suruklayin">📏</button>';
       html += '<button type="button" class="cizim-btn" data-arac-tipi="tool" onclick="trendAraciToggle(this,\'kart-lw-chart\')" title="Trend cizgisi: masaustunde suruklayin, mobilde iki kez dokunun">📈</button>';
-      html += '<button type="button" class="cizim-btn" data-arac-tipi="tool" onclick="silgiAraciToggle(this,\'kart-lw-chart\')" title="Silgi: bir trend cizgisine dokunun">🧹</button>';
+      html += '<button type="button" class="cizim-btn" data-arac-tipi="tool" onclick="yatayAraciToggle(this,\'kart-lw-chart\')" title="Yatay cizgi: tiklayip surukleyin">➖</button>';
+      html += '<button type="button" class="cizim-btn" data-arac-tipi="tool" onclick="fibAraciToggle(this,\'kart-lw-chart\')" title="Fibonacci: masaustunde suruklayin, mobilde iki kez dokunun">🌀</button>';
+      html += '<button type="button" class="cizim-btn" data-arac-tipi="tool" onclick="silgiAraciToggle(this,\'kart-lw-chart\')" title="Silgi: bir cizime dokunun">🧹</button>';
       html += '<button type="button" class="cizim-btn' + (kartFiyatCizgileriGizliMi ? " aktif" : "") + '" onclick="kartFiyatCizgileriToggle(this)" title="Giris/Hedef/Stop/Ekleme cizgilerini gizle/goster">🙈</button>';
       html += '</div>';
       html += '<div id="kart-lw-chart" data-sembol="' + s.sembol + '" style="width:100%;height:400px;border-radius:10px;overflow:hidden;background:#0a0f1e"></div>';
