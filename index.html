@@ -3886,14 +3886,39 @@ function coinPerformansGoster() {
       coinPerformansGorunumAnahtari = gorunumAnahtari;
       coinPerformansSatirlar = {};
 
-      coinler.sort(function(a, b) {
-        function toplamHacim(sembol) {
-          var t = 0;
-          for (var bot in veri[sembol]) t += veri[sembol][bot].acilan || 0;
-          return t;
+      function toplamHacim(sembol) {
+        var t = 0;
+        for (var bot in veri[sembol]) t += veri[sembol][bot].acilan || 0;
+        return t;
+      }
+
+      if (coinPerformansOdaFiltresi === "hepsi") {
+        // "Tumu" gorunumunde 4 farkli odanin basari oranini TEK bir ortak
+        // sirada anlamli birlestirmenin yolu yok (bir coin Oda 1'de %90,
+        // Oda 3'te %40 basarili olabilir) - bu yuzden burada eskisi gibi
+        // toplam islem hacmine gore siraliyoruz.
+        coinler.sort(function(a, b) { return toplamHacim(b) - toplamHacim(a); });
+      } else {
+        // Belirli bir oda secilince, O ODANIN basari oranina (TP / (TP+Stop))
+        // gore yuksekten dusuge sirala. En az 5 kapanmis islemi OLMAYAN
+        // coinler (orn. 1/1 = "%100 basarili" gibi yaniltici sonuclar
+        // vermesin diye) SIRALAMAYA DAHIL EDILMEZ - listeden CIKARILMAZ,
+        // sadece herhangi bir "yetersiz veri" etiketi KOYMADAN listenin
+        // sonuna, kendi aralarinda hacme gore siralanmis halde eklenir.
+        var oda = coinPerformansOdaFiltresi;
+        function basariBilgisi(sembol) {
+          var d = (veri[sembol] || {})[oda];
+          var toplam = d ? (d.tp || 0) + (d.stop || 0) : 0;
+          return { yeterli: toplam >= 5, oran: toplam > 0 ? (d.tp || 0) / toplam : 0 };
         }
-        return toplamHacim(b) - toplamHacim(a);
-      });
+        coinler.sort(function(a, b) {
+          var ba = basariBilgisi(a), bb = basariBilgisi(b);
+          if (ba.yeterli && !bb.yeterli) return -1;
+          if (!ba.yeterli && bb.yeterli) return 1;
+          if (ba.yeterli && bb.yeterli) return bb.oran - ba.oran;
+          return toplamHacim(b) - toplamHacim(a);
+        });
+      }
 
       var tablo = document.createElement("table");
       tablo.style.cssText = "width:100%;border-collapse:collapse;font-size:12.5px;min-width:660px";
