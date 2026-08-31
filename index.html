@@ -1478,6 +1478,8 @@ function zamanDilimiSec(btn) {
 // olurdu. Giris/Hedef/Stop/E1-E2-E3 zaten Veriler sekmesinde acikca gorunen,
 // gizli olmayan bilgiler oldugu icin sorun yok.
 var kartChart = null, kartSeries = null, kartPriceLines = [], kartSonAnahtar = null, kartKutuRef = null;
+var kartTrendCizgileri = []; // [{series, p1:{time,value}, p2:{time,value}}] - SADECE tam ekran kart
+var kartFiyatCizgileriGizliMi = false; // Giris/Hedef/Stop/Ekleme cizgileri (SADECE grafikte) gizli mi
 
 // ==================== PAYLASILAN OLCUM ARACI (Destek/Direnc + Kart grafikleri) ====================
 // Kutuphanenin (lightweight-charts) kendi ciziyicisi yok - fiyat/zaman
@@ -1495,8 +1497,13 @@ var OLCUM_DOCUMENT_KURULDU = false;
 
 function olcumNoktaAl(e, kutu, chartAl, seriAl) {
   var rect = kutu.getBoundingClientRect();
-  var clientX = e.touches ? e.touches[0].clientX : e.clientX;
-  var clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  // touchend olayinda "touches" listesi BOSTUR (parmak zaten kalkti) - son
+  // konum "changedTouches" icinde gelir. touchstart/touchmove'da ise
+  // "touches" doludur. Ikisini de kontrol ederek her durumda dogru
+  // (son) dokunma noktasini aliyoruz.
+  var t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]);
+  var clientX = t ? t.clientX : e.clientX;
+  var clientY = t ? t.clientY : e.clientY;
   var x = clientX - rect.left, y = clientY - rect.top;
   var chart = chartAl(), seri = seriAl();
   if (!chart || !seri) return null;
@@ -1642,7 +1649,7 @@ function grafikOlcumAraciKur(kutuId, chartAl, seriAl) {
   }
 
   function basla(e) {
-    if (kutu.getAttribute("data-olcum-aktif") !== "1") return;
+    if (kutu.getAttribute("data-aktif-arac") !== "olcum") return;
     var b = olcumNoktaAl(e, kutu, chartAl, seriAl);
     if (!b) return;
     OLCUM_DURUM = { suruklemede: true, baslangic: b, kutu: kutu, chartAl: chartAl, seriAl: seriAl, etiket: etiket, dikdortgen: dikdortgen };
@@ -1689,14 +1696,235 @@ function grafikOlcumAraciKur(kutuId, chartAl, seriAl) {
   kutu._olcumEtiketGizle = function() { etiket.style.display = "none"; dikdortgen.style.display = "none"; birakVeTemizle(); };
 }
 
-function olcumAraciToggle(btn, kutuId) {
+function araciToggle(btn, kutuId, aracAdi) {
   var kutu = document.getElementById(kutuId);
   if (!kutu) return;
-  var aktif = kutu.getAttribute("data-olcum-aktif") === "1";
-  aktif = !aktif;
-  kutu.setAttribute("data-olcum-aktif", aktif ? "1" : "0");
-  btn.classList.toggle("aktif", aktif);
-  if (!aktif && kutu._olcumEtiketGizle) kutu._olcumEtiketGizle();
+  var mevcut = kutu.getAttribute("data-aktif-arac") || "";
+  var yeni = mevcut === aracAdi ? "" : aracAdi;
+  kutu.setAttribute("data-aktif-arac", yeni);
+  var cubuk = btn.closest(".zaman-dilimi-cubugu") || btn.parentElement;
+  if (cubuk) {
+    var hepsi = cubuk.querySelectorAll('.cizim-btn[data-arac-tipi="tool"]');
+    for (var i = 0; i < hepsi.length; i++) hepsi[i].classList.remove("aktif");
+  }
+  if (yeni) btn.classList.add("aktif");
+  // Baska bir arac secilince (ya da ayni arac kapatilinca) onceki aracin
+  // yari-tamamlanmis onizlemesini/isaretini temizle - iki arac birbirine
+  // karisip "hayalet" cizgi/etiket birakmasin.
+  if (yeni !== "olcum" && kutu._olcumEtiketGizle) kutu._olcumEtiketGizle();
+  if (yeni !== "trend" && kutu._trendOnizlemeTemizle) kutu._trendOnizlemeTemizle();
+}
+
+function olcumAraciToggle(btn, kutuId) { araciToggle(btn, kutuId, "olcum"); }
+function trendAraciToggle(btn, kutuId) { araciToggle(btn, kutuId, "trend"); }
+function silgiAraciToggle(btn, kutuId) { araciToggle(btn, kutuId, "silgi"); }
+
+// ==================== TREND CIZGISI ARACI (SADECE Veriler > tam ekran kart) ====================
+// Olcum araciyla AYNI mimari: capture-phase mousedown/touchstart, sadece
+// arac aktifken (data-aktif-arac==="trend") yakalar, move dinleyicileri
+// SADECE surukleme sirasinda dinamik eklenir/kaldirilir - boylece arac
+// kapaliyken (varsayilan) sayfa kaydirma/yakinlastirma HICBIR SEKILDE
+// etkilenmez (masaustunde de mobilde de).
+//
+// MASAUSTU: sol tik basili tutunca cizim baslar, surukleyip birakinca biter
+// (klasik surukle-birak) - tipki olcum araci gibi.
+// MOBIL: ilk dokunus sadece bir ISARET birakir (cizgi henuz baslamaz).
+// O isaretin YARI CAPI icine (TREND_MARKER_YARICAP) tekrar dokunulursa
+// cizim o noktadan baslar ve parmak surukledikce cizilir. Isaretin disina
+// yeni bir dokunus, isareti sadece o yeni yere tasir. Boylece rastgele bir
+// dokunus/kaydirma asla yanlislikla cizgi baslatmaz.
+//
+// Cizgiler GERCEK grafik serisi (2 noktali LineSeries, fiyat/zaman
+// koordinatli) olarak eklenir - ekran pikseline degil, boylece grafik
+// kaydirilip/yakinlastirilinca ya da zaman dilimi degisince cizgi dogru
+// yerde kalir (TradingView'daki gibi).
+var TREND_MARKER_YARICAP = 22; // px
+
+function grafikTrendAraciKur(kutuId, chartAl, seriAl) {
+  var kutu = document.getElementById(kutuId);
+  if (!kutu || kutu.getAttribute("data-trend-kuruldu")) return;
+  kutu.setAttribute("data-trend-kuruldu", "1");
+  kutu.style.position = "relative";
+
+  var svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("style", "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:26");
+  var onizlemeCizgi = document.createElementNS(SVG_NS, "line");
+  onizlemeCizgi.setAttribute("stroke", "#60a5fa");
+  onizlemeCizgi.setAttribute("stroke-width", "2");
+  onizlemeCizgi.setAttribute("stroke-dasharray", "5,4");
+  onizlemeCizgi.style.display = "none";
+  var isaretNokta = document.createElementNS(SVG_NS, "circle");
+  isaretNokta.setAttribute("r", "6");
+  isaretNokta.setAttribute("fill", "#60a5fa");
+  isaretNokta.setAttribute("stroke", "#0a0f1e");
+  isaretNokta.setAttribute("stroke-width", "2");
+  isaretNokta.style.display = "none";
+  svg.appendChild(onizlemeCizgi);
+  svg.appendChild(isaretNokta);
+  kutu.appendChild(svg);
+
+  var beklemedeNokta = null;     // mobil: ilk dokunusla birakilan, henuz cizgiye donusmemis isaret
+  var suruklemeBaslangic = null; // aktif surukleme (masaustu ya da mobil 2. dokunus) baslangici
+
+  function onizlemeGoster(b, s) {
+    onizlemeCizgi.setAttribute("x1", b.x); onizlemeCizgi.setAttribute("y1", b.y);
+    onizlemeCizgi.setAttribute("x2", s.x); onizlemeCizgi.setAttribute("y2", s.y);
+    onizlemeCizgi.style.display = "block";
+  }
+  function isaretGoster(b) {
+    isaretNokta.setAttribute("cx", b.x); isaretNokta.setAttribute("cy", b.y);
+    isaretNokta.style.display = "block";
+  }
+  function temizle() {
+    onizlemeCizgi.style.display = "none";
+    isaretNokta.style.display = "none";
+    beklemedeNokta = null;
+    suruklemeBaslangic = null;
+  }
+  kutu._trendOnizlemeTemizle = temizle;
+
+  function cizgiyiKaydet(b, s) {
+    var chart = chartAl(), seri = seriAl();
+    if (!chart || !seri || b.zaman == null || s.zaman == null || b.fiyat == null || s.fiyat == null) return;
+    if (b.zaman === s.zaman) return; // ayni noktaya tiklama/tap - anlamsiz cizgi olusturma
+    var yeniSeri = chart.addLineSeries({
+      color: "#60a5fa", lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false
+    });
+    var p1 = { time: b.zaman, value: b.fiyat }, p2 = { time: s.zaman, value: s.fiyat };
+    var noktalar = b.zaman < s.zaman ? [p1, p2] : [p2, p1];
+    yeniSeri.setData(noktalar);
+    kartTrendCizgileri.push({ series: yeniSeri, p1: p1, p2: p2 });
+  }
+
+  function hareket(e) {
+    if (!suruklemeBaslangic) return;
+    var simdi = olcumNoktaAl(e, kutu, chartAl, seriAl);
+    if (simdi) onizlemeGoster(suruklemeBaslangic, simdi);
+  }
+
+  function dinleyicileriKaldir() {
+    kutu.removeEventListener("mousemove", hareket, true);
+    kutu.removeEventListener("touchmove", hareket, { passive: false, capture: true });
+    document.removeEventListener("touchmove", hareket, { passive: false });
+    document.removeEventListener("mousemove", hareket);
+    document.removeEventListener("mouseup", birak);
+  }
+
+  function birak(e) {
+    if (suruklemeBaslangic) {
+      var son = olcumNoktaAl(e, kutu, chartAl, seriAl) || suruklemeBaslangic;
+      cizgiyiKaydet(suruklemeBaslangic, son);
+    }
+    temizle();
+    dinleyicileriKaldir();
+  }
+
+  function basla(e) {
+    if (kutu.getAttribute("data-aktif-arac") !== "trend") return;
+    var nokta = olcumNoktaAl(e, kutu, chartAl, seriAl);
+    if (!nokta) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!e.touches) {
+      // MASAUSTU: basili tutunca hemen baslar
+      suruklemeBaslangic = nokta;
+      onizlemeGoster(nokta, nokta);
+      kutu.addEventListener("mousemove", hareket, true);
+      document.addEventListener("mousemove", hareket);
+      document.addEventListener("mouseup", birak);
+      return;
+    }
+
+    // MOBIL: bekleyen bir isaret varsa VE bu dokunus onun uzerindeyse -> cizmeye basla
+    if (beklemedeNokta) {
+      var mesafe = Math.hypot(nokta.x - beklemedeNokta.x, nokta.y - beklemedeNokta.y);
+      if (mesafe <= TREND_MARKER_YARICAP) {
+        suruklemeBaslangic = beklemedeNokta;
+        beklemedeNokta = null;
+        onizlemeGoster(suruklemeBaslangic, nokta);
+        kutu.addEventListener("touchmove", hareket, { passive: false, capture: true });
+        document.addEventListener("touchmove", hareket, { passive: false });
+        return;
+      }
+    }
+    // Ilk dokunus (ya da isaretin disina yeni bir dokunus) - sadece isaretle, cizgiyi BASLATMA
+    beklemedeNokta = nokta;
+    isaretGoster(nokta);
+  }
+
+  kutu.addEventListener("mousedown", basla, true);
+  kutu.addEventListener("touchstart", basla, { passive: false, capture: true });
+  kutu.addEventListener("mouseup", birak, true);
+  kutu.addEventListener("touchend", birak, true);
+}
+
+// ==================== SILGI ARACI (SADECE Veriler > tam ekran kart) ====================
+// Tek bir dokunus/tik ile en yakin trend cizgisini siler - once o cizginin
+// GUNCEL (mevcut kaydirma/yakinlastirmaya gore yeniden hesaplanmis) ekran
+// piksel konumunu bulur, tiklanan noktaya olan mesafesini olcer, esigin
+// (TREND_SILGI_ESIK) altindaysa siler. Esigin disinda hicbir cizgi yoksa
+// hicbir sey olmaz (yanlislikla baska bir seyi silmez).
+var TREND_SILGI_ESIK = 10; // px
+
+function grafikSilgiAraciKur(kutuId, chartAl, seriAl) {
+  var kutu = document.getElementById(kutuId);
+  if (!kutu || kutu.getAttribute("data-silgi-kuruldu")) return;
+  kutu.setAttribute("data-silgi-kuruldu", "1");
+
+  function noktaSegmentMesafesi(px, py, x1, y1, x2, y2) {
+    var dx = x2 - x1, dy = y2 - y1;
+    var uzunlukKare = dx * dx + dy * dy;
+    if (uzunlukKare === 0) return Math.hypot(px - x1, py - y1);
+    var t = ((px - x1) * dx + (py - y1) * dy) / uzunlukKare;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+  }
+
+  function tikla(e) {
+    if (kutu.getAttribute("data-aktif-arac") !== "silgi") return;
+    var chart = chartAl();
+    if (!chart) return;
+    var rect = kutu.getBoundingClientRect();
+    var tut = e.changedTouches ? e.changedTouches[0] : e;
+    var px = tut.clientX - rect.left, py = tut.clientY - rect.top;
+    e.preventDefault();
+    e.stopPropagation();
+
+    var enYakinIdx = -1, enYakinMesafe = TREND_SILGI_ESIK + 1;
+    for (var i = 0; i < kartTrendCizgileri.length; i++) {
+      var c = kartTrendCizgileri[i];
+      var x1 = chart.timeScale().timeToCoordinate(c.p1.time);
+      var y1 = c.series.priceToCoordinate(c.p1.value);
+      var x2 = chart.timeScale().timeToCoordinate(c.p2.time);
+      var y2 = c.series.priceToCoordinate(c.p2.value);
+      if (x1 == null || y1 == null || x2 == null || y2 == null) continue;
+      var mesafe = noktaSegmentMesafesi(px, py, x1, y1, x2, y2);
+      if (mesafe < enYakinMesafe) { enYakinMesafe = mesafe; enYakinIdx = i; }
+    }
+    if (enYakinIdx !== -1) {
+      try { chart.removeSeries(kartTrendCizgileri[enYakinIdx].series); } catch (err) {}
+      kartTrendCizgileri.splice(enYakinIdx, 1);
+    }
+  }
+
+  kutu.addEventListener("mousedown", tikla, true);
+  kutu.addEventListener("touchstart", tikla, { passive: false, capture: true });
+}
+
+// ==================== FIYAT CIZGILERINI GIZLE/GOSTER (SADECE grafikte) ====================
+// Sadece Giris/Hedef/Stop/E1-E3 CIZGILERINI (grafik uzerindeki yatay
+// cizgiler) gizler - trend cizgilerine, "guncel fiyat" cizgisine (kutuphane
+// tarafindan otomatik cizilir, bizim kartPriceLines dizimizde degildir) VE
+// kartin USTUNDEKI Giris/Hedef/Stop/E1-E3 METIN satirlarina DOKUNMAZ.
+function kartFiyatCizgileriToggle(btn) {
+  kartFiyatCizgileriGizliMi = !kartFiyatCizgileriGizliMi;
+  btn.classList.toggle("aktif", kartFiyatCizgileriGizliMi);
+  for (var i = 0; i < kartPriceLines.length; i++) {
+    try {
+      kartPriceLines[i].applyOptions({ lineVisible: !kartFiyatCizgileriGizliMi, axisLabelVisible: !kartFiyatCizgileriGizliMi });
+    } catch (e) {}
+  }
 }
 
 function kartAktifSinyalBul() {
@@ -1762,6 +1990,12 @@ function kartLwGrafikGuncelle(sembol) {
     kartSonAnahtar = anahtar;
 
     if (!kartChart) {
+      // Yeni bir kart acildi (kartKapat() bir onceki kartta kartChart'i
+      // null'lamisti) - trend cizgileri VE fiyat-cizgisi-gizleme durumu bu
+      // "oturuma" ozel, yeni acilan kartta sifirdan baslamali (bir onceki
+      // kapatilan kartin cizimleri/gizleme durumu buraya SIZMAMALI).
+      kartTrendCizgileri = [];
+      kartFiyatCizgileriGizliMi = false;
       kartChart = LightweightCharts.createChart(kutu2, {
         layout: { background: { color: "#0a0f1e" }, textColor: "#94a3b8" },
         grid: { vertLines: { color: "#141d33" }, horzLines: { color: "#141d33" } },
@@ -1778,6 +2012,8 @@ function kartLwGrafikGuncelle(sembol) {
         if (kartChart && k) kartChart.applyOptions({ width: k.clientWidth });
       });
       grafikOlcumAraciKur("kart-lw-chart", function() { return kartChart; }, function() { return kartSeries; });
+      grafikTrendAraciKur("kart-lw-chart", function() { return kartChart; }, function() { return kartSeries; });
+      grafikSilgiAraciKur("kart-lw-chart", function() { return kartChart; }, function() { return kartSeries; });
       grafikOhlcBilgisiKur("kart-lw-chart", kartChart, kartSeries);
     }
 
@@ -1801,7 +2037,8 @@ function kartLwGrafikGuncelle(sembol) {
         var f = parseFloat(fiyat);
         if (!f) return;
         kartPriceLines.push(kartSeries.createPriceLine({
-          price: f, color: renk, lineWidth: 1, lineStyle: stil, axisLabelVisible: true, title: baslik
+          price: f, color: renk, lineWidth: 1, lineStyle: stil,
+          lineVisible: !kartFiyatCizgileriGizliMi, axisLabelVisible: !kartFiyatCizgileriGizliMi, title: baslik
         }));
       };
       ekle(sinyal.giris || sinyal.maliyet, "#e2e8f0", "Giris", LightweightCharts.LineStyle.Solid);
@@ -3549,7 +3786,10 @@ function sinyalleriGoster() {
       html += '<button type="button" class="cizim-btn zaman-btn' + (aktifZaman === "4h" ? " aktif" : "") + '" data-interval="4h" data-sembol="' + s.sembol + '" onclick="zamanDilimiSec(this)">4sa</button>';
       html += '<button type="button" class="cizim-btn zaman-btn' + (aktifZaman === "1d" ? " aktif" : "") + '" data-interval="1d" data-sembol="' + s.sembol + '" onclick="zamanDilimiSec(this)">Günlük</button>';
       html += '<button type="button" class="cizim-btn zaman-btn' + (aktifZaman === "1w" ? " aktif" : "") + '" data-interval="1w" data-sembol="' + s.sembol + '" onclick="zamanDilimiSec(this)">Haftalık</button>';
-      html += '<button type="button" class="cizim-btn" onclick="olcumAraciToggle(this,\'kart-lw-chart\')" title="Olcum araci: grafikte suruklayin">📏</button>';
+      html += '<button type="button" class="cizim-btn" data-arac-tipi="tool" onclick="olcumAraciToggle(this,\'kart-lw-chart\')" title="Olcum araci: grafikte suruklayin">📏</button>';
+      html += '<button type="button" class="cizim-btn" data-arac-tipi="tool" onclick="trendAraciToggle(this,\'kart-lw-chart\')" title="Trend cizgisi: masaustunde suruklayin, mobilde iki kez dokunun">📈</button>';
+      html += '<button type="button" class="cizim-btn" data-arac-tipi="tool" onclick="silgiAraciToggle(this,\'kart-lw-chart\')" title="Silgi: bir trend cizgisine dokunun">🧹</button>';
+      html += '<button type="button" class="cizim-btn' + (kartFiyatCizgileriGizliMi ? " aktif" : "") + '" onclick="kartFiyatCizgileriToggle(this)" title="Giris/Hedef/Stop/Ekleme cizgilerini gizle/goster">🙈</button>';
       html += '</div>';
       html += '<div id="kart-lw-chart" data-sembol="' + s.sembol + '" style="width:100%;height:400px;border-radius:10px;overflow:hidden;background:#0a0f1e"></div>';
     } else {
