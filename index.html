@@ -1838,12 +1838,24 @@ function grafikCizimAraciKur(kutuId, chartAl, seriAl) {
     isaretNokta.setAttribute("cx", b.x); isaretNokta.setAttribute("cy", b.y);
     isaretNokta.style.display = "block";
   }
-  function temizle() {
+  function temizleSurukleme() {
+    // SADECE surukleme onizlemesini gizler - mobildeki BEKLEYEN ISARETI
+    // (ilk dokunusla konan, henuz cizgiye donusmemis nokta) SILMEZ. Bu
+    // ayrimin nedeni onemli: birak() (touchend), MOBILDE ILK DOKUNUSUN
+    // parmagi kaldirma anini da tetikler - o an henuz surukleme
+    // BASLAMAMISTIR (sadece isaret konmustur), bu yuzden isareti silersek
+    // kullanici ikinci dokunusu yapamadan isaret kaybolur ve cizgi HICBIR
+    // ZAMAN cizilemez. Asil hata buydu.
     onizlemeCizgi.style.display = "none";
-    isaretNokta.style.display = "none";
-    beklemedeNokta = null;
     suruklemeBaslangic = null;
     suruklemeAraci = null;
+  }
+  function temizle() {
+    // TAMAMEN temizler (isaret dahil) - arac degistirildiginde/kapatildiginda
+    // ya da yeni bir kart acildiginda cagrilir.
+    temizleSurukleme();
+    isaretNokta.style.display = "none";
+    beklemedeNokta = null;
   }
   kutu._cizimOnizlemeTemizle = temizle;
 
@@ -1867,9 +1879,12 @@ function grafikCizimAraciKur(kutuId, chartAl, seriAl) {
       if (suruklemeAraci === "trend") trendCizgisiOlustur(suruklemeBaslangic, son);
       else if (suruklemeAraci === "yatay") yatayCizgisiOlustur(son.fiyat); // SON (birakilan) fiyat - baslangic degil
       else if (suruklemeAraci === "fib") fibCizimiOlustur(suruklemeBaslangic, son);
+      temizleSurukleme();
+      dinleyicileriKaldir();
     }
-    temizle();
-    dinleyicileriKaldir();
+    // suruklemeBaslangic yoksa (mobilde SADECE ilk dokunus/isaretleme
+    // olduysa) HICBIR SEY temizlenmez - bekleyen isaret ekranda kalmaya
+    // devam eder, kullanicinin ikinci (isaretin uzerine) dokunusunu bekler.
   }
 
   function basla(e) {
@@ -1910,6 +1925,7 @@ function grafikCizimAraciKur(kutuId, chartAl, seriAl) {
         suruklemeBaslangic = beklemedeNokta;
         suruklemeAraci = arac;
         beklemedeNokta = null;
+        isaretNokta.style.display = "none"; // isaret artik canli onizleme cizgisine donustu
         onizlemeGoster(suruklemeBaslangic, nokta);
         kutu.addEventListener("touchmove", hareket, { passive: false, capture: true });
         document.addEventListener("touchmove", hareket, { passive: false });
