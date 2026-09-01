@@ -4011,7 +4011,14 @@ function sinyalleriGoster() {
   // MUTLAK sekilde korunur - "araligi kaydet/geri yukle" gibi tahmine
   // dayali bir yontem gerekmez, cunku nesnenin kendisi hic bozulmuyor.
   var korunanGrafikDugumu = null;
+  var korunanSayfaScrollY = null;
   if (kartChart && secilenKartAnahtari) {
+    // Grafik gibi, kullanicinin SAYFA KAYDIRMA konumunu da koruyoruz -
+    // asagidaki innerHTML atamasi tum listeyi yeniden olusturdugu icin
+    // tarayici (ozellikle mobilde) kaydirmayi BASA SIFIRLIYORDU. Kart
+    // acikken kullanici muhtemelen grafik uzerinde cizim yapiyor/bakiyor
+    // olur - 10 saniyede bir sayfanin basina firlamasi rahatsiz ediciydi.
+    korunanSayfaScrollY = window.scrollY;
     var oncekiKutu = document.getElementById("kart-lw-chart");
     if (oncekiKutu) {
       korunanGrafikDugumu = oncekiKutu;
@@ -4032,6 +4039,12 @@ function sinyalleriGoster() {
       }
       kartLwGrafikGuncelle(acikSembol);
     }
+  }
+  if (korunanSayfaScrollY !== null) {
+    // Bir sonraki frame'de geri yukle - innerHTML atamasi sonrasi olusan
+    // layout/reflow TAMAMLANDIKTAN sonra uygulanmazsa tarayici onu tekrar
+    // eziyor olabilirdi.
+    requestAnimationFrame(function() { window.scrollTo(0, korunanSayfaScrollY); });
   }
 }
 
