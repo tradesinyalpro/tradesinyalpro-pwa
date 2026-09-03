@@ -2114,9 +2114,39 @@ function kartAktifSinyalBul() {
   return null;
 }
 
-function kartLwGrafikGuncelle(sembol) {
+function kartLwGrafikGuncelle(sembol, oncedenYakalananScrollTop) {
   var kutu = document.getElementById("kart-lw-chart");
   if (!kutu || kutu.getAttribute("data-sembol") !== sembol) return;
+
+  // Kart ZATEN aciksa (bu bir arka plan yenilemesi ya da zaman dilimi
+  // degisimi - ILK ACILIS DEGIL), kartin KENDI scrollTop'unu koruyacagiz
+  // (.kart-genisletilmis position:fixed + kendi overflow-y:auto'suna sahip
+  // - dogru hedef window degil, kartin kendisi). Binance'ten veri gelmesi
+  // ASENKRON oldugu icin (bkz. asagidaki xhr.onload) bu koruma o veri
+  // geldikten SONRA, en son noktada uygulanmali - yoksa sinyalleriGoster()
+  // daki daha erken koruma yetersiz kaliyor.
+  //
+  // ONEMLI (bulunan IKINCI hata): sinyalleriGoster() bu fonksiyonu, tum
+  // listeyi yeniden olusturduktan (innerHTML) HEMEN SONRA cagirir - o anda
+  // YENI kart elementi zaten var ama scrollTop'u HENUZ 0'DIR (dogru degere
+  // geri yukleyen rAF daha calismamistir). Eger burada scrollTop'u
+  // SENKRON olarak yeniden okumaya calissaydik, YANLISLIKLA 0'i
+  // yakalar ve XHR sonunda kart'i YANLIS sekilde basa sarardik - "once
+  // duzeliyor, sonra tekrar kayiyor" hatasinin asil sebebi buydu. Cozum:
+  // sinyalleriGoster() DOGRU degeri (innerHTML atamasindan ONCE yakaladigi
+  // degeri) parametre olarak DOGRUDAN gonderir, burada YENIDEN OKUMAYA
+  // CALISILMAZ. Sadece BASKA bir yerden (orn. zaman dilimi butonu) 2.
+  // parametre verilmeden cagrildiginda - ki o durumda kart YIKILIP YENIDEN
+  // KURULMADI, senkron okuma GUVENLIDIR - eski senkron-okuma yontemine
+  // basvurulur.
+  var kartZatenAcikMi = !!kartChart;
+  var scrollKorumaTop;
+  if (typeof oncedenYakalananScrollTop === "number") {
+    scrollKorumaTop = oncedenYakalananScrollTop;
+  } else {
+    var kartElementiOnceden = document.querySelector(".signal-card.kart-genisletilmis");
+    scrollKorumaTop = kartElementiOnceden ? kartElementiOnceden.scrollTop : null;
+  }
 
   var interval = mumZamanDilimiAl(sembol);
   var sayi = KART_ZAMAN_DILIMI_SAYI[interval] || 288;
@@ -2224,6 +2254,15 @@ function kartLwGrafikGuncelle(sembol) {
       ekle(sinyal.e1, "#fbbf24", "E1", LightweightCharts.LineStyle.Dotted);
       ekle(sinyal.e2, "#fbbf24", "E2", LightweightCharts.LineStyle.Dotted);
       ekle(sinyal.e3, "#fbbf24", "E3", LightweightCharts.LineStyle.Dotted);
+    }
+
+    if (kartZatenAcikMi) {
+      // Veri gelip grafik/fiyat cizgileri yeniden cizildikten SONRAKI reflow'u
+      // da kapsayacak sekilde, kartin scrollTop'unu simdi (bir sonraki frame'de) geri yukle.
+      requestAnimationFrame(function() {
+        var kartElementiSimdi = document.querySelector(".signal-card.kart-genisletilmis");
+        if (kartElementiSimdi && scrollKorumaTop !== null) kartElementiSimdi.scrollTop = scrollKorumaTop;
+      });
     }
   };
   xhr.send();
@@ -4011,14 +4050,17 @@ function sinyalleriGoster() {
   // MUTLAK sekilde korunur - "araligi kaydet/geri yukle" gibi tahmine
   // dayali bir yontem gerekmez, cunku nesnenin kendisi hic bozulmuyor.
   var korunanGrafikDugumu = null;
-  var korunanSayfaScrollY = null;
+  var korunanKartScrollTop = null;
   if (kartChart && secilenKartAnahtari) {
-    // Grafik gibi, kullanicinin SAYFA KAYDIRMA konumunu da koruyoruz -
-    // asagidaki innerHTML atamasi tum listeyi yeniden olusturdugu icin
-    // tarayici (ozellikle mobilde) kaydirmayi BASA SIFIRLIYORDU. Kart
-    // acikken kullanici muhtemelen grafik uzerinde cizim yapiyor/bakiyor
-    // olur - 10 saniyede bir sayfanin basina firlamasi rahatsiz ediciydi.
-    korunanSayfaScrollY = window.scrollY;
+    // ONEMLI: tam ekran kart (.kart-genisletilmis) "position:fixed" ve
+    // KENDI "overflow-y:auto"suna sahip ayri bir kutu - yani kullanici
+    // grafigi gormek icin SAYFAYI degil, KARTIN KENDI ICINI kaydiriyor.
+    // Bu yuzden window.scrollY/scrollTo BURADA ISE YARAMAZ - dogru hedef
+    // kartin kendi scrollTop'u. Asagidaki innerHTML atamasi tum listeyi
+    // yeniden olusturdugu icin bu deger sifirlaniyordu, kullanici 10
+    // saniyede bir kartin basina firlatiliyordu.
+    var oncekiKart = document.querySelector(".signal-card.kart-genisletilmis");
+    if (oncekiKart) korunanKartScrollTop = oncekiKart.scrollTop;
     var oncekiKutu = document.getElementById("kart-lw-chart");
     if (oncekiKutu) {
       korunanGrafikDugumu = oncekiKutu;
@@ -4037,14 +4079,17 @@ function sinyalleriGoster() {
           kartKutuRef = korunanGrafikDugumu;
         }
       }
-      kartLwGrafikGuncelle(acikSembol);
+      kartLwGrafikGuncelle(acikSembol, korunanKartScrollTop);
     }
   }
-  if (korunanSayfaScrollY !== null) {
+  if (korunanKartScrollTop !== null) {
     // Bir sonraki frame'de geri yukle - innerHTML atamasi sonrasi olusan
     // layout/reflow TAMAMLANDIKTAN sonra uygulanmazsa tarayici onu tekrar
     // eziyor olabilirdi.
-    requestAnimationFrame(function() { window.scrollTo(0, korunanSayfaScrollY); });
+    requestAnimationFrame(function() {
+      var yeniKart = document.querySelector(".signal-card.kart-genisletilmis");
+      if (yeniKart) yeniKart.scrollTop = korunanKartScrollTop;
+    });
   }
 }
 
