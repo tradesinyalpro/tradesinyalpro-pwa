@@ -5702,7 +5702,7 @@ function sekmeAc(id, el) {
   // gostermek icin sekme her acildiginda render edilir, otomatik veri
   // cekmez (sadece kullanicinin kendi sorgusuyla tetiklenir).
   if (id === "analiz") { kriptoAnalizGoster(); hisseAnalizGoster(); bistAnalizGoster(); }
-  if (id === "yonetici") { botDurumuGoster(); bistAnalizGoster(); buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); guvenlikHaritasiGoster(); }
+  if (id === "yonetici") { botDurumuGoster(); yoneticiBistAnalizGoster(); buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); guvenlikHaritasiGoster(); }
   if (id === "piyasa") altinFiyatlariGoster();
   if (id === "genelbakis") genelBakisDoldur("genelbakis-icerik");
   if (id === "coinperformans") coinPerformansGoster();
@@ -5856,7 +5856,7 @@ function botDurumuGoster() {
 // bilgisi + RSI + hacim orani. Henuz genele acilmadi (hukuki degerlendirme
 // bekliyor), bu yuzden backend zaten SADECE admin_mi() dogrulamasiyla veri
 // donduruyor - buradaki goruntuleme de sadece Yonetici panelinde.
-function bistAnalizGoster() {
+function yoneticiBistAnalizGoster() {
   var kutu = document.getElementById("yonetici-bist-analiz-icerik");
   if (!kutu) return;
   var xhr = new XMLHttpRequest();
