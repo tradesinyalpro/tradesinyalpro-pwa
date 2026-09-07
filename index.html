@@ -5859,34 +5859,48 @@ function botDurumuGoster() {
 function yoneticiBistAnalizGoster() {
   var kutu = document.getElementById("yonetici-bist-analiz-icerik");
   if (!kutu) return;
+  // Once bir "yukleniyor" yer tutucusu koyuyoruz - boylece istek
+  // basarisiz olsa bile kutu TAMAMEN BOS/GORUNMEZ kalmaz, en azindan
+  // fonksiyonun calistigini goruruz.
+  kutu.innerHTML = '<div class="section-title">BIST Analiz (sadece bilgilendirici - al/sat sinyali degil)</div><div class="loading">Yukleniyor...</div>';
   var xhr = new XMLHttpRequest();
   xhr.open("GET", API + "/bist/analiz", true);
   xhr.setRequestHeader("X-Auth-Token", authToken || "");
   xhr.onload = function() {
-    if (xhr.status !== 200) return;
-    var veri = JSON.parse(xhr.responseText);
-    var kayitlar = veri.kayitlar || [];
-    var html = '<div class="section-title">BIST Analiz (sadece bilgilendirici - al/sat sinyali degil)</div>';
-    if (kayitlar.length === 0) {
-      html += '<div class="empty" style="padding:10px 0">Henuz bir bildirim yok (borsa kapaliyken veya fiyat henuz bir seviyeye yaklasmadiysa normaldir)</div>';
-      kutu.innerHTML = html;
+    if (xhr.status !== 200) {
+      kutu.innerHTML = '<div class="section-title">BIST Analiz</div><div class="empty" style="padding:10px 0;color:#f87171">HATA (' + xhr.status + '): ' + (xhr.responseText || "bilinmeyen hata").substring(0, 300) + '</div>';
       return;
     }
-    for (var i = 0; i < Math.min(kayitlar.length, 50); i++) {
-      var k = kayitlar[i];
-      var seviyeAdi = k.tip === "destek" ? "Destek" : "Direnç";
-      var renk = k.tip === "destek" ? "#4ade80" : "#f87171";
-      var rsiMetin = k.rsi != null ? k.rsi : "-";
-      var hacimMetin = k.hacim_orani != null ? (k.hacim_orani + "x") : "-";
-      html += '<div class="signal-card" style="margin-bottom:6px;padding:10px 14px">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center">' +
-        '<span style="font-weight:600;font-size:13px">#' + k.sembol + '</span>' +
-        '<span class="badge" style="background:' + renk + '22;color:' + renk + '">' + seviyeAdi + ': ' + k.seviye + '</span></div>' +
-        '<div style="font-size:11.5px;color:#94a3b8;margin-top:4px">Güncel: ' + k.guncel_fiyat +
-        ' &nbsp;·&nbsp; RSI(14): ' + rsiMetin + ' &nbsp;·&nbsp; Hacim: ' + hacimMetin + '</div>' +
-        '<div class="sig-time">' + k.zaman + '</div></div>';
+    try {
+      var veri = JSON.parse(xhr.responseText);
+      var kayitlar = veri.kayitlar || [];
+      var html = '<div class="section-title">BIST Analiz (sadece bilgilendirici - al/sat sinyali degil)</div>';
+      if (kayitlar.length === 0) {
+        html += '<div class="empty" style="padding:10px 0">Henuz bir bildirim yok (borsa kapaliyken veya fiyat henuz bir seviyeye yaklasmadiysa normaldir)</div>';
+        kutu.innerHTML = html;
+        return;
+      }
+      for (var i = 0; i < Math.min(kayitlar.length, 50); i++) {
+        var k = kayitlar[i];
+        var seviyeAdi = k.tip === "destek" ? "Destek" : "Direnç";
+        var renk = k.tip === "destek" ? "#4ade80" : "#f87171";
+        var rsiMetin = k.rsi != null ? k.rsi : "-";
+        var hacimMetin = k.hacim_orani != null ? (k.hacim_orani + "x") : "-";
+        html += '<div class="signal-card" style="margin-bottom:6px;padding:10px 14px">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center">' +
+          '<span style="font-weight:600;font-size:13px">#' + k.sembol + '</span>' +
+          '<span class="badge" style="background:' + renk + '22;color:' + renk + '">' + seviyeAdi + ': ' + k.seviye + '</span></div>' +
+          '<div style="font-size:11.5px;color:#94a3b8;margin-top:4px">Güncel: ' + k.guncel_fiyat +
+          ' &nbsp;·&nbsp; RSI(14): ' + rsiMetin + ' &nbsp;·&nbsp; Hacim: ' + hacimMetin + '</div>' +
+          '<div class="sig-time">' + k.zaman + '</div></div>';
+      }
+      kutu.innerHTML = html;
+    } catch (e) {
+      kutu.innerHTML = '<div class="section-title">BIST Analiz</div><div class="empty" style="padding:10px 0;color:#f87171">JS HATASI: ' + e.message + '</div>';
     }
-    kutu.innerHTML = html;
+  };
+  xhr.onerror = function() {
+    kutu.innerHTML = '<div class="section-title">BIST Analiz</div><div class="empty" style="padding:10px 0;color:#f87171">AG HATASI: sunucuya hic ulasilamadi (CORS/baglanti sorunu olabilir)</div>';
   };
   xhr.send();
 }
