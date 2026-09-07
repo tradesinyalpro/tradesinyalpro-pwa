@@ -626,6 +626,7 @@
 
   <div id="yonetici" style="display:none">
     <div id="yonetici-bot-durumu-icerik" style="margin-bottom:14px"></div>
+    <div id="yonetici-bist-analiz-icerik" style="margin-bottom:14px"></div>
     <div id="yonetici-bakim-icerik" style="margin-bottom:14px"></div>
     <div id="yonetici-buyume-icerik"></div>
     <div id="yonetici-ziyaret-ozet"></div>
@@ -5701,7 +5702,7 @@ function sekmeAc(id, el) {
   // gostermek icin sekme her acildiginda render edilir, otomatik veri
   // cekmez (sadece kullanicinin kendi sorgusuyla tetiklenir).
   if (id === "analiz") { kriptoAnalizGoster(); hisseAnalizGoster(); bistAnalizGoster(); }
-  if (id === "yonetici") { botDurumuGoster(); buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); guvenlikHaritasiGoster(); }
+  if (id === "yonetici") { botDurumuGoster(); bistAnalizGoster(); buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); guvenlikHaritasiGoster(); }
   if (id === "piyasa") altinFiyatlariGoster();
   if (id === "genelbakis") genelBakisDoldur("genelbakis-icerik");
   if (id === "coinperformans") coinPerformansGoster();
@@ -5844,6 +5845,47 @@ function botDurumuGoster() {
         '<div style="font-size:10px;color:#64748b;margin-top:4px">Son görülme: ' + gecenYazi + '</div></div>';
     }
     html += '</div>';
+    kutu.innerHTML = html;
+  };
+  xhr.send();
+}
+
+// ==================== BIST ANALIZ (SADECE ADMIN GORUR) ====================
+// Bu, kripto odalarindaki sinyal sistemiyle KARISTIRILMAMALI - al/sat
+// sinyali DEGIL, sadece "bir hisse gunluk destek/direnc bolgesine yaklasti"
+// bilgisi + RSI + hacim orani. Henuz genele acilmadi (hukuki degerlendirme
+// bekliyor), bu yuzden backend zaten SADECE admin_mi() dogrulamasiyla veri
+// donduruyor - buradaki goruntuleme de sadece Yonetici panelinde.
+function bistAnalizGoster() {
+  var kutu = document.getElementById("yonetici-bist-analiz-icerik");
+  if (!kutu) return;
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/bist/analiz", true);
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status !== 200) return;
+    var veri = JSON.parse(xhr.responseText);
+    var kayitlar = veri.kayitlar || [];
+    var html = '<div class="section-title">BIST Analiz (sadece bilgilendirici - al/sat sinyali degil)</div>';
+    if (kayitlar.length === 0) {
+      html += '<div class="empty" style="padding:10px 0">Henuz bir bildirim yok (borsa kapaliyken veya fiyat henuz bir seviyeye yaklasmadiysa normaldir)</div>';
+      kutu.innerHTML = html;
+      return;
+    }
+    for (var i = 0; i < Math.min(kayitlar.length, 50); i++) {
+      var k = kayitlar[i];
+      var seviyeAdi = k.tip === "destek" ? "Destek" : "Direnç";
+      var renk = k.tip === "destek" ? "#4ade80" : "#f87171";
+      var rsiMetin = k.rsi != null ? k.rsi : "-";
+      var hacimMetin = k.hacim_orani != null ? (k.hacim_orani + "x") : "-";
+      html += '<div class="signal-card" style="margin-bottom:6px;padding:10px 14px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center">' +
+        '<span style="font-weight:600;font-size:13px">#' + k.sembol + '</span>' +
+        '<span class="badge" style="background:' + renk + '22;color:' + renk + '">' + seviyeAdi + ': ' + k.seviye + '</span></div>' +
+        '<div style="font-size:11.5px;color:#94a3b8;margin-top:4px">Güncel: ' + k.guncel_fiyat +
+        ' &nbsp;·&nbsp; RSI(14): ' + rsiMetin + ' &nbsp;·&nbsp; Hacim: ' + hacimMetin + '</div>' +
+        '<div class="sig-time">' + k.zaman + '</div></div>';
+    }
     kutu.innerHTML = html;
   };
   xhr.send();
