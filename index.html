@@ -6785,6 +6785,13 @@ function sifreDegistir() {
       document.getElementById("sifre-eski").value = "";
       document.getElementById("sifre-yeni").value = "";
       document.getElementById("sifre-yeni-tekrar").value = "";
+      // Basari mesaji kisa bir sure gorunsun, sonra tum form (mesaj +
+      // kutular + buton) kendiliginden kapansin - kullanici tekrar
+      // "Sifre Degistir"e basip kapatmak zorunda kalmasin.
+      setTimeout(function() {
+        document.getElementById("sifre-form").style.display = "none";
+        basariEl.style.display = "none";
+      }, 2000);
     } else {
       hataEl.textContent = yanit.hata || "Sifre degistirilemedi";
       hataEl.style.display = "block";
