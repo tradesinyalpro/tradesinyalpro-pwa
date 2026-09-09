@@ -241,6 +241,7 @@
       <input class="auth-input" id="giris-kadi" type="text" placeholder="Kullanici adi" autocomplete="username">
       <input class="auth-input" id="giris-sifre" type="password" placeholder="Sifre" autocomplete="current-password">
       <button class="auth-btn" onclick="girisYap()">Giris Yap</button>
+      <div class="auth-toggle" onclick="sifremiUnuttumAc()">Şifremi Unuttum</div>
       <div class="auth-toggle" onclick="formDegistir('kayit')">Hesabin yok mu? Kayit Ol</div>
       <div style="text-align:center;margin-top:14px;font-size:12px;color:#64748b;line-height:1.5">
         Uyeliginizin onaylanmasi icin yoneticiye basvurun.<br>
@@ -254,7 +255,8 @@
       <input class="auth-input" id="kayit-kadi" type="text" placeholder="Kullanici adi" autocomplete="username">
       <input class="auth-input" id="kayit-sifre" type="password" placeholder="Sifre (en az 6 karakter)" autocomplete="new-password">
       <input class="auth-input" id="kayit-telegram" type="text" placeholder="Telegram kullanici adi (@ornek)">
-      <input class="auth-input" id="kayit-email" type="email" placeholder="E-posta (istege bagli)">
+      <input class="auth-input" id="kayit-email" type="email" placeholder="E-posta">
+      <div style="font-size:11px;color:#64748b;margin-top:-4px;margin-bottom:8px">Şifreni unutursan yeni şifren bu adrese gönderilir.</div>
       <div style="display:flex;align-items:center;gap:8px;margin:10px 0;font-size:12.5px;color:#94a3b8">
         <input type="checkbox" id="sozlesme-onay-tik" disabled style="width:16px;height:16px">
         <span onclick="yasalUyariAc()" style="cursor:pointer;text-decoration:underline">Yasal Uyariyi Oku ve Onayla</span>
@@ -262,6 +264,18 @@
       <button class="auth-btn" id="uye-ol-btn" onclick="kayitOl()" disabled style="opacity:0.5;cursor:not-allowed">Kayit Ol</button>
       <div class="auth-toggle" onclick="formDegistir('giris')">Zaten hesabin var mi? Giris Yap</div>
     </div>
+  </div>
+</div>
+
+<div id="sifremi-unuttum-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:5001;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#111827;border:1px solid #1e293b;border-radius:14px;max-width:380px;width:100%;padding:20px">
+    <div style="font-weight:600;margin-bottom:12px">Şifremi Unuttum</div>
+    <div style="font-size:12.5px;color:#94a3b8;margin-bottom:14px">Kullanıcı adını ya da kayıtlı e-postanı gir — eşleşen bir hesap varsa, o e-posta adresine geçici bir şifre gönderilir.</div>
+    <div class="auth-error" id="sifremi-unuttum-hata" style="display:none"></div>
+    <div class="auth-success" id="sifremi-unuttum-basari" style="display:none"></div>
+    <input class="auth-input" id="sifremi-unuttum-girdi" type="text" placeholder="Kullanici adi ya da e-posta">
+    <button class="auth-btn" onclick="sifremiUnuttumGonder()">Gönder</button>
+    <div class="auth-toggle" onclick="sifremiUnuttumKapat()">Vazgeç</div>
   </div>
 </div>
 
@@ -6556,6 +6570,47 @@ function haberFiltre(kategori, el) {
   for (var i = 0; i < btnlar.length; i++) btnlar[i].classList.remove("active");
   el.classList.add("active");
   haberleriGoster();
+}
+
+function sifremiUnuttumAc() {
+  document.getElementById("sifremi-unuttum-hata").style.display = "none";
+  document.getElementById("sifremi-unuttum-basari").style.display = "none";
+  document.getElementById("sifremi-unuttum-girdi").value = "";
+  document.getElementById("sifremi-unuttum-modal").style.display = "flex";
+}
+function sifremiUnuttumKapat() {
+  document.getElementById("sifremi-unuttum-modal").style.display = "none";
+}
+function sifremiUnuttumGonder() {
+  var girdi = document.getElementById("sifremi-unuttum-girdi").value.trim();
+  var hataEl = document.getElementById("sifremi-unuttum-hata");
+  var basariEl = document.getElementById("sifremi-unuttum-basari");
+  hataEl.style.display = "none";
+  basariEl.style.display = "none";
+  if (!girdi) {
+    hataEl.textContent = "Kullanici adi ya da e-posta girin";
+    hataEl.style.display = "block";
+    return;
+  }
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/sifre-unuttum", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.onload = function() {
+    var yanit;
+    try { yanit = JSON.parse(xhr.responseText); } catch (e) { yanit = {}; }
+    if (xhr.status === 200) {
+      basariEl.textContent = yanit.mesaj || "Eslesen bir hesap varsa, e-posta gonderildi.";
+      basariEl.style.display = "block";
+    } else {
+      hataEl.textContent = yanit.hata || "Bir hata olustu, tekrar deneyin.";
+      hataEl.style.display = "block";
+    }
+  };
+  xhr.onerror = function() {
+    hataEl.textContent = "Baglanti hatasi, tekrar deneyin.";
+    hataEl.style.display = "block";
+  };
+  xhr.send(JSON.stringify({ kullanici_adi_veya_email: girdi }));
 }
 
 function formDegistir(hangisi) {
