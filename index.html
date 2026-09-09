@@ -685,6 +685,7 @@
     <div class="auth-success" id="sifre-basari"></div>
     <input class="auth-input" id="sifre-eski" type="password" placeholder="Mevcut sifre">
     <input class="auth-input" id="sifre-yeni" type="password" placeholder="Yeni sifre (en az 6 karakter)">
+    <input class="auth-input" id="sifre-yeni-tekrar" type="password" placeholder="Yeni sifre (tekrar)">
     <button class="auth-btn" onclick="sifreDegistir()">Degistir</button>
   </div>
 </div>
@@ -6759,10 +6760,17 @@ function sifreFormAcKapat() {
 function sifreDegistir() {
   var eski = document.getElementById("sifre-eski").value;
   var yeni = document.getElementById("sifre-yeni").value;
+  var yeniTekrar = document.getElementById("sifre-yeni-tekrar").value;
   var hataEl = document.getElementById("sifre-hata");
   var basariEl = document.getElementById("sifre-basari");
   hataEl.style.display = "none";
   basariEl.style.display = "none";
+
+  if (yeni !== yeniTekrar) {
+    hataEl.textContent = "Yeni sifreler eslesmiyor";
+    hataEl.style.display = "block";
+    return;
+  }
 
   var xhr = new XMLHttpRequest();
   xhr.open("POST", API + "/sifre_degistir", true);
@@ -6776,6 +6784,7 @@ function sifreDegistir() {
       basariEl.style.display = "block";
       document.getElementById("sifre-eski").value = "";
       document.getElementById("sifre-yeni").value = "";
+      document.getElementById("sifre-yeni-tekrar").value = "";
     } else {
       hataEl.textContent = yanit.hata || "Sifre degistirilemedi";
       hataEl.style.display = "block";
