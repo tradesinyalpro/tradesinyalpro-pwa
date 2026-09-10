@@ -603,6 +603,9 @@
     <div class="bot-filter" style="margin-bottom:10px">
       <button class="bot-btn active" id="dd-zaman-15m" onclick="ddZamanDegistir('15m',this)">15 Dakika</button>
       <button class="bot-btn" id="dd-zaman-1h" onclick="ddZamanDegistir('1h',this)">1 Saat</button>
+      <button class="bot-btn" id="dd-zaman-4h" onclick="ddZamanDegistir('4h',this)">4 Saat</button>
+      <button class="bot-btn" id="dd-zaman-1d" onclick="ddZamanDegistir('1d',this)">Günlük</button>
+      <button class="bot-btn" id="dd-zaman-1w" onclick="ddZamanDegistir('1w',this)">Haftalık</button>
       <button class="bot-btn" onclick="olcumAraciToggle(this,'dd-chart')" title="Olcum araci: grafikte suruklayin">📏 Olcum</button>
     </div>
     <div id="dd-seviye-bilgi" style="font-size:12.5px;color:#94a3b8;margin-bottom:10px;line-height:1.7"></div>
@@ -6236,8 +6239,8 @@ function ddYukle(symbol) {
 
       var html = "";
       html += ddSeviyeSatiri("Güncel Fiyat", guncelFiyat, "#e2e8f0");
-      html += ddSeviyeSatiri("Destek (24s)", destek, "#3b82f6");
-      html += ddSeviyeSatiri("Direnç (24s)", direnc, "#f59e0b");
+      html += ddSeviyeSatiri("Destek (96 mum)", destek, "#3b82f6");
+      html += ddSeviyeSatiri("Direnç (96 mum)", direnc, "#f59e0b");
       html += ddSeviyeSatiri("RSI (14)", rsi, rsi <= 35 ? "#4ade80" : (rsi >= 65 ? "#f87171" : "#e2e8f0"));
       if (sinyalKosulu) html += ddSeviyeSatiri("Sinyal Koşulu", sinyalKosulu, "#fbbf24");
 
@@ -7218,9 +7221,11 @@ function yoneticiPaneliGoster() {
           '<button class="refresh-btn" style="background:#7c3aed;color:#fff" onclick="kullaniciOnaylaSuresiz(\'' + u.kullanici_adi + '\')">Süresiz Onayla ✨</button>' +
           '</div>';
       }
-      kart += '<div style="text-align:center;margin-top:8px;display:flex;gap:8px;justify-content:center">' +
+      kart += '<div style="text-align:center;margin-top:8px">' +
         '<button class="refresh-btn" style="background:#22c55e;color:#052e16;font-weight:700" onclick="kullaniciGercekSifreSifirla(\'' + u.kullanici_adi + '\')">Sifre Sifirla (Kaydi Silmez)</button>' +
-        '<button class="refresh-btn" onclick="kullaniciSifreSifirla(\'' + u.kullanici_adi + '\')">Sifre Sifirla (Kaydi Sil)</button>' +
+        '</div>';
+      kart += '<div style="text-align:center;margin-top:8px">' +
+        '<button class="refresh-btn" style="background:#ef4444;color:#fff;font-weight:700" onclick="kullaniciSifreSifirla(\'' + u.kullanici_adi + '\')">Kaydı Sil</button>' +
         '</div>';
       kart += '</div>';
 
