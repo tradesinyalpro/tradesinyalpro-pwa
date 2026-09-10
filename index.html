@@ -588,6 +588,7 @@
       <button class="bot-btn active" onclick="balinaFiltre('kripto',this)">Kripto</button>
       <button class="bot-btn" onclick="balinaFiltre('altcoin',this)">Altcoinler</button>
       <button class="bot-btn" onclick="balinaFiltre('hisse',this)">ABD Hisseleri</button>
+      <button class="bot-btn" onclick="balinaFiltre('hyperliquid',this)">Cüzdan Takip</button>
     </div>
     <div id="balina-icerik"><div class="loading">Yukleniyor...</div></div>
   </div>
@@ -762,6 +763,7 @@ function fiyatlariBirlestirVeGoster() {
   }, 300);
 }
 var tumBalina = { islemler: [], ozet: {} };
+var tumHyperliquid = { cuzdanlar: {} };
 var balinaKategori = "kripto";
 var piyasaVerisi = null;
 var piyasaSonGuncelleme = 0;
@@ -1002,6 +1004,17 @@ function veriYukle() {
     }
   };
   xhr4.send();
+
+  var xhrHl = new XMLHttpRequest();
+  xhrHl.open("GET", API + "/hyperliquid-balina", true);
+  xhrHl.setRequestHeader("X-Auth-Token", authToken || "");
+  xhrHl.onload = function() {
+    if (xhrHl.status === 200) {
+      tumHyperliquid = JSON.parse(xhrHl.responseText);
+      if (aktifSekme === "balina" && balinaKategori === "hyperliquid") balinaGoster();
+    }
+  };
+  xhrHl.send();
 
   var xhr5 = new XMLHttpRequest();
   xhr5.open("GET", "https://api.binance.com/api/v3/ticker/price", true);
@@ -5064,6 +5077,14 @@ function turkiyeZamanindanMs(zamanStr) {
 }
 
 function balinaGoster() {
+  // Cuzdan Takip (Hyperliquid) sekmesi tamamen ayri bir veri kaynagindan
+  // (tumHyperliquid) besleniyor - diger 3 sekmenin (Kripto/Altcoin/Hisse)
+  // Binance tabanli tumBalina mantigina hic girmeden erken donuyoruz.
+  if (balinaKategori === "hyperliquid") {
+    hyperliquidGoster();
+    return;
+  }
+
   // Backend artik islemleri coin bazinda ({"BTCUSDT":[...], ...}) gonderiyor,
   // her coin kendi icinde en fazla 20 kayit tutuyor. Mevcut filtreleme
   // mantigi tek bir duz liste bekledigi icin once hepsini birlestiriyoruz.
@@ -5153,6 +5174,73 @@ function balinaGoster() {
   }
 
   document.getElementById("balina-icerik").innerHTML = html;
+}
+
+function hyperliquidGoster() {
+  // whale_tracker.py scripti her cuzdanin GUNCEL pozisyon listesini
+  // ayri ayri gonderiyor (/hyperliquid-balina/guncelle) - burada hepsini
+  // tek bir duz listede birlestirip en buyukten kucuge siraliyoruz.
+  var cuzdanlar = tumHyperliquid.cuzdanlar || {};
+  var tumPozisyonlar = [];
+  Object.keys(cuzdanlar).forEach(function(adres) {
+    var c = cuzdanlar[adres];
+    (c.pozisyonlar || []).forEach(function(p) {
+      tumPozisyonlar.push({
+        etiket: c.etiket || adres.slice(0, 10),
+        zaman: c.zaman,
+        coin: p.coin,
+        direction: p.direction,
+        size: p.size,
+        entry_price: p.entry_price,
+        notional_usd: p.notional_usd,
+        leverage: p.leverage,
+        liquidation_price: p.liquidation_price,
+        unrealized_pnl: p.unrealized_pnl,
+        open_duration: p.open_duration
+      });
+    });
+  });
+
+  tumPozisyonlar.sort(function(a, b) { return (b.notional_usd || 0) - (a.notional_usd || 0); });
+
+  var html = '<div class="section-title">Hyperliquid Balina Cuzdanlari (' + tumPozisyonlar.length + ' acik pozisyon)</div>';
+
+  if (tumPozisyonlar.length === 0) {
+    html += '<div class="empty">Henuz pozisyon verisi yok veya yukleniyor...</div>';
+  } else {
+    for (var i = 0; i < tumPozisyonlar.length; i++) {
+      html += hyperliquidKartHtml(tumPozisyonlar[i]);
+    }
+  }
+
+  document.getElementById("balina-icerik").innerHTML = html;
+}
+
+function hyperliquidKartHtml(p) {
+  var yonCls = p.direction === "LONG" ? "long" : "short";
+  var yonRenk = p.direction === "LONG" ? "#4ade80" : "#f87171";
+  var pnlRenk = (p.unrealized_pnl || 0) >= 0 ? "#4ade80" : "#f87171";
+  var pnlYazi = (p.unrealized_pnl || 0) >= 0
+    ? "+$" + Math.abs(p.unrealized_pnl).toLocaleString(undefined, {maximumFractionDigits: 0})
+    : "-$" + Math.abs(p.unrealized_pnl).toLocaleString(undefined, {maximumFractionDigits: 0});
+  var buyuklukYazi = "$" + Math.round(p.notional_usd || 0).toLocaleString();
+  var likidasyonYazi = p.liquidation_price ? "$" + Number(p.liquidation_price).toLocaleString() : "Yok";
+
+  var kart = '<div class="signal-card ' + yonCls + '">';
+  kart += '<div class="sig-header"><div class="sig-symbol">';
+  kart += '<span style="display:inline-block;border:1.5px solid ' + yonRenk + ';border-radius:8px;padding:2px 8px">#' + p.coin + '</span>';
+  kart += '<span style="margin-left:6px;font-size:11px;color:#64748b">' + p.etiket + '</span></div>';
+  kart += '<div class="sig-badges"><span class="badge ' + yonCls + '">' + p.direction + '</span>';
+  kart += '<span class="badge" style="background:#1e293b;color:#94a3b8">' + p.leverage + 'x</span></div></div>';
+  kart += '<div class="sig-row"><span class="sig-key">Buyukluk</span><span class="sig-val">' + buyuklukYazi + '</span></div>';
+  kart += '<div class="sig-row"><span class="sig-key">Giris Fiyati</span><span class="sig-val">$' + Number(p.entry_price).toLocaleString() + '</span></div>';
+  kart += '<div class="sig-row"><span class="sig-key">Likidasyon</span><span class="sig-val">' + likidasyonYazi + '</span></div>';
+  kart += '<div class="sig-row"><span class="sig-key">Anlik K/Z</span><span class="sig-val" style="color:' + pnlRenk + ';font-weight:600">' + pnlYazi + '</span></div>';
+  if (p.open_duration) {
+    kart += '<div class="sig-time">' + p.open_duration + '</div>';
+  }
+  kart += '</div>';
+  return kart;
 }
 
 function balinaKartHtml(t) {
