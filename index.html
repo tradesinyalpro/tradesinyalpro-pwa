@@ -6424,11 +6424,6 @@ function ddYukle(symbol) {
       return { time: Math.floor(m[0] / 1000) + TR_UTC_FARKI_SN, open: parseFloat(m[1]), high: parseFloat(m[2]), low: parseFloat(m[3]), close: parseFloat(m[4]) };
     });
 
-    // Botun sinyal-tara() ile AYNI kosul: desteğe/dirence %0.3 yakinlik + RSI esigi
-    var sinyalKosulu = null;
-    if ((guncelFiyat - destek) / guncelFiyat < 0.003 && rsi <= 35) sinyalKosulu = "LONG (destek + RSI dusuk)";
-    else if ((direnc - guncelFiyat) / guncelFiyat < 0.003 && rsi >= 65) sinyalKosulu = "SHORT (direnc + RSI yuksek)";
-
     var anahtar = symbol + "_" + ddSeciliZaman;
     var coinDegisti = (anahtar !== ddSonCizilenAnahtar);
     ddSonCizilenAnahtar = anahtar;
@@ -6455,7 +6450,6 @@ function ddYukle(symbol) {
       html += ddSeviyeSatiri("Destek", destek, "#3b82f6");
       html += ddSeviyeSatiri("Direnç", direnc, "#f59e0b");
       html += ddSeviyeSatiri("RSI (14)", rsi, rsi <= 35 ? "#4ade80" : (rsi >= 65 ? "#f87171" : "#e2e8f0"));
-      if (sinyalKosulu) html += ddSeviyeSatiri("Sinyal Koşulu", sinyalKosulu, "#fbbf24");
 
       if (acikSinyal) {
         var yonRengi = acikSinyal.yon === "LONG" ? "#22c55e" : "#ef4444";
