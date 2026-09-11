@@ -5216,7 +5216,9 @@ function hyperliquidGoster() {
         liquidation_price: p.liquidation_price,
         unrealized_pnl: p.unrealized_pnl,
         open_duration: p.open_duration,
-        opened_at_ms: p.opened_at_ms
+        opened_at_ms: p.opened_at_ms,
+        mark_price: p.mark_price,
+        liq_uzaklik_yuzde: p.liq_uzaklik_yuzde
       });
     });
   });
@@ -5281,7 +5283,17 @@ function hyperliquidKartHtml(p, tiklanabilir) {
     : "-$" + Math.abs(p.unrealized_pnl).toLocaleString(undefined, {maximumFractionDigits: 0});
   var buyuklukYazi = "$" + Math.round(p.notional_usd || 0).toLocaleString();
   var likidasyonYazi = p.liquidation_price ? "$" + Number(p.liquidation_price).toLocaleString() : "Yok";
+  var anlikFiyatYazi = p.mark_price ? "$" + Number(p.mark_price).toLocaleString() : "-";
   var tiklaAttr = tiklanabilir ? ' onclick="hyperliquidCuzdanDetayAc(\'' + p.adres + '\')" style="cursor:pointer"' : '';
+
+  // Likidasyona uzaklik yuzdesi ne kadar KUCUKSE o kadar TEHLIKELI -
+  // renk buna gore kirmizi (yakin/riskli) -> yesil (uzak/guvenli) kayar.
+  var uzaklikHtml = '';
+  if (p.liq_uzaklik_yuzde !== null && p.liq_uzaklik_yuzde !== undefined) {
+    var uzaklikRenk = p.liq_uzaklik_yuzde < 10 ? "#f87171" : (p.liq_uzaklik_yuzde < 25 ? "#fbbf24" : "#4ade80");
+    uzaklikHtml = '<div class="sig-row"><span class="sig-key">Likidasyona Uzaklik</span>' +
+      '<span class="sig-val" style="color:' + uzaklikRenk + ';font-weight:600">%' + p.liq_uzaklik_yuzde.toFixed(1) + '</span></div>';
+  }
 
   var kart = '<div class="signal-card ' + yonCls + '"' + tiklaAttr + '>';
   kart += '<div class="sig-header"><div class="sig-symbol">';
@@ -5291,7 +5303,9 @@ function hyperliquidKartHtml(p, tiklanabilir) {
   kart += '<span class="badge" style="background:#1e293b;color:#94a3b8">' + p.leverage + 'x</span></div></div>';
   kart += '<div class="sig-row"><span class="sig-key">Buyukluk</span><span class="sig-val">' + buyuklukYazi + '</span></div>';
   kart += '<div class="sig-row"><span class="sig-key">Giris Fiyati</span><span class="sig-val">$' + Number(p.entry_price).toLocaleString() + '</span></div>';
+  kart += '<div class="sig-row"><span class="sig-key">Anlik Fiyat</span><span class="sig-val">' + anlikFiyatYazi + '</span></div>';
   kart += '<div class="sig-row"><span class="sig-key">Likidasyon</span><span class="sig-val">' + likidasyonYazi + '</span></div>';
+  kart += uzaklikHtml;
   kart += '<div class="sig-row"><span class="sig-key">Anlik K/Z</span><span class="sig-val" style="color:' + pnlRenk + ';font-weight:600">' + pnlYazi + '</span></div>';
   if (p.open_duration) {
     kart += '<div class="sig-time">' + p.open_duration + '</div>';
