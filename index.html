@@ -6276,7 +6276,8 @@ function guvenlikHaritasiGoster() {
 // tasinir - boylece grafikte gosterilen seviyeler botun GERCEK mantigina
 // sadik kalir, uydurma/genel bir teknik analiz DEGILDIR.
 var ddChart = null, ddSeries = null, ddPriceLines = [], ddSeciliCoin = "BTCUSDT", ddSeciliZaman = "15m",
-  ddIlkYuklendi = false, ddSonCizilenAnahtar = null, DD_TOP100 = [], DD_TOP100_YUKLENDI = false;
+  ddIlkYuklendi = false, ddSonCizilenAnahtar = null, DD_TOP100 = [], DD_TOP100_YUKLENDI = false,
+  ddAcikSinyalDetayGizli = false;
 
 function ddSekmeIlkYukle() {
   if (!ddIlkYuklendi) {
@@ -6453,14 +6454,13 @@ function ddYukle(symbol) {
 
       if (acikSinyal) {
         var yonRengi = acikSinyal.yon === "LONG" ? "#22c55e" : "#ef4444";
-        html += '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #1e293b">' +
-          '<div style="font-weight:700;margin-bottom:4px">📍 Açık Sinyal: <span style="color:' + yonRengi + '">' + acikSinyal.yon + '</span></div></div>';
-        html += ddSeviyeSatiri("Giriş/Maliyet", acikSinyal.maliyet, "#e2e8f0");
-        html += ddSeviyeSatiri("Hedef (TP)", acikSinyal.hedef, "#4ade80");
-        html += ddSeviyeSatiri("Stop", acikSinyal.stop, "#f87171");
-        html += ddSeviyeSatiri("E1", acikSinyal.e1, "#fbbf24");
-        html += ddSeviyeSatiri("E2", acikSinyal.e2, "#fbbf24");
-        html += ddSeviyeSatiri("E3", acikSinyal.e3, "#fbbf24");
+        var detayHtml = "";
+        detayHtml += ddSeviyeSatiri("Giriş/Maliyet", acikSinyal.maliyet, "#e2e8f0");
+        detayHtml += ddSeviyeSatiri("Hedef (TP)", acikSinyal.hedef, "#4ade80");
+        detayHtml += ddSeviyeSatiri("Stop", acikSinyal.stop, "#f87171");
+        detayHtml += ddSeviyeSatiri("E1", acikSinyal.e1, "#fbbf24");
+        detayHtml += ddSeviyeSatiri("E2", acikSinyal.e2, "#fbbf24");
+        detayHtml += ddSeviyeSatiri("E3", acikSinyal.e3, "#fbbf24");
 
         // Pozisyon Durumu: mevcut sinyal kartlarindaki (sinyalKartOlustur)
         // ile BIREBIR AYNI formul - ham fiyat farki * 8x sabit kaldirac (LEV).
@@ -6471,10 +6471,24 @@ function ddYukle(symbol) {
             : (girisNum - guncelFiyat) / girisNum * 100;
           var pozYuzde = hamYuzde * 8;
           var pozPozitif = pozYuzde >= 0;
-          html += '<div style="margin-top:6px;padding-top:6px;border-top:1px dashed #1e293b;display:flex;justify-content:space-between">' +
+          detayHtml += '<div style="margin-top:6px;padding-top:6px;border-top:1px dashed #1e293b;display:flex;justify-content:space-between">' +
             '<span>Pozisyon Durumu</span><span style="font-weight:700;color:' + (pozPozitif ? "#4ade80" : "#f87171") + '">' +
             (pozPozitif ? "+ %" : "- %") + Math.abs(pozYuzde).toFixed(1) + '</span></div>';
         }
+
+        html += '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #1e293b">' +
+          '<div style="font-weight:700;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">' +
+          '<span>📍 Açık Sinyal: <span style="color:' + yonRengi + '">' + acikSinyal.yon + '</span></span>' +
+          '<span onclick="ddAcikSinyalDetayToggle()" style="cursor:pointer;color:#64748b;font-size:12px;font-weight:400;display:flex;align-items:center;gap:4px">' +
+          '<span id="dd-acik-sinyal-toggle-yazi">' + (ddAcikSinyalDetayGizli ? "Göster" : "Gizle") + '</span>' +
+          '<svg id="dd-acik-sinyal-toggle-ikon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+          (ddAcikSinyalDetayGizli
+            ? '<path d="M17.94 17.94A10.94 10.94 0 0112 19c-7 0-11-7-11-7a18.5 18.5 0 015.06-5.94M9.9 4.24A10.9 10.9 0 0112 4c7 0 11 7 11 7a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>'
+            : '<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path><circle cx="12" cy="12" r="3"></circle>') +
+          '</svg></span>' +
+          '</div>' +
+          '<div id="dd-acik-sinyal-detay" style="' + (ddAcikSinyalDetayGizli ? "display:none" : "") + '">' + detayHtml + '</div>' +
+          '</div>';
       } else {
         html += '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #1e293b;color:#475569">Bu coin icin su an acik bir sinyal yok.</div>';
       }
@@ -6487,6 +6501,20 @@ function ddYukle(symbol) {
   };
   xhr.onerror = function() { bilgiKutu.innerHTML = '<div class="empty">Binance verisi alinamadi</div>'; };
   xhr.send();
+}
+
+function ddAcikSinyalDetayToggle() {
+  ddAcikSinyalDetayGizli = !ddAcikSinyalDetayGizli;
+  var detay = document.getElementById("dd-acik-sinyal-detay");
+  var yazi = document.getElementById("dd-acik-sinyal-toggle-yazi");
+  var ikon = document.getElementById("dd-acik-sinyal-toggle-ikon");
+  if (detay) detay.style.display = ddAcikSinyalDetayGizli ? "none" : "";
+  if (yazi) yazi.textContent = ddAcikSinyalDetayGizli ? "Göster" : "Gizle";
+  if (ikon) {
+    ikon.innerHTML = ddAcikSinyalDetayGizli
+      ? '<path d="M17.94 17.94A10.94 10.94 0 0112 19c-7 0-11-7-11-7a18.5 18.5 0 015.06-5.94M9.9 4.24A10.9 10.9 0 0112 4c7 0 11 7 11 7a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>'
+      : '<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path><circle cx="12" cy="12" r="3"></circle>';
+  }
 }
 
 function ddGrafikCiz(candleData, destek, direnc, coinDegisti) {
