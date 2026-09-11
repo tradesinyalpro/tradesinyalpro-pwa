@@ -5006,6 +5006,7 @@ function balinaFiltre(kategori, el) {
   balinaKategori = kategori;
   altcoinDetaySembol = null;
   balinaCoinDetay = null;
+  hyperliquidCuzdanDetay = null;
   var btnlar = document.querySelectorAll("#balina .bot-btn");
   for (var i = 0; i < btnlar.length; i++) btnlar[i].classList.remove("active");
   el.classList.add("active");
@@ -5014,6 +5015,7 @@ function balinaFiltre(kategori, el) {
 
 var altcoinDetaySembol = null;
 var balinaCoinDetay = null;
+var hyperliquidCuzdanDetay = null;
 var balinaListeScrollY = 0;
 var performansDetayBot = null;
 
@@ -5048,6 +5050,7 @@ window.addEventListener("popstate", function(e) {
   altcoinDetaySembol = (e.state && e.state.altcoinDetay) ? e.state.altcoinDetay : null;
   var oncekiBalinaCoinDetay = balinaCoinDetay;
   balinaCoinDetay = (e.state && e.state.balinaCoinDetay) ? e.state.balinaCoinDetay : null;
+  hyperliquidCuzdanDetay = (e.state && e.state.hyperliquidCuzdanDetay) ? e.state.hyperliquidCuzdanDetay : null;
   performansDetayBot = (e.state && e.state.performansDetay) ? e.state.performansDetay : null;
   if (aktifSekme === "balina") {
     balinaGoster();
@@ -5176,16 +5179,32 @@ function balinaGoster() {
   document.getElementById("balina-icerik").innerHTML = html;
 }
 
+function hyperliquidSirala(liste) {
+  // En yakin zamanda acilan pozisyon en ustte (opened_at_ms buyukten kucuge).
+  // Acilis zamani hesaplanamamis (kucuk/esik alti) pozisyonlar en sona,
+  // onlar da kendi aralarinda buyuklugune (notional_usd) gore sıralanir.
+  liste.sort(function(a, b) {
+    var aVar = !!a.opened_at_ms, bVar = !!b.opened_at_ms;
+    if (aVar && bVar) return b.opened_at_ms - a.opened_at_ms;
+    if (aVar && !bVar) return -1;
+    if (!aVar && bVar) return 1;
+    return (b.notional_usd || 0) - (a.notional_usd || 0);
+  });
+  return liste;
+}
+
 function hyperliquidGoster() {
   // whale_tracker.py scripti her cuzdanin GUNCEL pozisyon listesini
   // ayri ayri gonderiyor (/hyperliquid-balina/guncelle) - burada hepsini
-  // tek bir duz listede birlestirip en buyukten kucuge siraliyoruz.
+  // tek bir duz listede birlestirip en yakin zamanda acilandan eskiye
+  // dogru siraliyoruz.
   var cuzdanlar = tumHyperliquid.cuzdanlar || {};
   var tumPozisyonlar = [];
   Object.keys(cuzdanlar).forEach(function(adres) {
     var c = cuzdanlar[adres];
     (c.pozisyonlar || []).forEach(function(p) {
       tumPozisyonlar.push({
+        adres: adres,
         etiket: c.etiket || adres.slice(0, 10),
         zaman: c.zaman,
         coin: p.coin,
@@ -5196,12 +5215,35 @@ function hyperliquidGoster() {
         leverage: p.leverage,
         liquidation_price: p.liquidation_price,
         unrealized_pnl: p.unrealized_pnl,
-        open_duration: p.open_duration
+        open_duration: p.open_duration,
+        opened_at_ms: p.opened_at_ms
       });
     });
   });
 
-  tumPozisyonlar.sort(function(a, b) { return (b.notional_usd || 0) - (a.notional_usd || 0); });
+  // --- Bir cuzdanin detayina girilmisse, sadece onun pozisyonlarini goster ---
+  if (hyperliquidCuzdanDetay) {
+    var cuzdanPozisyonlari = tumPozisyonlar.filter(function(p) { return p.adres === hyperliquidCuzdanDetay; });
+    hyperliquidSirala(cuzdanPozisyonlari);
+    var etiketYazi = cuzdanPozisyonlari.length > 0 ? cuzdanPozisyonlari[0].etiket : hyperliquidCuzdanDetay.slice(0, 10);
+
+    var dhtml = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">';
+    dhtml += '<span onclick="hyperliquidCuzdanDetayKapat()" style="cursor:pointer;font-size:13px;color:#60a5fa">&larr; Geri</span>';
+    dhtml += '<div class="section-title" style="margin:0">' + etiketYazi + ' (' + cuzdanPozisyonlari.length + ' pozisyon)</div></div>';
+
+    if (cuzdanPozisyonlari.length === 0) {
+      dhtml += '<div class="empty">Bu cuzdanin acik pozisyonu kalmadi</div>';
+    } else {
+      for (var j = 0; j < cuzdanPozisyonlari.length; j++) {
+        dhtml += hyperliquidKartHtml(cuzdanPozisyonlari[j], false);
+      }
+    }
+    document.getElementById("balina-icerik").innerHTML = dhtml;
+    return;
+  }
+
+  // --- Genel liste (tum cuzdanlar, en yakin zamanda acilandan eskiye) ---
+  hyperliquidSirala(tumPozisyonlar);
 
   var html = '<div class="section-title">Hyperliquid Balina Cuzdanlari (' + tumPozisyonlar.length + ' acik pozisyon)</div>';
 
@@ -5209,14 +5251,28 @@ function hyperliquidGoster() {
     html += '<div class="empty">Henuz pozisyon verisi yok veya yukleniyor...</div>';
   } else {
     for (var i = 0; i < tumPozisyonlar.length; i++) {
-      html += hyperliquidKartHtml(tumPozisyonlar[i]);
+      html += hyperliquidKartHtml(tumPozisyonlar[i], true);
     }
   }
 
   document.getElementById("balina-icerik").innerHTML = html;
 }
 
-function hyperliquidKartHtml(p) {
+function hyperliquidCuzdanDetayAc(adres) {
+  balinaListeScrollY = window.scrollY;
+  hyperliquidCuzdanDetay = adres;
+  history.pushState({ hyperliquidCuzdanDetay: adres }, "", "");
+  balinaGoster();
+  window.scrollTo(0, 0);
+}
+
+function hyperliquidCuzdanDetayKapat() {
+  hyperliquidCuzdanDetay = null;
+  balinaGoster();
+  window.scrollTo(0, balinaListeScrollY);
+}
+
+function hyperliquidKartHtml(p, tiklanabilir) {
   var yonCls = p.direction === "LONG" ? "long" : "short";
   var yonRenk = p.direction === "LONG" ? "#4ade80" : "#f87171";
   var pnlRenk = (p.unrealized_pnl || 0) >= 0 ? "#4ade80" : "#f87171";
@@ -5225,8 +5281,9 @@ function hyperliquidKartHtml(p) {
     : "-$" + Math.abs(p.unrealized_pnl).toLocaleString(undefined, {maximumFractionDigits: 0});
   var buyuklukYazi = "$" + Math.round(p.notional_usd || 0).toLocaleString();
   var likidasyonYazi = p.liquidation_price ? "$" + Number(p.liquidation_price).toLocaleString() : "Yok";
+  var tiklaAttr = tiklanabilir ? ' onclick="hyperliquidCuzdanDetayAc(\'' + p.adres + '\')" style="cursor:pointer"' : '';
 
-  var kart = '<div class="signal-card ' + yonCls + '">';
+  var kart = '<div class="signal-card ' + yonCls + '"' + tiklaAttr + '>';
   kart += '<div class="sig-header"><div class="sig-symbol">';
   kart += '<span style="display:inline-block;border:1.5px solid ' + yonRenk + ';border-radius:8px;padding:2px 8px">#' + p.coin + '</span>';
   kart += '<span style="margin-left:6px;font-size:11px;color:#64748b">' + p.etiket + '</span></div>';
