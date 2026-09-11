@@ -6277,7 +6277,7 @@ function guvenlikHaritasiGoster() {
 // sadik kalir, uydurma/genel bir teknik analiz DEGILDIR.
 var ddChart = null, ddSeries = null, ddPriceLines = [], ddSeciliCoin = "BTCUSDT", ddSeciliZaman = "15m",
   ddIlkYuklendi = false, ddSonCizilenAnahtar = null, DD_TOP100 = [], DD_TOP100_YUKLENDI = false,
-  ddAcikSinyalDetayGizli = false;
+  ddAcikSinyalDetayGizli = false, ddSonAcikSinyal = null, ddSonDestekDeger = null, ddSonDirencDeger = null;
 
 function ddSekmeIlkYukle() {
   if (!ddIlkYuklendi) {
@@ -6494,6 +6494,9 @@ function ddYukle(symbol) {
       }
       bilgiKutu.innerHTML = html;
 
+      ddSonAcikSinyal = acikSinyal;
+      ddSonDestekDeger = destek;
+      ddSonDirencDeger = direnc;
       ddPriceLinelerCiz(acikSinyal, destek, direnc);
     };
     xhr2.onerror = function() { bilgiKutu.innerHTML = '<div class="empty">Sinyal verisi alinamadi</div>'; };
@@ -6515,6 +6518,8 @@ function ddAcikSinyalDetayToggle() {
       ? '<path d="M17.94 17.94A10.94 10.94 0 0112 19c-7 0-11-7-11-7a18.5 18.5 0 015.06-5.94M9.9 4.24A10.9 10.9 0 0112 4c7 0 11 7 11 7a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>'
       : '<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path><circle cx="12" cy="12" r="3"></circle>';
   }
+  // Grafikteki Giris/Hedef/Stop/E1/E2/E3 cizgilerini de aninda guncelle
+  ddPriceLinelerCiz(ddSonAcikSinyal, ddSonDestekDeger, ddSonDirencDeger);
 }
 
 function ddGrafikCiz(candleData, destek, direnc, coinDegisti) {
@@ -6576,7 +6581,10 @@ function ddPriceLinelerCiz(acikSinyal, destek, direnc) {
   ekle(destek, "#3b82f6", "Destek");
   ekle(direnc, "#f59e0b", "Direnç");
 
-  if (acikSinyal) {
+  // Giris/Hedef/Stop/E1/E2/E3 cizgileri, kullanicinin "Gizle" butonuyla
+  // kapatabildigi ayni anahtara bagli - grafik cok kalabalik olup fiyat
+  // secmeyi zorlastirmasin diye.
+  if (acikSinyal && !ddAcikSinyalDetayGizli) {
     ekle(acikSinyal.maliyet, "#e2e8f0", "Giriş", LightweightCharts.LineStyle.Solid);
     ekle(acikSinyal.hedef, "#4ade80", "Hedef", LightweightCharts.LineStyle.Solid);
     ekle(acikSinyal.stop, "#f87171", "Stop", LightweightCharts.LineStyle.Solid);
