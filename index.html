@@ -606,7 +606,7 @@
   <div id="destekdirenc" style="display:none;padding:8px 12px">
     <div style="position:relative;margin-bottom:10px">
       <input id="dd-arama" type="text" placeholder="Coin ara (orn: BTC, ETH, SOL...)" autocomplete="off"
-        oninput="ddAramaFiltrele()" onfocus="ddAramaFiltrele()"
+        oninput="ddAramaFiltrele()" onfocus="ddAramaFiltrele()" onkeydown="ddAramaEnter(event)"
         style="width:100%;background:#0a0f1e;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px">
       <div id="dd-arama-sonuc" style="display:none;position:absolute;top:44px;left:0;right:0;max-height:280px;overflow-y:auto;background:#0f1729;border:1px solid #1e293b;border-radius:10px;z-index:50"></div>
     </div>
@@ -6312,6 +6312,26 @@ function ddTop100Yukle() {
     } catch (e) {}
   };
   xhr.send();
+}
+
+function ddAramaEnter(event) {
+  if (event.key !== "Enter") return;
+  var girdi = document.getElementById("dd-arama").value.trim().toUpperCase();
+  if (!girdi) return;
+
+  // Yazilan seyin sonundaki bilinen parite eklerini (varsa) temizleyip
+  // HER ZAMAN USDT ekliyoruz - kullanici ne yazarsa yazsin sonuc daima
+  // vadeli USDT paritesi oluyor, baska bir pariteye asla gitmiyor.
+  var bilinenEkler = ["USDT", "USDC", "BUSD", "FDUSD", "TUSD", "USD"];
+  for (var i = 0; i < bilinenEkler.length; i++) {
+    var ek = bilinenEkler[i];
+    if (girdi.endsWith(ek)) {
+      girdi = girdi.slice(0, girdi.length - ek.length);
+      break;
+    }
+  }
+  var sembol = girdi + "USDT";
+  ddCoinSec(sembol);
 }
 
 function ddAramaFiltrele() {
