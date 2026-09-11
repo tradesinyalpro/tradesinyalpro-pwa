@@ -201,6 +201,10 @@
   .auth-logo span { color: #3b82f6; }
   .auth-input { width: 100%; padding: 12px 14px; margin-bottom: 12px; background: #0a0f1e; border: 1px solid #1e293b; border-radius: 10px; color: #e2e8f0; font-size: 14px; }
   .auth-input::placeholder { color: #64748b; }
+  .password-wrap { position: relative; margin-bottom: 12px; }
+  .password-wrap .auth-input { margin-bottom: 0; padding-right: 42px; }
+  .password-eye { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #64748b; display: flex; align-items: center; user-select: none; }
+  .password-eye:hover { color: #94a3b8; }
   .auth-btn { width: 100%; padding: 13px; background: #3b82f6; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 4px; }
   .auth-btn:active { opacity: 0.8; }
   .auth-toggle { text-align: center; margin-top: 16px; font-size: 13px; color: #60a5fa; cursor: pointer; }
@@ -239,7 +243,10 @@
     <div id="giris-form">
       <div class="auth-error" id="giris-hata"></div>
       <input class="auth-input" id="giris-kadi" type="text" placeholder="Kullanici adi" autocomplete="username">
-      <input class="auth-input" id="giris-sifre" type="password" placeholder="Sifre" autocomplete="current-password">
+      <div class="password-wrap">
+        <input class="auth-input" id="giris-sifre" type="password" placeholder="Sifre" autocomplete="current-password">
+        <span class="password-eye" onclick="sifreGorunurlugunuDegistir('giris-sifre', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>
+      </div>
       <button class="auth-btn" onclick="girisYap()">Giris Yap</button>
       <div class="auth-toggle" onclick="sifremiUnuttumAc()">Şifremi Unuttum</div>
       <div class="auth-toggle" onclick="formDegistir('kayit')">Hesabin yok mu? Kayit Ol</div>
@@ -253,7 +260,10 @@
       <div class="auth-error" id="kayit-hata"></div>
       <div class="auth-success" id="kayit-basari"></div>
       <input class="auth-input" id="kayit-kadi" type="text" placeholder="Kullanici adi" autocomplete="username">
-      <input class="auth-input" id="kayit-sifre" type="password" placeholder="Sifre (en az 6 karakter)" autocomplete="new-password">
+      <div class="password-wrap">
+        <input class="auth-input" id="kayit-sifre" type="password" placeholder="Sifre (en az 6 karakter)" autocomplete="new-password">
+        <span class="password-eye" onclick="sifreGorunurlugunuDegistir('kayit-sifre', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>
+      </div>
       <input class="auth-input" id="kayit-telegram" type="text" placeholder="Telegram kullanici adi (@ornek)">
       <input class="auth-input" id="kayit-email" type="email" placeholder="E-posta">
       <div style="font-size:11px;color:#64748b;margin-top:-4px;margin-bottom:8px">Şifreni unutursan yeni şifren bu adrese gönderilir.</div>
@@ -687,9 +697,18 @@
   <div id="sifre-form" style="display:none;max-width:300px;margin:16px auto 0">
     <div class="auth-error" id="sifre-hata"></div>
     <div class="auth-success" id="sifre-basari"></div>
-    <input class="auth-input" id="sifre-eski" type="password" placeholder="Mevcut sifre">
-    <input class="auth-input" id="sifre-yeni" type="password" placeholder="Yeni sifre (en az 6 karakter)">
-    <input class="auth-input" id="sifre-yeni-tekrar" type="password" placeholder="Yeni sifre (tekrar)">
+    <div class="password-wrap">
+      <input class="auth-input" id="sifre-eski" type="password" placeholder="Mevcut sifre">
+      <span class="password-eye" onclick="sifreGorunurlugunuDegistir('sifre-eski', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>
+    </div>
+    <div class="password-wrap">
+      <input class="auth-input" id="sifre-yeni" type="password" placeholder="Yeni sifre (en az 6 karakter)">
+      <span class="password-eye" onclick="sifreGorunurlugunuDegistir('sifre-yeni', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>
+    </div>
+    <div class="password-wrap">
+      <input class="auth-input" id="sifre-yeni-tekrar" type="password" placeholder="Yeni sifre (tekrar)">
+      <span class="password-eye" onclick="sifreGorunurlugunuDegistir('sifre-yeni-tekrar', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>
+    </div>
     <button class="auth-btn" onclick="sifreDegistir()">Degistir</button>
   </div>
 </div>
@@ -764,6 +783,21 @@ function fiyatlariBirlestirVeGoster() {
 }
 var tumBalina = { islemler: [], ozet: {} };
 var tumHyperliquid = { cuzdanlar: {} };
+
+var SIFRE_GOZ_ACIK_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+var SIFRE_GOZ_KAPALI_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0112 19c-7 0-11-7-11-7a18.5 18.5 0 015.06-5.94M9.9 4.24A10.9 10.9 0 0112 4c7 0 11 7 11 7a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>';
+
+function sifreGorunurlugunuDegistir(inputId, iconEl) {
+  var input = document.getElementById(inputId);
+  if (!input) return;
+  if (input.type === "password") {
+    input.type = "text";
+    iconEl.innerHTML = SIFRE_GOZ_KAPALI_SVG;
+  } else {
+    input.type = "password";
+    iconEl.innerHTML = SIFRE_GOZ_ACIK_SVG;
+  }
+}
 var balinaKategori = "kripto";
 var piyasaVerisi = null;
 var piyasaSonGuncelleme = 0;
@@ -6398,8 +6432,8 @@ function ddYukle(symbol) {
 
       var html = "";
       html += ddSeviyeSatiri("Güncel Fiyat", guncelFiyat, "#e2e8f0");
-      html += ddSeviyeSatiri("Destek (96 mum)", destek, "#3b82f6");
-      html += ddSeviyeSatiri("Direnç (96 mum)", direnc, "#f59e0b");
+      html += ddSeviyeSatiri("Destek", destek, "#3b82f6");
+      html += ddSeviyeSatiri("Direnç", direnc, "#f59e0b");
       html += ddSeviyeSatiri("RSI (14)", rsi, rsi <= 35 ? "#4ade80" : (rsi >= 65 ? "#f87171" : "#e2e8f0"));
       if (sinyalKosulu) html += ddSeviyeSatiri("Sinyal Koşulu", sinyalKosulu, "#fbbf24");
 
@@ -6995,8 +7029,14 @@ function zorunluSifreDegistirEkraniGoster(eskiSifre) {
     '<div style="color:#e2e8f0;font-size:15px;font-weight:600;text-align:center;margin-bottom:18px">' +
     'Yöneticiniz şifrenizi sıfırladı. Devam etmeden önce yeni bir şifre belirlemeniz gerekiyor.</div>' +
     '<div class="auth-error" id="zorunlu-sifre-hata" style="display:none"></div>' +
+    '<div class="password-wrap">' +
     '<input class="auth-input" id="zorunlu-sifre-yeni" type="password" placeholder="Yeni sifre (en az 6 karakter)">' +
+    '<span class="password-eye" onclick="sifreGorunurlugunuDegistir(\'zorunlu-sifre-yeni\', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>' +
+    '</div>' +
+    '<div class="password-wrap">' +
     '<input class="auth-input" id="zorunlu-sifre-tekrar" type="password" placeholder="Yeni sifre (tekrar)">' +
+    '<span class="password-eye" onclick="sifreGorunurlugunuDegistir(\'zorunlu-sifre-tekrar\', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>' +
+    '</div>' +
     '<button class="auth-btn" onclick="zorunluSifreDegistirGonder()">Şifreyi Belirle ve Devam Et</button>' +
     '</div>';
   document.body.appendChild(el);
