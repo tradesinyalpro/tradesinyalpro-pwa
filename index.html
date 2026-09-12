@@ -6408,9 +6408,19 @@ function ddYukle(symbol) {
     if (!Array.isArray(mumlar) || mumlar.length === 0) { bilgiKutu.innerHTML = '<div class="empty">Veri alinamadi</div>'; return; }
 
     var closes = mumlar.map(function(m) { return parseFloat(m[4]); });
-    var son96 = closes.slice(-96);
-    var destek = Math.min.apply(null, son96);
-    var direnc = Math.max.apply(null, son96);
+
+    // Oda kartlarindaki (mumSvgOlustur/coinAnalizi) ile AYNI mantik: basit
+    // min/max yerine pivot noktalarini bulup en cok "test edilen" (en fazla
+    // dokunulan) seviyeyi destek/direnc olarak seciyoruz - boylece site
+    // genelinde tutarli ve gercek teknik analiz mantigina uygun bir sonuc
+    // elde ediyoruz.
+    var mumlarObj = mumlar.map(function(m) {
+      return { acilis: parseFloat(m[1]), yuksek: parseFloat(m[2]), dusuk: parseFloat(m[3]), kapanis: parseFloat(m[4]), zaman: m[0] };
+    });
+    var guncelFiyatGecici = closes[closes.length - 1];
+    var srSonuc = destekDirencBul(mumlarObj, guncelFiyatGecici);
+    var destek = srSonuc.destek;
+    var direnc = srSonuc.direnc;
     var rsi = ddRsiHesapla(closes, 14);
     var guncelFiyat = closes[closes.length - 1];
 
