@@ -6091,6 +6091,18 @@ function botDurumuGoster() {
 // bilgisi + RSI + hacim orani. Henuz genele acilmadi (hukuki degerlendirme
 // bekliyor), bu yuzden backend zaten SADECE admin_mi() dogrulamasiyla veri
 // donduruyor - buradaki goruntuleme de sadece Yonetici panelinde.
+// "YYYY-MM-DD" -> "GG.AA.YYYY" (bugunse "(Bugün)" ekler) - gunlere gore
+// gruplama basligi icin kullanilir.
+function bistTarihBasligiFormatla(tarihStr) {
+  var parcalar = tarihStr.split("-");
+  if (parcalar.length !== 3) return tarihStr;
+  var etiket = parcalar[2] + "." + parcalar[1] + "." + parcalar[0];
+  var bugun = new Date();
+  var bugunStr = bugun.getFullYear() + "-" + String(bugun.getMonth() + 1).padStart(2, "0") + "-" + String(bugun.getDate()).padStart(2, "0");
+  if (tarihStr === bugunStr) etiket += " (Bugün)";
+  return etiket;
+}
+
 function yoneticiBistAnalizGoster() {
   var kutu = document.getElementById("yonetici-bist-analiz-icerik");
   if (!kutu) return;
@@ -6115,19 +6127,34 @@ function yoneticiBistAnalizGoster() {
         kutu.innerHTML = html;
         return;
       }
-      for (var i = 0; i < Math.min(kayitlar.length, 50); i++) {
+      // Kayitlar backend'den EN YENI ONCE sirali geliyor (bkz. /bist/analiz).
+      // Gune gore GRUPLUYORUZ (bu sirayi bozmadan) ki hangi sinyalin hangi
+      // gun geldigi karismasin - her yeni tarihte bir baslik acilir.
+      var sonGosterilenTarih = null;
+      var toplamGosterilen = 0;
+      var MAKS_GOSTERILEN = 200; // gun bazinda cok sinyal birikebilecegi icin eski limit (50) yetersiz kalabilir
+      for (var i = 0; i < kayitlar.length && toplamGosterilen < MAKS_GOSTERILEN; i++) {
         var k = kayitlar[i];
+        var buTarih = (k.zaman || "").substring(0, 10);
+        var buSaat = (k.zaman || "").substring(11);
+        if (buTarih !== sonGosterilenTarih) {
+          html += '<div style="font-size:12px;font-weight:700;color:#cbd5e1;margin:14px 0 6px;padding-bottom:4px;border-bottom:1px solid #334155">' +
+            bistTarihBasligiFormatla(buTarih) + '</div>';
+          sonGosterilenTarih = buTarih;
+        }
         var seviyeAdi = k.tip === "destek" ? "Destek" : "Direnç";
         var renk = k.tip === "destek" ? "#4ade80" : "#f87171";
         var rsiMetin = k.rsi != null ? k.rsi : "-";
         var hacimMetin = k.hacim_orani != null ? (k.hacim_orani + "x") : "-";
+        var guvenEtiketi = k.yuksek_guven ? ' <span class="badge" style="background:#facc1522;color:#facc15" title="Backtest sonucuna gore (RSI<=30 ve hacim<2.0x) daha guvenilir bulunan sinyal turu - yine de al/sat tavsiyesi degildir">⭐ Yüksek Güven</span>' : '';
         html += '<div class="signal-card" style="margin-bottom:6px;padding:10px 14px">' +
-          '<div style="display:flex;justify-content:space-between;align-items:center">' +
-          '<span style="font-weight:600;font-size:13px">#' + k.sembol + '</span>' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">' +
+          '<span style="font-weight:600;font-size:13px">#' + k.sembol + guvenEtiketi + '</span>' +
           '<span class="badge" style="background:' + renk + '22;color:' + renk + '">' + seviyeAdi + ': ' + k.seviye + '</span></div>' +
           '<div style="font-size:11.5px;color:#94a3b8;margin-top:4px">Güncel: ' + k.guncel_fiyat +
           ' &nbsp;·&nbsp; RSI(14): ' + rsiMetin + ' &nbsp;·&nbsp; Hacim: ' + hacimMetin + '</div>' +
-          '<div class="sig-time">' + k.zaman + '</div></div>';
+          '<div class="sig-time">' + buSaat + '</div></div>';
+        toplamGosterilen++;
       }
       kutu.innerHTML = html;
     } catch (e) {
