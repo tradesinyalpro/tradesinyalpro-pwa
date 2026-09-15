@@ -6121,9 +6121,13 @@ function yoneticiBistAnalizGoster() {
     try {
       var veri = JSON.parse(xhr.responseText);
       var kayitlar = veri.kayitlar || [];
-      var html = '<div class="section-title">BIST Analiz (sadece bilgilendirici - al/sat sinyali degil)</div>';
+      // 2026-09: bot artik SADECE "Yuksek Guven" esigini (RSI<=30 ve
+      // hacim<2.0x) gecen sinyalleri gonderiyor - digerleri hic buraya
+      // dusmuyor, bu yuzden eskisine gore cok daha az kayit gorunmesi
+      // BEKLENEN/NORMAL bir durum, hata degil.
+      var html = '<div class="section-title">BIST Analiz — sadece ⭐ Yüksek Güvenli sinyaller (sadece bilgilendirici, al/sat sinyali değil)</div>';
       if (kayitlar.length === 0) {
-        html += '<div class="empty" style="padding:10px 0">Henuz bir bildirim yok (borsa kapaliyken veya fiyat henuz bir seviyeye yaklasmadiysa normaldir)</div>';
+        html += '<div class="empty" style="padding:10px 0">Henuz yuksek guvenli bir sinyal yok (borsa kapaliyken, fiyat henuz bir seviyeye yaklasmadiysa, veya yaklasan hisseler filtre esigini (RSI<=30 ve hacim<2.0x) gecmediyse normaldir)</div>';
         kutu.innerHTML = html;
         return;
       }
