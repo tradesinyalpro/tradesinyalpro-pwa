@@ -6131,6 +6131,15 @@ function yoneticiBistAnalizGoster() {
         kutu.innerHTML = html;
         return;
       }
+      // "ucuncu madde" MAE bulgusu (2026-09): risk_notu her kayitta AYNI metin
+      // oldugu icin (bot sabit MAE_ISTATISTIK'ten uretiyor) her karta tekrar
+      // basmak yerine BIR KEZ, en ustte banner olarak gosteriyoruz - amac,
+      // filtrenin zarari ONLEMEDIGINI (sadece ortalamada daha iyi sinyal
+      // sectigini) her zaman gorunur tutmak.
+      if (kayitlar[0] && kayitlar[0].risk_notu) {
+        html += '<div style="font-size:11.5px;color:#facc15;background:#facc1514;border:1px solid #facc1533;' +
+          'border-radius:8px;padding:8px 10px;margin-bottom:10px">' + kayitlar[0].risk_notu + '</div>';
+      }
       // Kayitlar backend'den EN YENI ONCE sirali geliyor (bkz. /bist/analiz).
       // Gune gore GRUPLUYORUZ (bu sirayi bozmadan) ki hangi sinyalin hangi
       // gun geldigi karismasin - her yeni tarihte bir baslik acilir.
