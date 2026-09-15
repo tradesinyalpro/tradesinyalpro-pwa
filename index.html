@@ -4601,9 +4601,45 @@ function gecmisGoster() {
     html += '</div>';
   }
 
-  for (var k = 0; k < hepsi.length; k++) {
-    var s = hepsi[k].s;
-    var bot = hepsi[k].bot;
+  // Sonuclari ODA BAZINDA grupluyoruz - her odanin kendi basligi, kendi
+  // ozet istatistigi ve kendi (zamana gore en yeniden eskiye) sirali
+  // listesi olacak sekilde. Sabit Oda 1->4 sirasini kullaniyoruz ki
+  // tumVeriler'in ic sirasina bagli olmadan hep ayni duzende gorunsun.
+  var ODA_SIRASI = ["SINYAL_ODA_1", "SINYAL_ODA_2", "SINYAL_ODA_3", "SINYAL_ODA_4"];
+  var digerBotlar = botlar.filter(function(b) { return ODA_SIRASI.indexOf(b) === -1; });
+  var tumOdaSirasi = ODA_SIRASI.concat(digerBotlar);
+
+  for (var o = 0; o < tumOdaSirasi.length; o++) {
+    var odaBot = tumOdaSirasi[o];
+    var odaKayitlari = hepsi.filter(function(item) { return item.bot === odaBot; });
+    if (odaKayitlari.length === 0) continue;
+
+    var odaTp = 0, odaStop = 0;
+    for (var ot = 0; ot < odaKayitlari.length; ot++) {
+      if (odaKayitlari[ot].s.durum === "tp") odaTp++; else odaStop++;
+    }
+    var odaToplam = odaTp + odaStop;
+    var odaBasari = odaToplam > 0 ? Math.round(odaTp / odaToplam * 100) : 0;
+
+    html += '<div style="margin:18px 0 8px;padding-bottom:6px;border-bottom:1px solid #1e293b;' +
+      'display:flex;justify-content:space-between;align-items:center">';
+    html += '<span style="font-weight:700;color:#e2e8f0;font-size:15px">' + botAdi(odaBot) + '</span>';
+    html += '<span style="font-size:12px;color:#64748b">' + odaToplam + ' islem &middot; ' +
+      '<span style="color:#4ade80">' + odaTp + ' başarılı</span> / <span style="color:#f87171">' + odaStop + ' başarısız</span> &middot; %' + odaBasari + '</span>';
+    html += '</div>';
+
+    for (var k = 0; k < odaKayitlari.length; k++) {
+      html += gecmisKartHtml(odaKayitlari[k].s, odaKayitlari[k].bot);
+    }
+  }
+
+  if (hepsi.length === 0) {
+    html = arama ? ('<div class="empty">"' + arama + '" icin gecmis kayit bulunamadi</div>') : '<div class="empty">Henuz tamamlanmis islem yok</div>';
+  }
+  document.getElementById("gecmis-icerik").innerHTML = html;
+}
+
+function gecmisKartHtml(s, bot) {
     var sonuc = s.durum === "tp" ? "tp" : "stop";
     var sonucYazi = s.durum === "tp" ? "BAŞARILI" : "BAŞARISIZ";
     var yon = s.yon || "";
@@ -4630,21 +4666,17 @@ function gecmisGoster() {
       ? '<span style="font-size:10px;color:#60a5fa;margin-left:8px">(Ekleme oldu &middot; Kademe ' + s.asama + '/3)</span>'
       : "";
 
-    html += '<div class="signal-card ' + sonuc + '">';
-    html += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + yildizHtml + '</div>';
-    html += '<div class="sig-badges">' + kapanisPnlHtml + '<span class="badge ' + sonuc + '">' + sonucYazi + '</span>';
-    html += '<span class="badge bot">' + botAdi(bot) + '</span></div></div>';
-    html += '<div class="sig-row"><span class="sig-key">Yon</span><span class="badge ' + yonCls + '">' + yon + '</span></div>';
-    html += '<div class="sig-row"><span class="sig-key">Giris</span><span class="sig-val">' + (s.giris || s.maliyet || "-") + eklemeHtml + '</span></div>';
-    html += '<div style="display:flex;justify-content:space-between;align-items:center">';
-    html += '<div class="sig-time">' + (s.sonuc_zamani || s.zaman || "") + '</div>';
-    html += '<span onclick="replayAc(\'' + bot + '\',\'' + s.sembol + '\',\'' + (s.zaman || "") + '\')" style="cursor:pointer;font-size:11px;color:#60a5fa;background:#0f1a2e;border:1px solid #1e3a5f;padding:4px 10px;border-radius:20px">▶ Replay</span>';
-    html += '</div></div>';
-  }
-  if (hepsi.length === 0) {
-    html = arama ? ('<div class="empty">"' + arama + '" icin gecmis kayit bulunamadi</div>') : '<div class="empty">Henuz tamamlanmis islem yok</div>';
-  }
-  document.getElementById("gecmis-icerik").innerHTML = html;
+    var kart = '<div class="signal-card ' + sonuc + '">';
+    kart += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + yildizHtml + '</div>';
+    kart += '<div class="sig-badges">' + kapanisPnlHtml + '<span class="badge ' + sonuc + '">' + sonucYazi + '</span>';
+    kart += '<span class="badge bot">' + botAdi(bot) + '</span></div></div>';
+    kart += '<div class="sig-row"><span class="sig-key">Yon</span><span class="badge ' + yonCls + '">' + yon + '</span></div>';
+    kart += '<div class="sig-row"><span class="sig-key">Giris</span><span class="sig-val">' + (s.giris || s.maliyet || "-") + eklemeHtml + '</span></div>';
+    kart += '<div style="display:flex;justify-content:space-between;align-items:center">';
+    kart += '<div class="sig-time">' + (s.sonuc_zamani || s.zaman || "") + '</div>';
+    kart += '<span onclick="replayAc(\'' + bot + '\',\'' + s.sembol + '\',\'' + (s.zaman || "") + '\')" style="cursor:pointer;font-size:11px;color:#60a5fa;background:#0f1a2e;border:1px solid #1e3a5f;padding:4px 10px;border-radius:20px">▶ Replay</span>';
+    kart += '</div></div>';
+    return kart;
 }
 
 // ==================== GRAFİK REPLAY MODU (Gecmis > kapanmis sinyal) ====================
