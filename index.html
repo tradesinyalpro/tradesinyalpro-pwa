@@ -5657,7 +5657,7 @@ function sinyaleGit(bot, sembol) {
 }
 
 var coinAramaZamanlayici = null;
-var coinAramaGenelIstatistikMod = "tum"; // "tum" | "30gun" | "7gun"
+var coinAramaGenelIstatistikMod = "30gun"; // "tum" | "30gun" | "7gun"
 
 function coinAramaGirdiDegisti() {
   if (coinAramaZamanlayici) clearTimeout(coinAramaZamanlayici);
@@ -5677,7 +5677,7 @@ function coinAramaUygula() {
   }
   for (var j = 0; j < divlar.length; j++) divlar[j].style.display = "none";
   sonucDiv.style.display = "block";
-  coinAramaGenelIstatistikMod = "tum";
+  coinAramaGenelIstatistikMod = "30gun";
   coinAramaSonucCiz(sorgu);
 }
 
@@ -5716,7 +5716,7 @@ function coinAramaSonucCiz(sorgu) {
 function coinAramaSemboleGit(sembol) {
   var girdi = document.getElementById("coin-arama-input");
   if (girdi) girdi.value = sembol;
-  coinAramaGenelIstatistikMod = "tum";
+  coinAramaGenelIstatistikMod = "30gun";
   coinAramaTekSembolGoster(sembol);
 }
 
