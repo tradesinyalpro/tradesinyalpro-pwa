@@ -5789,33 +5789,50 @@ function coinAramaBalinayaGit(sembol, kategori) {
   }
 }
 
-function coinAramaOzetGridHtml(yonVerisi, sembol) {
-  var uzun = yonVerisi.LONG || { tp: 0, stop: 0 };
-  var kisa = yonVerisi.SHORT || { tp: 0, stop: 0 };
-  var uzunToplam = uzun.tp + uzun.stop;
-  var kisaToplam = kisa.tp + kisa.stop;
-  var uzunBasari = uzunToplam > 0 ? Math.round(uzun.tp / uzunToplam * 100) : null;
-  var kisaBasari = kisaToplam > 0 ? Math.round(kisa.tp / kisaToplam * 100) : null;
-  var balinaBaglantilari = sembol
-    ? '<span style="font-size:10px;color:#60a5fa;cursor:pointer;text-decoration:underline" onclick="event.stopPropagation();coinAramaBalinayaGit(\'' + sembol + '\',\'kripto\')">Kripto</span>' +
-      '<span style="font-size:10px;color:#60a5fa;cursor:pointer;text-decoration:underline;margin-left:8px" onclick="event.stopPropagation();coinAramaBalinayaGit(\'' + sembol + '\',\'altcoin\')">Altcoin</span>'
-    : "";
-  var html = '<div style="display:flex;gap:10px">';
-  html += '<div class="stat-card" style="flex:1">';
-  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:13px;color:#4ade80">&#9650; Long</span>' + balinaBaglantilari + '</div>';
-  html += '<div style="font-size:20px;font-weight:800;color:#4ade80;margin-bottom:6px">' + uzunToplam + ' islem</div>';
-  html += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#64748b">Basarili</span><span style="font-weight:700;color:#4ade80">' + uzun.tp + '</span></div>';
-  html += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#64748b">Basarisiz</span><span style="font-weight:700;color:#f87171">' + uzun.stop + '</span></div>';
-  html += '<div style="font-size:11px;color:#64748b;margin-top:8px">' + (uzunBasari !== null ? "%" + uzunBasari + " basari" : "Veri yok") + '</div>';
+function coinAramaTekOdaKutusuHtml(baslik, renk, veri) {
+  var toplam = veri.tp + veri.stop;
+  var basari = toplam > 0 ? Math.round(veri.tp / toplam * 100) : null;
+  var html = '<div class="stat-card" style="flex:1">';
+  html += '<div style="font-size:13px;color:' + renk + ';margin-bottom:8px">' + baslik + '</div>';
+  html += '<div style="font-size:20px;font-weight:800;color:' + renk + ';margin-bottom:6px">' + toplam + ' islem</div>';
+  html += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#64748b">Basarili</span><span style="font-weight:700;color:#4ade80">' + veri.tp + '</span></div>';
+  html += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#64748b">Basarisiz</span><span style="font-weight:700;color:#f87171">' + veri.stop + '</span></div>';
+  html += '<div style="font-size:11px;color:#64748b;margin-top:8px">' + (basari !== null ? "%" + basari + " basari" : "Veri yok") + '</div>';
   html += '</div>';
-  html += '<div class="stat-card" style="flex:1">';
-  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:13px;color:#f87171">&#9660; Short</span>' + balinaBaglantilari + '</div>';
-  html += '<div style="font-size:20px;font-weight:800;color:#f87171;margin-bottom:6px">' + kisaToplam + ' islem</div>';
-  html += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#64748b">Basarili</span><span style="font-weight:700;color:#4ade80">' + kisa.tp + '</span></div>';
-  html += '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#64748b">Basarisiz</span><span style="font-weight:700;color:#f87171">' + kisa.stop + '</span></div>';
-  html += '<div style="font-size:11px;color:#64748b;margin-top:8px">' + (kisaBasari !== null ? "%" + kisaBasari + " basari" : "Veri yok") + '</div>';
-  html += '</div>';
-  html += '</div>';
+  return html;
+}
+
+var GECMIS_ODA_SIRASI = ["SINYAL_ODA_1", "SINYAL_ODA_2", "SINYAL_ODA_3", "SINYAL_ODA_4"];
+
+function coinAramaOzetGridHtml(yonOdaVerisi, sembol) {
+  // yonOdaVerisi: {"SINYAL_ODA_1": {LONG:{tp,stop}, SHORT:{tp,stop}}, ...}
+  var html = "";
+  var hicVeriYokMu = true;
+
+  for (var o = 0; o < GECMIS_ODA_SIRASI.length; o++) {
+    var bot = GECMIS_ODA_SIRASI[o];
+    var odaVeri = yonOdaVerisi[bot];
+    if (!odaVeri) continue;
+    var uzun = odaVeri.LONG || { tp: 0, stop: 0 };
+    var kisa = odaVeri.SHORT || { tp: 0, stop: 0 };
+    if (uzun.tp + uzun.stop + kisa.tp + kisa.stop === 0) continue;
+    hicVeriYokMu = false;
+
+    html += '<div style="margin-bottom:14px">';
+    html += '<div style="font-weight:700;color:#e2e8f0;font-size:13px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #1e293b">' + botAdi(bot) + '</div>';
+    html += '<div style="display:flex;gap:10px;margin-bottom:6px">';
+    html += '<span style="flex:1;font-size:10px;color:#60a5fa;cursor:pointer;text-decoration:underline" onclick="coinAramaBalinayaGit(\'' + sembol + '\',\'kripto\')">Kripto</span>';
+    html += '<span style="flex:1;font-size:10px;color:#60a5fa;cursor:pointer;text-decoration:underline" onclick="coinAramaBalinayaGit(\'' + sembol + '\',\'altcoin\')">Altcoin</span>';
+    html += '</div>';
+    html += '<div style="display:flex;gap:10px">';
+    html += coinAramaTekOdaKutusuHtml("&#9650; Long", "#4ade80", uzun);
+    html += coinAramaTekOdaKutusuHtml("&#9660; Short", "#f87171", kisa);
+    html += '</div></div>';
+  }
+
+  if (hicVeriYokMu) {
+    html = '<div class="empty">Bu donemde/odalarda kayit yok</div>';
+  }
   return html;
 }
 
@@ -5832,8 +5849,8 @@ function coinAramaIstatistikYukle(sembol) {
       if (xhr.status !== 200) { alan.innerHTML = '<div class="empty">Veri alinamadi</div>'; return; }
       var yanit;
       try { yanit = JSON.parse(xhr.responseText); } catch (e) { alan.innerHTML = '<div class="empty">Veri alinamadi</div>'; return; }
-      var yon = (yanit.coin_yon || {})[sembol] || { LONG: { tp: 0, stop: 0 }, SHORT: { tp: 0, stop: 0 } };
-      alan.innerHTML = coinAramaOzetGridHtml(yon, sembol);
+      var yonOda = (yanit.coin_yon_oda || {})[sembol] || {};
+      alan.innerHTML = coinAramaOzetGridHtml(yonOda, sembol);
     };
     xhr.onerror = function() { alan.innerHTML = '<div class="empty">Sunucuya ulasilamadi</div>'; };
     xhr.send();
@@ -5843,10 +5860,11 @@ function coinAramaIstatistikYukle(sembol) {
   var gunSayisi = coinAramaGenelIstatistikMod === "7gun" ? 7 : 30;
   var sinirMs = gunSayisi * 24 * 60 * 60 * 1000;
   var simdiMs = Date.now();
-  var yonSayaci = { LONG: { tp: 0, stop: 0 }, SHORT: { tp: 0, stop: 0 } };
+  var yonOdaSayaci = {};
   var botlar = Object.keys(tumVeriler || {});
   for (var b = 0; b < botlar.length; b++) {
-    var sinyaller = (tumVeriler[botlar[b]] || {}).sinyaller || [];
+    var bot = botlar[b];
+    var sinyaller = (tumVeriler[bot] || {}).sinyaller || [];
     for (var i = 0; i < sinyaller.length; i++) {
       var s = sinyaller[i];
       if (s.sembol !== sembol) continue;
@@ -5854,10 +5872,11 @@ function coinAramaIstatistikYukle(sembol) {
       var zamanMs = turkiyeZamanindanMs(s.sonuc_zamani || s.zaman);
       if (!zamanMs || simdiMs - zamanMs > sinirMs) continue;
       var yonAdi = s.yon === "LONG" ? "LONG" : "SHORT";
-      yonSayaci[yonAdi][s.durum === "tp" ? "tp" : "stop"]++;
+      var odaKayit = yonOdaSayaci[bot] || (yonOdaSayaci[bot] = { LONG: { tp: 0, stop: 0 }, SHORT: { tp: 0, stop: 0 } });
+      odaKayit[yonAdi][s.durum === "tp" ? "tp" : "stop"]++;
     }
   }
-  alan.innerHTML = coinAramaOzetGridHtml(yonSayaci, sembol);
+  alan.innerHTML = coinAramaOzetGridHtml(yonOdaSayaci, sembol);
 }
 
 function coinAramaModDegistir(el, mod, sembol) {
