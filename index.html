@@ -6180,13 +6180,24 @@ function yoneticiBistAnalizGoster() {
       var sonGosterilenTarih = null;
       var toplamGosterilen = 0;
       var MAKS_GOSTERILEN = 200; // gun bazinda cok sinyal birikebilecegi icin eski limit (50) yetersiz kalabilir
+
+      // Her gunun toplam kayit sayisini onceden hesapliyoruz ki baslikta
+      // "X kayit" seklinde gosterebilelim.
+      var tarihSayaclari = {};
+      for (var ci = 0; ci < kayitlar.length; ci++) {
+        var ct = (kayitlar[ci].zaman || "").substring(0, 10);
+        tarihSayaclari[ct] = (tarihSayaclari[ct] || 0) + 1;
+      }
+
       for (var i = 0; i < kayitlar.length && toplamGosterilen < MAKS_GOSTERILEN; i++) {
         var k = kayitlar[i];
         var buTarih = (k.zaman || "").substring(0, 10);
         var buSaat = (k.zaman || "").substring(11);
         if (buTarih !== sonGosterilenTarih) {
-          html += '<div style="font-size:12px;font-weight:700;color:#cbd5e1;margin:14px 0 6px;padding-bottom:6px;border-bottom:3px solid #ef4444">' +
-            bistTarihBasligiFormatla(buTarih) + '</div>';
+          var buGunKaydi = tarihSayaclari[buTarih] || 0;
+          html += '<div style="font-size:12px;font-weight:700;color:#cbd5e1;margin:14px 0 6px;' +
+            'padding:6px 10px;border:3px solid #ef4444">' +
+            bistTarihBasligiFormatla(buTarih) + ' &middot; ' + buGunKaydi + ' kayit</div>';
           sonGosterilenTarih = buTarih;
         }
         var seviyeAdi = k.tip === "destek" ? "Destek" : "Direnç";
