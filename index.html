@@ -6185,7 +6185,7 @@ function yoneticiBistAnalizGoster() {
         var buTarih = (k.zaman || "").substring(0, 10);
         var buSaat = (k.zaman || "").substring(11);
         if (buTarih !== sonGosterilenTarih) {
-          html += '<div style="font-size:12px;font-weight:700;color:#cbd5e1;margin:14px 0 6px;padding-bottom:4px;border-bottom:1px solid #334155">' +
+          html += '<div style="font-size:12px;font-weight:700;color:#cbd5e1;margin:14px 0 6px;padding-bottom:6px;border-bottom:3px solid #ef4444">' +
             bistTarihBasligiFormatla(buTarih) + '</div>';
           sonGosterilenTarih = buTarih;
         }
