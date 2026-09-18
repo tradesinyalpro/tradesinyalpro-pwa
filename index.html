@@ -607,6 +607,11 @@
       <button class="bot-btn" onclick="balinaFiltre('hisse',this)">ABD Hisseleri</button>
       <button class="bot-btn" onclick="balinaFiltre('hyperliquid',this)">Cüzdan Takip</button>
     </div>
+    <div id="hyperliquid-arama-wrap" style="display:none;margin-bottom:10px">
+      <input id="hyperliquid-arama" type="text" placeholder="Coin ara (orn: BTC) - o coindeki tum balinalari gor"
+        oninput="hyperliquidGoster()" autocomplete="off"
+        style="width:100%;background:#0a0f1e;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px;box-sizing:border-box">
+    </div>
     <div id="balina-icerik"><div class="loading">Yukleniyor...</div></div>
   </div>
 
@@ -5137,6 +5142,10 @@ function balinaGoster() {
     return;
   }
 
+  // Diger 3 kategoride hyperliquid'e ozel arama kutusu gorunmesin.
+  var hlAramaKutu = document.getElementById("hyperliquid-arama-wrap");
+  if (hlAramaKutu) hlAramaKutu.style.display = "none";
+
   // Backend artik islemleri coin bazinda ({"BTCUSDT":[...], ...}) gonderiyor,
   // her coin kendi icinde en fazla 20 kayit tutuyor. Mevcut filtreleme
   // mantigi tek bir duz liste bekledigi icin once hepsini birlestiriyoruz.
@@ -5274,6 +5283,9 @@ function hyperliquidGoster() {
 
   // --- Bir cuzdanin detayina girilmisse, sadece onun pozisyonlarini goster ---
   if (hyperliquidCuzdanDetay) {
+    var hlAramaKutuD = document.getElementById("hyperliquid-arama-wrap");
+    if (hlAramaKutuD) hlAramaKutuD.style.display = "none";
+
     var cuzdanPozisyonlari = tumPozisyonlar.filter(function(p) { return p.adres === hyperliquidCuzdanDetay; });
     hyperliquidSirala(cuzdanPozisyonlari);
     var etiketYazi = cuzdanPozisyonlari.length > 0 ? cuzdanPozisyonlari[0].etiket : hyperliquidCuzdanDetay.slice(0, 10);
@@ -5293,16 +5305,43 @@ function hyperliquidGoster() {
     return;
   }
 
+  // Genel listedeyken (bir cuzdanin icine girilmemisken) arama kutusunu goster.
+  var hlAramaKutu = document.getElementById("hyperliquid-arama-wrap");
+  if (hlAramaKutu) hlAramaKutu.style.display = "";
+
+  var aramaGirdi = document.getElementById("hyperliquid-arama");
+  var aramaMetni = aramaGirdi ? aramaGirdi.value.trim().toUpperCase() : "";
+  var gosterilecekler = tumPozisyonlar;
+  if (aramaMetni) {
+    gosterilecekler = tumPozisyonlar.filter(function(p) {
+      return p.coin && p.coin.toUpperCase().indexOf(aramaMetni) !== -1;
+    });
+  }
+
   // --- Genel liste (tum cuzdanlar, en yakin zamanda acilandan eskiye) ---
-  hyperliquidSirala(tumPozisyonlar);
+  hyperliquidSirala(gosterilecekler);
 
-  var html = '<div class="section-title">Hyperliquid Balina Cuzdanlari (' + tumPozisyonlar.length + ' acik pozisyon)</div>';
+  var html = '<div class="section-title">Hyperliquid Balina Cuzdanlari (' + gosterilecekler.length + ' acik pozisyon)</div>';
 
-  if (tumPozisyonlar.length === 0) {
-    html += '<div class="empty">Henuz pozisyon verisi yok veya yukleniyor...</div>';
+  if (aramaMetni && gosterilecekler.length > 0) {
+    var toplamLong = 0, toplamShort = 0;
+    for (var t = 0; t < gosterilecekler.length; t++) {
+      if (gosterilecekler[t].direction === "LONG") toplamLong += (gosterilecekler[t].notional_usd || 0);
+      else toplamShort += (gosterilecekler[t].notional_usd || 0);
+    }
+    html += '<div class="stat-card" style="margin-bottom:10px;display:flex;justify-content:space-between">';
+    html += '<span style="color:#4ade80;font-weight:700">Toplam LONG: $' + Math.round(toplamLong).toLocaleString() + '</span>';
+    html += '<span style="color:#f87171;font-weight:700">Toplam SHORT: $' + Math.round(toplamShort).toLocaleString() + '</span>';
+    html += '</div>';
+  }
+
+  if (gosterilecekler.length === 0) {
+    html += aramaMetni
+      ? '<div class="empty">"' + aramaMetni + '" icin acik pozisyon bulunamadi</div>'
+      : '<div class="empty">Henuz pozisyon verisi yok veya yukleniyor...</div>';
   } else {
-    for (var i = 0; i < tumPozisyonlar.length; i++) {
-      html += hyperliquidKartHtml(tumPozisyonlar[i], true);
+    for (var i = 0; i < gosterilecekler.length; i++) {
+      html += hyperliquidKartHtml(gosterilecekler[i], true);
     }
   }
 
