@@ -5408,7 +5408,7 @@ function hyperliquidKartHtml(p, tiklanabilir) {
   kart += uzaklikHtml;
   kart += '<div class="sig-row"><span class="sig-key">Anlik K/Z</span><span class="sig-val" style="color:' + pnlRenk + ';font-weight:600">' + pnlYazi + '</span></div>';
   if (p.ilk_gorulme_epoch) {
-    kart += '<div class="sig-time">Sitede ilk görüldüğü: ' + epochToTRTarihSaat(p.ilk_gorulme_epoch) + '</div>';
+    kart += '<div class="sig-time">' + epochToTRTarihSaat(p.ilk_gorulme_epoch) + '</div>';
   }
   kart += '</div>';
   return kart;
