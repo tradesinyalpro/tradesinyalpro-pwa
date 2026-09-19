@@ -1484,6 +1484,53 @@ function destekDirencBul(mumlar, guncelFiyat) {
   return { destek: destek, direnc: direnc };
 }
 
+function destekDirencCokluBul(mumlar, guncelFiyat, adet) {
+  // destekDirencBul() ile AYNI pivot/gruplama mantigini kullanir, ama TEK
+  // bir en guclu seviye yerine, en guclu (en cok test edilmis) EN FAZLA
+  // `adet` kadar seviyeyi dondurur. SADECE en az 2 kez test edilmis
+  // gruplar sayiliyor - tek seferlik bir fitil "rastgele" bir seviye
+  // olarak grafige cizilmesin diye.
+  adet = adet || 3;
+  var yuksekPivotlar = pivotYuksekleriBul(mumlar, 2);
+  var dusukPivotlar = pivotDusukleriBul(mumlar, 2);
+  var tolerans = guncelFiyat * 0.004;
+
+  function gruplaVeSirala(pivotlar, ustMu) {
+    var adaylar = [];
+    for (var i = 0; i < pivotlar.length; i++) {
+      var p = pivotlar[i];
+      if (ustMu ? (p.deger > guncelFiyat) : (p.deger < guncelFiyat)) adaylar.push(p);
+    }
+    var gruplar = [];
+    for (var a = 0; a < adaylar.length; a++) {
+      var deger = adaylar[a].deger;
+      var bulunanGrup = null;
+      for (var g = 0; g < gruplar.length; g++) {
+        if (Math.abs(gruplar[g].ort - deger) <= tolerans) { bulunanGrup = gruplar[g]; break; }
+      }
+      if (bulunanGrup) {
+        bulunanGrup.degerler.push(deger);
+        var toplam = 0;
+        for (var d = 0; d < bulunanGrup.degerler.length; d++) toplam += bulunanGrup.degerler[d];
+        bulunanGrup.ort = toplam / bulunanGrup.degerler.length;
+      } else {
+        gruplar.push({ ort: deger, degerler: [deger] });
+      }
+    }
+    gruplar = gruplar.filter(function(g) { return g.degerler.length >= 2; });
+    gruplar.sort(function(x, y) {
+      if (y.degerler.length !== x.degerler.length) return y.degerler.length - x.degerler.length;
+      return Math.abs(x.ort - guncelFiyat) - Math.abs(y.ort - guncelFiyat);
+    });
+    return gruplar.slice(0, adet).map(function(g) { return { deger: g.ort, guc: g.degerler.length }; });
+  }
+
+  return {
+    direncler: gruplaVeSirala(yuksekPivotlar, true),
+    destekler: gruplaVeSirala(dusukPivotlar, false)
+  };
+}
+
 function uyumsuzlukBul(mumlar, rsiDizisi) {
   var yuksekPivotlar = pivotYuksekleriBul(mumlar, 2).filter(function(p) {
     return rsiDizisi[p.index] !== null && rsiDizisi[p.index] !== undefined;
@@ -6414,7 +6461,8 @@ function guvenlikHaritasiGoster() {
 // sadik kalir, uydurma/genel bir teknik analiz DEGILDIR.
 var ddChart = null, ddSeries = null, ddPriceLines = [], ddSeciliCoin = "BTCUSDT", ddSeciliZaman = "15m",
   ddIlkYuklendi = false, ddSonCizilenAnahtar = null, DD_TOP100 = [], DD_TOP100_YUKLENDI = false,
-  ddAcikSinyalDetayGizli = false, ddSonAcikSinyal = null, ddSonDestekDeger = null, ddSonDirencDeger = null;
+  ddAcikSinyalDetayGizli = false, ddSonAcikSinyal = null, ddSonDestekDeger = null, ddSonDirencDeger = null,
+  ddSonCokluDestekler = [], ddSonCokluDirencler = [];
 
 function ddSekmeIlkYukle() {
   if (!ddIlkYuklendi) {
@@ -6558,6 +6606,9 @@ function ddYukle(symbol) {
     var srSonuc = destekDirencBul(mumlarObj, guncelFiyatGecici);
     var destek = srSonuc.destek;
     var direnc = srSonuc.direnc;
+    var cokluSR = destekDirencCokluBul(mumlarObj, guncelFiyatGecici, 3);
+    ddSonCokluDestekler = cokluSR.destekler;
+    ddSonCokluDirencler = cokluSR.direncler;
     var rsi = ddRsiHesapla(closes, 14);
     var guncelFiyat = closes[closes.length - 1];
 
@@ -6842,6 +6893,32 @@ function ddPriceLinelerCiz(acikSinyal, destek, direnc) {
 
   ekle(destek, "#3b82f6", "Destek");
   ekle(direnc, "#f59e0b", "Direnç");
+
+  // Ek destek/direnc seviyeleri: birincil (en guclu) seviyeyle CAKISANLARI
+  // atlayip, geri kalanlari daha ince/soluk cizgiler olarak ekliyoruz.
+  var tolerans = (destek || direnc || 1) * 0.004;
+  var ekSayac = 2;
+  for (var di = 0; di < ddSonCokluDestekler.length; di++) {
+    var d = ddSonCokluDestekler[di].deger;
+    if (destek !== null && Math.abs(d - destek) <= tolerans) continue;
+    ddPriceLines.push(ddSeries.createPriceLine({
+      price: d, color: "#3b82f680", lineWidth: 1,
+      lineStyle: LightweightCharts.LineStyle.Dotted,
+      axisLabelVisible: true, title: "Destek " + ekSayac
+    }));
+    ekSayac++;
+  }
+  ekSayac = 2;
+  for (var ri = 0; ri < ddSonCokluDirencler.length; ri++) {
+    var r = ddSonCokluDirencler[ri].deger;
+    if (direnc !== null && Math.abs(r - direnc) <= tolerans) continue;
+    ddPriceLines.push(ddSeries.createPriceLine({
+      price: r, color: "#f59e0b80", lineWidth: 1,
+      lineStyle: LightweightCharts.LineStyle.Dotted,
+      axisLabelVisible: true, title: "Direnç " + ekSayac
+    }));
+    ekSayac++;
+  }
 
   // Giris/Hedef/Stop/E1/E2/E3 cizgileri, kullanicinin "Gizle" butonuyla
   // kapatabildigi ayni anahtara bagli - grafik cok kalabalik olup fiyat
