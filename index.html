@@ -630,6 +630,7 @@
       <button class="bot-btn" id="dd-zaman-1d" onclick="ddZamanDegistir('1d',this)">Günlük</button>
       <button class="bot-btn" id="dd-zaman-1w" onclick="ddZamanDegistir('1w',this)">Haftalık</button>
       <button class="bot-btn" onclick="olcumAraciToggle(this,'dd-chart')" title="Olcum araci: grafikte suruklayin">📏 Olcum</button>
+      <button class="bot-btn" id="dd-ichimoku-btn" onclick="ddIchimokuToggle(this)">☁️ Ichimoku</button>
     </div>
     <div id="dd-seviye-bilgi" style="font-size:12.5px;color:#94a3b8;margin-bottom:10px;line-height:1.7"></div>
     <div id="dd-chart" style="width:100%;height:400px;border-radius:10px;overflow:hidden;background:#0a0f1e"></div>
@@ -6574,7 +6575,9 @@ function ddYukle(symbol) {
     var anahtar = symbol + "_" + ddSeciliZaman;
     var coinDegisti = (anahtar !== ddSonCizilenAnahtar);
     ddSonCizilenAnahtar = anahtar;
+    ddSonMumlarHam = mumlar;
     ddGrafikCiz(candleData, destek, direnc, coinDegisti);
+    ddIchimokuUygula();
 
     // Bu coin icin su an ACIK bir Oda2 sinyali var mi - backend'den kontrol
     var xhr2 = new XMLHttpRequest();
@@ -6668,6 +6671,117 @@ function ddAcikSinyalDetayToggle() {
   }
   // Grafikteki Giris/Hedef/Stop/E1/E2/E3 cizgilerini de aninda guncelle
   ddPriceLinelerCiz(ddSonAcikSinyal, ddSonDestekDeger, ddSonDirencDeger);
+}
+
+// ============================================================
+// ICHIMOKU BULUTU (Destek/Direnc grafigi icin, isteğe bagli)
+// ============================================================
+var ddIchimokuAcik = false;
+var ddIchimokuSeriler = []; // her yeniden cizimde temizlenip yeniden olusturuluyor
+var ddSonMumlarHam = null;  // en son cekilen ham mum verisi (Ichimoku hesaplamak icin sakliyoruz)
+
+function ddIchimokuToggle(el) {
+  ddIchimokuAcik = !ddIchimokuAcik;
+  el.classList.toggle("active", ddIchimokuAcik);
+  ddIchimokuUygula();
+}
+
+function ddDonchianOrtasi(mumlar, i, periyot) {
+  if (i < periyot - 1) return null;
+  var maxH = -Infinity, minL = Infinity;
+  for (var k = i - periyot + 1; k <= i; k++) {
+    if (mumlar[k].yuksek > maxH) maxH = mumlar[k].yuksek;
+    if (mumlar[k].dusuk < minL) minL = mumlar[k].dusuk;
+  }
+  return (maxH + minL) / 2;
+}
+
+function ddIchimokuTemizle() {
+  for (var i = 0; i < ddIchimokuSeriler.length; i++) {
+    try { ddChart.removeSeries(ddIchimokuSeriler[i]); } catch (e) {}
+  }
+  ddIchimokuSeriler = [];
+}
+
+function ddIchimokuUygula() {
+  if (!ddChart || !ddSonMumlarHam) return;
+  ddIchimokuTemizle();
+  if (!ddIchimokuAcik) return;
+
+  var TENKAN = 9, KIJUN = 26, SENKOU_B = 52, SHIFT = 26;
+  var TR_UTC_FARKI_SN = 3 * 60 * 60;
+  var mumlar = ddSonMumlarHam.map(function(m) {
+    return { zamanSn: Math.floor(m[0] / 1000) + TR_UTC_FARKI_SN, yuksek: parseFloat(m[2]), dusuk: parseFloat(m[3]) };
+  });
+  var n = mumlar.length;
+  if (n < TENKAN + 1) return;
+  var intervalSn = n > 1 ? (mumlar[1].zamanSn - mumlar[0].zamanSn) : 900;
+
+  function plotZamani(idx) {
+    if (idx < n) return mumlar[idx].zamanSn;
+    return mumlar[n - 1].zamanSn + (idx - (n - 1)) * intervalSn;
+  }
+
+  var tenkanCizgi = [], kijunCizgi = [];
+  var bulutNoktalari = []; // {time, a, b} - shift uygulanmis
+
+  for (var i = 0; i < n; i++) {
+    var tenkan = ddDonchianOrtasi(mumlar, i, TENKAN);
+    var kijun = ddDonchianOrtasi(mumlar, i, KIJUN);
+    var senkouB = ddDonchianOrtasi(mumlar, i, SENKOU_B);
+
+    if (tenkan !== null) tenkanCizgi.push({ time: mumlar[i].zamanSn, value: tenkan });
+    if (kijun !== null) kijunCizgi.push({ time: mumlar[i].zamanSn, value: kijun });
+
+    if (tenkan !== null && kijun !== null && senkouB !== null) {
+      var senkouA = (tenkan + kijun) / 2;
+      bulutNoktalari.push({ time: plotZamani(i + SHIFT), a: senkouA, b: senkouB });
+    }
+  }
+
+  if (tenkanCizgi.length > 1) {
+    var s1 = ddChart.addLineSeries({ color: "#3b82f6", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, title: "Tenkan" });
+    s1.setData(tenkanCizgi);
+    ddIchimokuSeriler.push(s1);
+  }
+  if (kijunCizgi.length > 1) {
+    var s2 = ddChart.addLineSeries({ color: "#f97316", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, title: "Kijun" });
+    s2.setData(kijunCizgi);
+    ddIchimokuSeriler.push(s2);
+  }
+
+  // Bulut (Kumo): A>=B ise yesil, A<B ise kirmizi. Renk her degistiginde
+  // yeni bir "parca" baslatiyoruz. Her parca icin IKI alan serisi ile
+  // "maskeleme" tekniği kullaniyoruz: alttaki seri (max deger) parca rengiyle
+  // doluyor, ustteki seri (min deger) arka plan rengiyle ustunu ORTUYOR -
+  // geriye sadece iki cizgi arasindaki bant, dogru renkte kalıyor.
+  var idx = 0;
+  while (idx < bulutNoktalari.length - 1) {
+    var yesilMi = bulutNoktalari[idx].a >= bulutNoktalari[idx].b;
+    var parcaBaslangic = idx;
+    while (idx < bulutNoktalari.length - 1 &&
+           (bulutNoktalari[idx + 1].a >= bulutNoktalari[idx + 1].b) === yesilMi) {
+      idx++;
+    }
+    var parca = bulutNoktalari.slice(parcaBaslangic, idx + 1);
+    if (parca.length >= 2) {
+      var renk = yesilMi ? "#4ade8055" : "#f8717155";
+      var ustSeri = ddChart.addAreaSeries({
+        topColor: renk, bottomColor: renk, lineColor: "transparent", lineWidth: 0,
+        priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false
+      });
+      ustSeri.setData(parca.map(function(p) { return { time: p.time, value: Math.max(p.a, p.b) }; }));
+      ddIchimokuSeriler.push(ustSeri);
+
+      var altSeri = ddChart.addAreaSeries({
+        topColor: "#0a0f1e", bottomColor: "#0a0f1e", lineColor: "transparent", lineWidth: 0,
+        priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false
+      });
+      altSeri.setData(parca.map(function(p) { return { time: p.time, value: Math.min(p.a, p.b) }; }));
+      ddIchimokuSeriler.push(altSeri);
+    }
+    idx++;
+  }
 }
 
 function ddGrafikCiz(candleData, destek, direnc, coinDegisti) {
