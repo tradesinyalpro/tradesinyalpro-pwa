@@ -6624,8 +6624,8 @@ function ddYukle(symbol) {
 
         html += '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #1e293b">' +
           '<div style="font-weight:700;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">' +
-          '<span>📍 Açık Sinyal: <span style="color:' + yonRengi + '">' + acikSinyal.yon + '</span></span>' +
-          '<span onclick="ddAcikSinyalDetayToggle()" style="cursor:pointer;color:#64748b;font-size:12px;font-weight:400;display:flex;align-items:center;gap:4px">' +
+          '<span id="dd-acik-sinyal-baslik" style="' + (ddAcikSinyalDetayGizli ? "display:none" : "") + '">📍 Açık Sinyal: <span style="color:' + yonRengi + '">' + acikSinyal.yon + '</span></span>' +
+          '<span onclick="ddAcikSinyalDetayToggle()" style="cursor:pointer;color:#64748b;font-size:12px;font-weight:400;display:flex;align-items:center;gap:4px;margin-left:auto">' +
           '<span id="dd-acik-sinyal-toggle-yazi">' + (ddAcikSinyalDetayGizli ? "Göster" : "Gizle") + '</span>' +
           '<svg id="dd-acik-sinyal-toggle-ikon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
           (ddAcikSinyalDetayGizli
@@ -6655,9 +6655,11 @@ function ddYukle(symbol) {
 function ddAcikSinyalDetayToggle() {
   ddAcikSinyalDetayGizli = !ddAcikSinyalDetayGizli;
   var detay = document.getElementById("dd-acik-sinyal-detay");
+  var baslik = document.getElementById("dd-acik-sinyal-baslik");
   var yazi = document.getElementById("dd-acik-sinyal-toggle-yazi");
   var ikon = document.getElementById("dd-acik-sinyal-toggle-ikon");
   if (detay) detay.style.display = ddAcikSinyalDetayGizli ? "none" : "";
+  if (baslik) baslik.style.display = ddAcikSinyalDetayGizli ? "none" : "";
   if (yazi) yazi.textContent = ddAcikSinyalDetayGizli ? "Göster" : "Gizle";
   if (ikon) {
     ikon.innerHTML = ddAcikSinyalDetayGizli
