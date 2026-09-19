@@ -6680,6 +6680,19 @@ var ddIchimokuAcik = false;
 var ddIchimokuSeriler = []; // her yeniden cizimde temizlenip yeniden olusturuluyor
 var ddSonMumlarHam = null;  // en son cekilen ham mum verisi (Ichimoku hesaplamak icin sakliyoruz)
 
+// Her zaman dilimi icin AYRI AYRI duzenlenebilir Ichimoku parametreleri.
+// {donusum: Tenkan periyodu, temel: Kijun periyodu, oncuB: Senkou Span B
+// periyodu, gecikme: bulutun kac mum ILERI kaydirilacagi}
+// Su an hepsi ayni (sizin TradingView'de test ettiginiz) degerlerle
+// basliyor - isterseniz her satiri ayri ayri degistirebilirsiniz.
+var DD_ICHIMOKU_AYARLARI = {
+  "15m": { donusum: 3, temel: 40, oncuB: 45, gecikme: 1 },
+  "1h":  { donusum: 3, temel: 40, oncuB: 45, gecikme: 1 },
+  "4h":  { donusum: 3, temel: 40, oncuB: 45, gecikme: 1 },
+  "1d":  { donusum: 3, temel: 40, oncuB: 45, gecikme: 1 },
+  "1w":  { donusum: 3, temel: 40, oncuB: 45, gecikme: 1 }
+};
+
 function ddIchimokuToggle(el) {
   ddIchimokuAcik = !ddIchimokuAcik;
   el.classList.toggle("active", ddIchimokuAcik);
@@ -6708,13 +6721,15 @@ function ddIchimokuUygula() {
   ddIchimokuTemizle();
   if (!ddIchimokuAcik) return;
 
-  var TENKAN = 9, KIJUN = 26, SENKOU_B = 52, SHIFT = 26;
+  var ayar = DD_ICHIMOKU_AYARLARI[ddSeciliZaman] || DD_ICHIMOKU_AYARLARI["1h"];
+  var DONUSUM = ayar.donusum, TEMEL = ayar.temel, ONCU_B = ayar.oncuB, GECIKME = ayar.gecikme;
+
   var TR_UTC_FARKI_SN = 3 * 60 * 60;
   var mumlar = ddSonMumlarHam.map(function(m) {
     return { zamanSn: Math.floor(m[0] / 1000) + TR_UTC_FARKI_SN, yuksek: parseFloat(m[2]), dusuk: parseFloat(m[3]) };
   });
   var n = mumlar.length;
-  if (n < TENKAN + 1) return;
+  if (n < DONUSUM + 1) return;
   var intervalSn = n > 1 ? (mumlar[1].zamanSn - mumlar[0].zamanSn) : 900;
 
   function plotZamani(idx) {
@@ -6722,32 +6737,17 @@ function ddIchimokuUygula() {
     return mumlar[n - 1].zamanSn + (idx - (n - 1)) * intervalSn;
   }
 
-  var tenkanCizgi = [], kijunCizgi = [];
-  var bulutNoktalari = []; // {time, a, b} - shift uygulanmis
+  var bulutNoktalari = []; // {time, a, b} - gecikme uygulanmis
 
   for (var i = 0; i < n; i++) {
-    var tenkan = ddDonchianOrtasi(mumlar, i, TENKAN);
-    var kijun = ddDonchianOrtasi(mumlar, i, KIJUN);
-    var senkouB = ddDonchianOrtasi(mumlar, i, SENKOU_B);
+    var donusum = ddDonchianOrtasi(mumlar, i, DONUSUM);
+    var temel = ddDonchianOrtasi(mumlar, i, TEMEL);
+    var oncuB = ddDonchianOrtasi(mumlar, i, ONCU_B);
 
-    if (tenkan !== null) tenkanCizgi.push({ time: mumlar[i].zamanSn, value: tenkan });
-    if (kijun !== null) kijunCizgi.push({ time: mumlar[i].zamanSn, value: kijun });
-
-    if (tenkan !== null && kijun !== null && senkouB !== null) {
-      var senkouA = (tenkan + kijun) / 2;
-      bulutNoktalari.push({ time: plotZamani(i + SHIFT), a: senkouA, b: senkouB });
+    if (donusum !== null && temel !== null && oncuB !== null) {
+      var oncuA = (donusum + temel) / 2;
+      bulutNoktalari.push({ time: plotZamani(i + GECIKME), a: oncuA, b: oncuB });
     }
-  }
-
-  if (tenkanCizgi.length > 1) {
-    var s1 = ddChart.addLineSeries({ color: "#3b82f6", lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
-    s1.setData(tenkanCizgi);
-    ddIchimokuSeriler.push(s1);
-  }
-  if (kijunCizgi.length > 1) {
-    var s2 = ddChart.addLineSeries({ color: "#f97316", lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
-    s2.setData(kijunCizgi);
-    ddIchimokuSeriler.push(s2);
   }
 
   // Bulut (Kumo): A>=B ise yesil, A<B ise kirmizi. Renk her degistiginde
