@@ -5237,13 +5237,26 @@ function balinaGoster() {
   document.getElementById("balina-icerik").innerHTML = html;
 }
 
+function epochToTRTarihSaat(epochSaniye) {
+  // Backend'den gelen "ilk_gorulme_epoch" (saniye, UTC) degerini
+  // Turkiye saatiyle "GG.AA.YYYY SS:DD" formatinda gosterir.
+  var d = new Date(epochSaniye * 1000);
+  var parcalar = new Intl.DateTimeFormat("tr-TR", {
+    timeZone: "Europe/Istanbul", day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hour12: false
+  }).formatToParts(d);
+  var g = {};
+  parcalar.forEach(function(p) { g[p.type] = p.value; });
+  return g.day + "." + g.month + "." + g.year + " " + g.hour + ":" + g.minute;
+}
+
 function hyperliquidSirala(liste) {
-  // En yakin zamanda acilan pozisyon en ustte (opened_at_ms buyukten kucuge).
-  // Acilis zamani hesaplanamamis (kucuk/esik alti) pozisyonlar en sona,
-  // onlar da kendi aralarinda buyuklugune (notional_usd) gore sıralanir.
+  // En yakin zamanda (sitemizde) GORULEN pozisyon en ustte
+  // (ilk_gorulme_epoch buyukten kucuge) - artik "tahmini acilis zamani"
+  // degil, backend'in kalici olarak sakladigi GERCEK "ilk gorulme" ani.
   liste.sort(function(a, b) {
-    var aVar = !!a.opened_at_ms, bVar = !!b.opened_at_ms;
-    if (aVar && bVar) return b.opened_at_ms - a.opened_at_ms;
+    var aVar = !!a.ilk_gorulme_epoch, bVar = !!b.ilk_gorulme_epoch;
+    if (aVar && bVar) return b.ilk_gorulme_epoch - a.ilk_gorulme_epoch;
     if (aVar && !bVar) return -1;
     if (!aVar && bVar) return 1;
     return (b.notional_usd || 0) - (a.notional_usd || 0);
@@ -5273,8 +5286,7 @@ function hyperliquidGoster() {
         leverage: p.leverage,
         liquidation_price: p.liquidation_price,
         unrealized_pnl: p.unrealized_pnl,
-        open_duration: p.open_duration,
-        opened_at_ms: p.opened_at_ms,
+        ilk_gorulme_epoch: p.ilk_gorulme_epoch,
         mark_price: p.mark_price,
         liq_uzaklik_yuzde: p.liq_uzaklik_yuzde
       });
@@ -5395,8 +5407,8 @@ function hyperliquidKartHtml(p, tiklanabilir) {
   kart += '<div class="sig-row"><span class="sig-key">Likidasyon</span><span class="sig-val">' + likidasyonYazi + '</span></div>';
   kart += uzaklikHtml;
   kart += '<div class="sig-row"><span class="sig-key">Anlik K/Z</span><span class="sig-val" style="color:' + pnlRenk + ';font-weight:600">' + pnlYazi + '</span></div>';
-  if (p.open_duration) {
-    kart += '<div class="sig-time">' + p.open_duration + '</div>';
+  if (p.ilk_gorulme_epoch) {
+    kart += '<div class="sig-time">Sitede ilk görüldüğü: ' + epochToTRTarihSaat(p.ilk_gorulme_epoch) + '</div>';
   }
   kart += '</div>';
   return kart;
