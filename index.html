@@ -1712,7 +1712,7 @@ function olcumDocumentListenerlariKur() {
   document.addEventListener("mouseup", olcumBirakIsle);
 }
 
-function grafikOhlcBilgisiKur(kutuId, chartObj, seriesObj) {
+function grafikOhlcBilgisiKur(kutuId, chartObj, seriAl) {
   var kutu = document.getElementById(kutuId);
   if (!kutu || kutu.getAttribute("data-ohlc-kuruldu")) return;
   kutu.setAttribute("data-ohlc-kuruldu", "1");
@@ -1729,7 +1729,7 @@ function grafikOhlcBilgisiKur(kutuId, chartObj, seriesObj) {
       bilgiKutusu.style.display = "none";
       return;
     }
-    var veri = param.seriesData.get(seriesObj);
+    var veri = param.seriesData.get(seriAl());
     if (!veri || veri.open == null) { bilgiKutusu.style.display = "none"; return; }
     // param.time, grafige verilirken TR saatine (UTC+3) gore KASITLI olarak
     // kaydirilmis bir deger - bu yuzden burada getUTC*() kullanmak, HEM
@@ -2355,7 +2355,7 @@ function kartLwGrafikGuncelle(sembol, oncedenYakalananScrollTop) {
       grafikOlcumAraciKur("kart-lw-chart", function() { return kartChart; }, function() { return kartSeries; });
       grafikCizimAraciKur("kart-lw-chart", function() { return kartChart; }, function() { return kartSeries; });
       grafikSilgiAraciKur("kart-lw-chart", function() { return kartChart; }, function() { return kartSeries; });
-      grafikOhlcBilgisiKur("kart-lw-chart", kartChart, kartSeries);
+      grafikOhlcBilgisiKur("kart-lw-chart", kartChart, function() { return kartSeries; });
       // Bu coin icin daha once (bu cihazda ya da BASKA bir cihazda) kaydedilmis
       // cizimleri sunucudan cek ve yeniden olustur - cihazlar arasi senkron.
       kartCizimleriYukle(sembol);
@@ -6462,7 +6462,7 @@ function guvenlikHaritasiGoster() {
 var ddChart = null, ddSeries = null, ddPriceLines = [], ddSeciliCoin = "BTCUSDT", ddSeciliZaman = "15m",
   ddIlkYuklendi = false, ddSonCizilenAnahtar = null, DD_TOP100 = [], DD_TOP100_YUKLENDI = false,
   ddAcikSinyalDetayGizli = false, ddSonAcikSinyal = null, ddSonDestekDeger = null, ddSonDirencDeger = null,
-  ddSonCokluDestekler = [], ddSonCokluDirencler = [];
+  ddSonCokluDestekler = [], ddSonCokluDirencler = [], ddSonCandleData = null;
 
 function ddSekmeIlkYukle() {
   if (!ddIlkYuklendi) {
@@ -6627,6 +6627,7 @@ function ddYukle(symbol) {
     var coinDegisti = (anahtar !== ddSonCizilenAnahtar);
     ddSonCizilenAnahtar = anahtar;
     ddSonMumlarHam = mumlar;
+    ddSonCandleData = candleData;
     ddGrafikCiz(candleData, destek, direnc, coinDegisti);
     ddIchimokuUygula();
 
@@ -6833,6 +6834,24 @@ function ddIchimokuUygula() {
     }
     idx++;
   }
+
+  // Mum serisi grafik ilk acildiginda BIR KEZ olusturulup her seferinde
+  // tekrar kullaniliyor - bulut ise her seferinde ONDAN SONRA ekleniyor.
+  // Kutuphanede SONRADAN eklenen seri hep USTTE cizildigi icin, bulut
+  // mumlarin uzerine biniyordu. Cozum: bulutu ciz, SONRA mum serisini
+  // SIL VE YENIDEN OLUSTUR - boylece mumlar her zaman en son eklenen (ve
+  // dolayisiyla en USTTE gorunen) seri olur, bulut arka planda kalir.
+  if (ddIchimokuSeriler.length > 0 && ddSonCandleData) {
+    try { ddChart.removeSeries(ddSeries); } catch (e) {}
+    ddSeries = ddChart.addCandlestickSeries({
+      upColor: "#4ade80", downColor: "#f87171", borderVisible: false,
+      wickUpColor: "#4ade80", wickDownColor: "#f87171"
+    });
+    ddSeries.setData(ddSonCandleData);
+    // Destek/Direnc/Giris/Hedef/Stop gibi fiyat cizgileri, silinen eski
+    // seriyle birlikte kayboldugu icin yeni seri uzerinde tekrar ciziliyor.
+    ddPriceLinelerCiz(ddSonAcikSinyal, ddSonDestekDeger, ddSonDirencDeger);
+  }
 }
 
 function ddGrafikCiz(candleData, destek, direnc, coinDegisti) {
@@ -6852,7 +6871,7 @@ function ddGrafikCiz(candleData, destek, direnc, coinDegisti) {
     });
     window.addEventListener("resize", function() { if (ddChart) ddChart.applyOptions({ width: kutu.clientWidth }); });
     grafikOlcumAraciKur("dd-chart", function() { return ddChart; }, function() { return ddSeries; });
-    grafikOhlcBilgisiKur("dd-chart", ddChart, ddSeries);
+    grafikOhlcBilgisiKur("dd-chart", ddChart, function() { return ddSeries; });
   }
 
   if (coinDegisti || ilkOlusturma) {
