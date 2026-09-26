@@ -5970,9 +5970,36 @@ function coinAramaTekOdaKutusuHtml(baslik, renk, veri) {
 
 var GECMIS_ODA_SIRASI = ["SINYAL_ODA_1", "SINYAL_ODA_2", "SINYAL_ODA_3", "SINYAL_ODA_4"];
 
+var COIN_ARAMA_EN_BASARILI_MIN_ISLEM = 5; // %100 gibi yanıltıcı oranların 1-2 islemden gelmesini engeller
+
+function coinAramaEnBasariliOdaYonHtml(yonOdaVerisi) {
+  var enIyi = null;
+  for (var o = 0; o < GECMIS_ODA_SIRASI.length; o++) {
+    var bot = GECMIS_ODA_SIRASI[o];
+    var odaVeri = yonOdaVerisi[bot];
+    if (!odaVeri) continue;
+    ["LONG", "SHORT"].forEach(function(yon) {
+      var v = odaVeri[yon] || { tp: 0, stop: 0 };
+      var toplam = v.tp + v.stop;
+      if (toplam < COIN_ARAMA_EN_BASARILI_MIN_ISLEM) return;
+      var oran = v.tp / toplam;
+      if (!enIyi || oran > enIyi.oran || (oran === enIyi.oran && toplam > enIyi.toplam)) {
+        enIyi = { bot: bot, yon: yon, oran: oran, toplam: toplam };
+      }
+    });
+  }
+  if (!enIyi) return "";
+  var yonRenk = enIyi.yon === "LONG" ? "#4ade80" : "#f87171";
+  var yonYazi = enIyi.yon === "LONG" ? "LONG" : "SHORT";
+  return '<div class="stat-card" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">' +
+    '<span style="font-size:12px;color:#94a3b8">En başarılı:</span>' +
+    '<span style="font-weight:700"><span style="color:#e2e8f0">' + botAdi(enIyi.bot) + '</span> <span style="color:' + yonRenk + '">' + yonYazi + '</span> ' +
+    '<span style="color:#fbbf24">%' + Math.round(enIyi.oran * 100) + '</span> <span style="color:#64748b;font-weight:400">(' + enIyi.toplam + ' islem)</span></span></div>';
+}
+
 function coinAramaOzetGridHtml(yonOdaVerisi, sembol) {
   // yonOdaVerisi: {"SINYAL_ODA_1": {LONG:{tp,stop}, SHORT:{tp,stop}}, ...}
-  var html = "";
+  var html = coinAramaEnBasariliOdaYonHtml(yonOdaVerisi);
   var hicVeriYokMu = true;
 
   for (var o = 0; o < GECMIS_ODA_SIRASI.length; o++) {
@@ -6103,6 +6130,9 @@ function coinAramaTekSembolGoster(sembol) {
     html += '</div>';
   }
 
+  html += '<div class="section-title">En Yakin Destek / Direnç <span style="font-weight:400;color:#64748b;font-size:10px">(15dk)</span></div>';
+  html += '<div id="coin-arama-destekdirenc-alani"><div class="loading">Yukleniyor...</div></div>';
+
   html += '<div class="section-title">Genel Istatistik</div>';
   html += '<div class="ozet-toggle" id="coin-arama-toggle">';
   html += '<span class="' + (coinAramaGenelIstatistikMod === "tum" ? "aktif" : "") + '" onclick="coinAramaModDegistir(this,\'tum\',\'' + sembol + '\')">Tum Zamanlar</span>';
@@ -6113,6 +6143,52 @@ function coinAramaTekSembolGoster(sembol) {
 
   sonucDiv.innerHTML = html;
   coinAramaIstatistikYukle(sembol);
+  coinAramaDestekDirencYukle(sembol);
+}
+
+function coinAramaDestekDirencYukle(sembol) {
+  var alan = document.getElementById("coin-arama-destekdirenc-alani");
+  if (!alan) return;
+  // Destek/Direnç sekmesindeki Oda 2 stratejisiyle AYNI zaman dilimi (15
+  // dakikalik mumlar) kullanilir - sitedeki tek "resmi" destek/direnc
+  // yontemi bu oldugu icin, arama kutusunda farkli bir yontem/zaman dilimi
+  // gostermek kafa karistirici olurdu.
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", "https://fapi.binance.com/fapi/v1/klines?symbol=" + sembol + "&interval=15m&limit=200", true);
+  xhr.onload = function() {
+    if (xhr.status !== 200) { alan.innerHTML = '<div class="empty">Veri alinamadi</div>'; return; }
+    var mumlar;
+    try { mumlar = JSON.parse(xhr.responseText); } catch (e) { alan.innerHTML = '<div class="empty">Veri alinamadi</div>'; return; }
+    if (!Array.isArray(mumlar) || mumlar.length === 0) { alan.innerHTML = '<div class="empty">Veri alinamadi</div>'; return; }
+    // Destek/Direnç sekmesiyle (ddYukle) AYNI donusum: destekDirencCokluBul
+    // ham Binance kline dizisini degil, {acilis,yuksek,dusuk,kapanis,zaman}
+    // nesnelerini bekliyor.
+    var mumlarObj = mumlar.map(function(m) {
+      return { acilis: parseFloat(m[1]), yuksek: parseFloat(m[2]), dusuk: parseFloat(m[3]), kapanis: parseFloat(m[4]), zaman: m[0] };
+    });
+    var guncelFiyat = mumlarObj[mumlarObj.length - 1].kapanis;
+    var sr = destekDirencCokluBul(mumlarObj, guncelFiyat, 1);
+    var destek = sr.destekler[0];
+    var direnc = sr.direncler[0];
+    if (!destek && !direnc) { alan.innerHTML = '<div class="empty">Yeterli seviye bulunamadi</div>'; return; }
+    var html = '<div class="stat-card" style="display:flex;justify-content:space-between">';
+    if (destek) {
+      var destekUzaklikYuzde = ((guncelFiyat - destek.deger) / guncelFiyat * 100).toFixed(2);
+      html += '<span style="color:#4ade80"><b>Destek</b><br>' + fiyatEtiketFormatla(destek.deger) + '<br><span style="font-size:10px;color:#64748b">-%' + destekUzaklikYuzde + '</span></span>';
+    } else {
+      html += '<span style="color:#64748b">Destek yok</span>';
+    }
+    if (direnc) {
+      var direncUzaklikYuzde = ((direnc.deger - guncelFiyat) / guncelFiyat * 100).toFixed(2);
+      html += '<span style="color:#f87171;text-align:right"><b>Direnç</b><br>' + fiyatEtiketFormatla(direnc.deger) + '<br><span style="font-size:10px;color:#64748b">+%' + direncUzaklikYuzde + '</span></span>';
+    } else {
+      html += '<span style="color:#64748b">Direnç yok</span>';
+    }
+    html += '</div>';
+    alan.innerHTML = html;
+  };
+  xhr.onerror = function() { alan.innerHTML = '<div class="empty">Sunucuya ulasilamadi</div>'; };
+  xhr.send();
 }
 
 function sekmeAc(id, el) {
