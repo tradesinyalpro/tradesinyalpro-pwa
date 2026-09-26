@@ -7861,26 +7861,46 @@ function bildirimleriAc() {
       var xhrKey = new XMLHttpRequest();
       xhrKey.open("GET", API + "/push/public-key", true);
       xhrKey.onload = function() {
-        if (xhrKey.status !== 200) return;
+        if (xhrKey.status !== 200) { alert("Bildirim anahtari alinamadi - sunucuya ulasilamadi."); return; }
         var anahtar = JSON.parse(xhrKey.responseText).publicKey;
-        if (!anahtar) return;
-        reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(anahtar)
-        }).then(function(sub) {
-          var xhrSub = new XMLHttpRequest();
-          xhrSub.open("POST", API + "/push/abone-ol", true);
-          xhrSub.setRequestHeader("Content-Type", "application/json");
-          xhrSub.setRequestHeader("X-Auth-Token", authToken);
-          xhrSub.onload = function() {
-            if (xhrSub.status === 200) {
-              localStorage.setItem("ts_bildirim_acik", "1");
-              bildirimBanneriGizle();
-            }
-          };
-          xhrSub.send(JSON.stringify({ subscription: sub }));
-        }).catch(function() {});
+        if (!anahtar) { alert("Bildirim sistemi sunucuda henuz yapilandirilmamis (VAPID anahtari eksik)."); return; }
+
+        // Onceki bir denemeden (ornegin VAPID anahtarlari daha sonra
+        // degistirilmis/eklenmisse) bu cihazda ESKI/gecersiz bir abonelik
+        // kalmis olabilir. Farkli bir applicationServerKey ile subscribe()
+        // cagirmak bu durumda tarayicida SESSIZCE reddediliyordu (hata
+        // yakalanip hicbir sey gosterilmiyordu) - bu yuzden once mevcut
+        // aboneligi (varsa) temizleyip SIFIRDAN abone oluyoruz.
+        reg.pushManager.getSubscription().then(function(eskiSub) {
+          var devamEt = eskiSub ? eskiSub.unsubscribe() : Promise.resolve();
+          devamEt.then(function() {
+            reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(anahtar)
+            }).then(function(sub) {
+              var xhrSub = new XMLHttpRequest();
+              xhrSub.open("POST", API + "/push/abone-ol", true);
+              xhrSub.setRequestHeader("Content-Type", "application/json");
+              xhrSub.setRequestHeader("X-Auth-Token", authToken);
+              xhrSub.onload = function() {
+                if (xhrSub.status === 200) {
+                  localStorage.setItem("ts_bildirim_acik", "1");
+                  bildirimBanneriGizle();
+                } else {
+                  alert("Abonelik sunucuya kaydedilemedi (kod " + xhrSub.status + "). Lutfen tekrar deneyin.");
+                }
+              };
+              xhrSub.onerror = function() { alert("Abonelik sunucuya kaydedilirken baglanti hatasi olustu."); };
+              xhrSub.send(JSON.stringify({ subscription: sub }));
+            }).catch(function(hata) {
+              alert("Bildirimlere abone olunamadi: " + (hata && hata.message ? hata.message : hata));
+            });
+          });
+        }).catch(function(hata) {
+          alert("Mevcut abonelik kontrol edilirken hata olustu: " + (hata && hata.message ? hata.message : hata));
+        });
       };
+      xhrKey.onerror = function() { alert("Bildirim anahtari alinamadi - sunucuya ulasilamadi."); };
       xhrKey.send();
     });
   });
