@@ -239,6 +239,7 @@
 <div id="auth-ekrani" class="auth-screen" style="display:none">
   <div class="auth-card">
     <div class="auth-logo">Trade<span>Sinyal</span>Pro</div>
+    <div class="auth-toggle" id="auth-vazgec-linki" onclick="authEkraniniKapat()" style="display:none;margin-bottom:10px">&larr; Vazgeç</div>
 
     <div id="giris-form">
       <div class="auth-error" id="giris-hata"></div>
@@ -361,6 +362,14 @@
 </div>
 
 <div class="content">
+  <div id="misafir-engel" style="display:none;padding:8px 12px">
+    <div class="stat-card" style="text-align:center;padding:36px 20px">
+      <div style="font-size:32px;margin-bottom:10px">🔒</div>
+      <div style="font-size:15px;color:#e2e8f0;font-weight:600;margin-bottom:10px">Bu alana erişim için üye olmanız gerekmektedir</div>
+      <div style="font-size:12.5px;color:#94a3b8;margin-bottom:18px">Üye olarak tüm sekmelere ve canlı sinyallere erişebilirsiniz.</div>
+      <button class="auth-btn" onclick="genelBakisGirisGoster()" style="width:auto;padding:10px 26px">Giriş Yap / Üye Ol</button>
+    </div>
+  </div>
   <div id="coin-arama-sonuc" style="display:none;padding:8px 12px"></div>
   <div id="genelbakis" style="display:none;padding:8px 12px">
     <div id="genelbakis-icerik"><div class="loading">Yukleniyor...</div></div>
@@ -747,6 +756,11 @@
 var API = "https://abundant-light-production-fb25.up.railway.app";
 var authToken = null;
 var hesapDurumu = null;
+var misafirModu = false;
+// Misafir (uye olmayan) ziyaretcinin GERCEK icerikle gorebilecegi sekmeler -
+// geri kalani (Veriler, Destek/Direnç, Piyasa, Analiz, Balina Takip,
+// Haberler, Yonetici) sekmeye tiklandiginda "uye olmanız gerekmektedir" yazisi gosterir.
+var MISAFIR_IZINLI_SEKMELER = ["genelbakis", "portfoy", "performans", "coinperformans", "gecmis", "rapor", "iletisim"];
 var sessizSaatBaslangic = null;
 var sessizSaatBitis = null;
 var hesapKalanGun = null;
@@ -3521,10 +3535,10 @@ var PAPER_RENK = {
 
 function paperTradingGoster() {
   var kutu = document.getElementById("portfoy-paper-icerik");
-  if (!kutu || !authToken) return;
+  if (!kutu) return;
   if (!document.getElementById("paper-kartlar")) {
     kutu.innerHTML =
-      '<div style="font-size:10.5px;color:#64748b;margin-bottom:10px;line-height:1.5">Her oda 1000 TL sanal bakiye ile bu ozelligin yayina girdigi andan itibaren CANLI takip edilir. Her sinyal kapandiginda (BAŞARILI/BAŞARISIZ), bakiyenin %2\'si risk edilip 8x sabit kaldirac varsayimiyla bilesik olarak guncellenir - Oda Simulasyonu ile ayni formul, ama gecmise degil bugunden itibaren ileriye bakar. Bu bir SIMULASYONDUR, gercek islem degildir.</div>' +
+      '<div style="font-size:10.5px;color:#64748b;margin-bottom:10px;line-height:1.5">Her oda 1000 USD sanal bakiye ile bu ozelligin yayina girdigi andan itibaren CANLI takip edilir. Her sinyal kapandiginda (BAŞARILI/BAŞARISIZ), bakiyenin %2\'si risk edilip 8x sabit kaldirac varsayimiyla bilesik olarak guncellenir - Oda Simulasyonu ile ayni formul, ama gecmise degil bugunden itibaren ileriye bakar. Bu bir SIMULASYONDUR, gercek islem degildir.</div>' +
       '<div id="paper-kartlar" class="stats-grid" style="grid-template-columns:repeat(2,1fr)"></div>' +
       '<div id="paper-chart" style="width:100%;height:300px;border-radius:10px;overflow:hidden;background:#0a0f1e;margin-top:10px"></div>' +
       '<div id="paper-siralama" style="margin-top:14px"></div>';
@@ -3532,7 +3546,7 @@ function paperTradingGoster() {
 
   var xhr = new XMLHttpRequest();
   xhr.open("GET", API + "/paper-trading", true);
-  xhr.setRequestHeader("X-Auth-Token", authToken);
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
   xhr.onload = function() {
     if (xhr.status !== 200) return;
     var veri = JSON.parse(xhr.responseText);
@@ -3548,7 +3562,7 @@ function paperTradingGoster() {
       var renk = getiriYuzde >= 0 ? "#4ade80" : "#f87171";
       kartHtml += '<div class="stat-card" style="border-left:3px solid ' + PAPER_RENK[bot] + '">' +
         '<div class="stat-label">' + botAdi(bot) + '</div>' +
-        '<div class="stat-val" style="color:' + renk + '">' + d.bakiye.toFixed(2) + ' TL</div>' +
+        '<div class="stat-val" style="color:' + renk + '">' + d.bakiye.toFixed(2) + ' USD</div>' +
         '<div style="font-size:11px;color:' + renk + ';margin-top:2px">%' + (getiriYuzde >= 0 ? "+" : "") + getiriYuzde.toFixed(1) + '</div>' +
         '<div style="font-size:10px;color:#64748b;margin-top:4px">' + d.tp + ' BAŞARILI / ' + d.stop + ' BAŞARISIZ</div></div>';
       siralamaListesi.push({ bot: bot, getiri: getiriYuzde, bakiye: d.bakiye });
@@ -4325,7 +4339,13 @@ function performansGoster() {
         var durum = sig.durum || "aktif";
         var ikon = durum === "tp" ? "✅" : durum === "stop" ? "🛑" : "🔵";
         if (durum === "aktif") {
-          html += '<span class="mini-chip aktif tiklanabilir" onclick="sinyaleGit(\'' + bot + '\',\'' + sig.sembol + '\')">' + ikon + ' ' + sig.sembol + '</span>';
+          // Misafir (uye olmayan) ziyaretci acik pozisyonun kartina
+          // yonlendirilmesin diye tiklanabilirligi kaldiriyoruz.
+          if (misafirModu) {
+            html += '<span class="mini-chip aktif">' + ikon + ' ' + sig.sembol + '</span>';
+          } else {
+            html += '<span class="mini-chip aktif tiklanabilir" onclick="sinyaleGit(\'' + bot + '\',\'' + sig.sembol + '\')">' + ikon + ' ' + sig.sembol + '</span>';
+          }
         } else {
           html += '<span class="mini-chip ' + durum + '">' + ikon + ' ' + sig.sembol + '</span>';
         }
@@ -5888,6 +5908,45 @@ function coinAramaBalinayaGit(sembol, kategori) {
   }
 }
 
+function coinAramaHyperliquidToplamHtml(sembol) {
+  var cuzdanlar = tumHyperliquid.cuzdanlar || {};
+  var toplamLong = 0, toplamShort = 0, adet = 0;
+  Object.keys(cuzdanlar).forEach(function(adres) {
+    var c = cuzdanlar[adres];
+    (c.pozisyonlar || []).forEach(function(p) {
+      if (p.coin !== sembol) return;
+      adet++;
+      if (p.direction === "LONG") toplamLong += (p.notional_usd || 0);
+      else toplamShort += (p.notional_usd || 0);
+    });
+  });
+  if (adet === 0) return "";
+
+  var html = '<div class="section-title">Balina Cuzdan Takip - Acik Pozisyonlar</div>';
+  html += '<div class="stat-card" style="margin-bottom:6px">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+  html += '<span style="font-size:11px;color:#64748b">' + adet + ' acik pozisyon</span>';
+  html += '<span style="font-size:10px;color:#60a5fa;cursor:pointer;text-decoration:underline" onclick="coinAramaHyperliquideGit(\'' + sembol + '\')">Detay icin Cuzdan Takip</span>';
+  html += '</div>';
+  html += '<div style="display:flex;justify-content:space-between">';
+  html += '<span style="color:#4ade80;font-weight:700">Toplam LONG: $' + Math.round(toplamLong).toLocaleString() + '</span>';
+  html += '<span style="color:#f87171;font-weight:700">Toplam SHORT: $' + Math.round(toplamShort).toLocaleString() + '</span>';
+  html += '</div></div>';
+  return html;
+}
+
+function coinAramaHyperliquideGit(sembol) {
+  var balinaTab = document.querySelector('.tab[onclick*="balina"]');
+  if (balinaTab) sekmeAc("balina", balinaTab);
+  var hedefBtn = document.querySelector('#balina .bot-btn[onclick*="hyperliquid"]');
+  if (hedefBtn) balinaFiltre("hyperliquid", hedefBtn);
+  var aramaGirdi = document.getElementById("hyperliquid-arama");
+  if (aramaGirdi) {
+    aramaGirdi.value = sembol;
+    hyperliquidGoster();
+  }
+}
+
 function coinAramaTekOdaKutusuHtml(baslik, renk, veri) {
   var toplam = veri.tp + veri.stop;
   var basari = toplam > 0 ? Math.round(veri.tp / toplam * 100) : null;
@@ -6010,6 +6069,8 @@ function coinAramaTekSembolGoster(sembol) {
     html += aktifKartlar.join("");
   }
 
+  html += coinAramaHyperliquidToplamHtml(sembol);
+
   var ozet = (tumBalina.ozet || {})[sembol];
   if (ozet) {
     html += '<div class="section-title">Anlik Balina Baskisi (5dk)</div>';
@@ -6061,6 +6122,14 @@ function sekmeAc(id, el) {
   el.classList.add("active");
   var divlar = document.querySelectorAll(".content > div");
   for (var i = 0; i < divlar.length; i++) divlar[i].style.display = "none";
+
+  // Misafir (uye olmayan) ziyaretci, izinli sekmeler DISINDA bir sekmeye
+  // tiklarsa gercek icerik yerine "uye olmanız gerekmektedir" yazisini gorur.
+  if (misafirModu && MISAFIR_IZINLI_SEKMELER.indexOf(id) === -1) {
+    document.getElementById("misafir-engel").style.display = "block";
+    return;
+  }
+
   document.getElementById(id).style.display = "block";
   guncelle();
   // Analiz sekmesi (coin/hisse/piyasa analizleri) - onceki mesaj gecmisini
@@ -7182,7 +7251,17 @@ function canliYayinKontrolEt() {
 
 function genelBakisGirisGoster() {
   document.getElementById("genelbakis-genel").style.display = "none";
+  document.getElementById("app-icerik").style.display = "none";
   document.getElementById("auth-ekrani").style.display = "flex";
+}
+
+function authEkraniniKapat() {
+  document.getElementById("auth-ekrani").style.display = "none";
+  if (misafirModu) {
+    document.getElementById("app-icerik").style.display = "block";
+  } else {
+    document.getElementById("genelbakis-genel").style.display = "flex";
+  }
 }
 
 function sinyalAramaGuncelle(deger) {
@@ -7992,14 +8071,34 @@ function kullaniciSifreSifirla(kadi) {
   xhr.send(JSON.stringify({ kullanici_adi: kadi }));
 }
 
+function misafirModuBaslat() {
+  // Uye olmayan (token'i olmayan) bir ziyaretci icin: tam uygulama
+  // kabugunu (sekmeler dahil) gosteriyoruz ama sadece MISAFIR_IZINLI_SEKMELER
+  // listesindeki sekmeler gercek icerik yukler - digerlerine tiklaninca
+  // "uye olmanız gerekmektedir" yazisi cikar (bkz. sekmeAc()).
+  misafirModu = true;
+  authToken = "";
+  hesapDurumu = null;
+  document.getElementById("genelbakis-genel").style.display = "none";
+  document.getElementById("app-icerik").style.display = "block";
+  document.getElementById("yonetici-tab").style.display = "none";
+  document.getElementById("kalan-sure-gostergesi").textContent = "";
+  document.getElementById("durum-banner-alani").innerHTML =
+    '<div class="durum-banner bekliyor">Misafir olarak görüntülüyorsunuz. Tüm sekmelere ve canlı sinyallere erişmek için üye olun. ' +
+    '<span onclick="genelBakisGirisGoster()" style="cursor:pointer;text-decoration:underline;color:#60a5fa">Giriş Yap / Üye Ol</span></div>';
+  var genelBakisTab = document.querySelector('.tab[onclick*="genelbakis"]');
+  if (genelBakisTab) sekmeAc("genelbakis", genelBakisTab);
+  canliYayinKontrolEt();
+  veriYukle();
+  setInterval(veriYukle, 10000);
+  if (localStorage.getItem("ts_admin_cihazi") !== "1") ziyaretKaydet("misafir");
+}
+
 function sayfaBaslat() {
   var kayitliToken = localStorage.getItem("ts_token");
   if (!kayitliToken) {
     document.getElementById("yukleniyor-ekrani").style.display = "none";
-    document.getElementById("genelbakis-genel").style.display = "flex";
-    genelBakisDoldur("genelbakis-genel-icerik");
-    canliYayinKontrolEt();
-    if (localStorage.getItem("ts_admin_cihazi") !== "1") ziyaretKaydet("misafir");
+    misafirModuBaslat();
     return;
   }
   var xhr = new XMLHttpRequest();
