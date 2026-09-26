@@ -5908,13 +5908,21 @@ function coinAramaBalinayaGit(sembol, kategori) {
   }
 }
 
+function coinAramaHyperliquidCoinAdi(sembol) {
+  // Genel arama kutusu Binance parite formatinda calisir (orn: "NEARUSDT"),
+  // Hyperliquid ise coin'i sadece kendi ticker'iyla tutar (orn: "NEAR") -
+  // bu yuzden karsilastirmadan once yaygin parite eklerini kirpiyoruz.
+  return (sembol || "").toUpperCase().replace(/(USDT|USDC|BUSD|USD|PERP)$/, "");
+}
+
 function coinAramaHyperliquidToplamHtml(sembol) {
+  var coinAdi = coinAramaHyperliquidCoinAdi(sembol);
   var cuzdanlar = tumHyperliquid.cuzdanlar || {};
   var toplamLong = 0, toplamShort = 0, adet = 0;
   Object.keys(cuzdanlar).forEach(function(adres) {
     var c = cuzdanlar[adres];
     (c.pozisyonlar || []).forEach(function(p) {
-      if (p.coin !== sembol) return;
+      if ((p.coin || "").toUpperCase() !== coinAdi) return;
       adet++;
       if (p.direction === "LONG") toplamLong += (p.notional_usd || 0);
       else toplamShort += (p.notional_usd || 0);
@@ -5942,7 +5950,7 @@ function coinAramaHyperliquideGit(sembol) {
   if (hedefBtn) balinaFiltre("hyperliquid", hedefBtn);
   var aramaGirdi = document.getElementById("hyperliquid-arama");
   if (aramaGirdi) {
-    aramaGirdi.value = sembol;
+    aramaGirdi.value = coinAramaHyperliquidCoinAdi(sembol);
     hyperliquidGoster();
   }
 }
