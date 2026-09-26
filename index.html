@@ -6370,11 +6370,34 @@ function pushDurumGoster() {
     html += satir("Bu tarayici Push API destekliyor", tarayiciDestekMi);
     html += satir("Bu tarayicida bildirim izni verilmis", izinDurumu === "granted", "(" + izinDurumu + ")");
     html += '<div style="font-size:10.5px;color:#64748b;margin-top:10px;line-height:1.5">Yukaridaki 5 satirin HEPSI ✅ olmadan bildirim gelmez. Oda basindaki 🔔 (sessize alma) butonu bunlardan BAGIMSIZDIR - o sadece o odadan bildirim isteyip istemediginizi belirler, cihazi push icin abone etmez.</div>';
-    html += '<div style="margin-top:10px"><button class="refresh-btn" onclick="pushDurumGoster()">Yenile</button></div>';
+    html += '<div id="push-test-sonuc" style="font-size:11px;color:#4ade80;margin-top:8px"></div>';
+    html += '<div style="margin-top:10px;display:flex;gap:8px">';
+    html += '<button class="refresh-btn" onclick="pushDurumGoster()">Yenile</button>';
+    if (v.abonelik_sayisi > 0) html += '<button class="refresh-btn" onclick="pushTestGonder()">Test Bildirimi Gönder</button>';
+    html += '</div>';
     html += '</div>';
     kutu.innerHTML = html;
   };
   xhr.onerror = function() { kutu.innerHTML = ""; };
+  xhr.send();
+}
+
+function pushTestGonder() {
+  var sonucEl = document.getElementById("push-test-sonuc");
+  if (sonucEl) sonucEl.textContent = "Gonderiliyor...";
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/admin/push-test", true);
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (!sonucEl) return;
+    if (xhr.status === 200) {
+      sonucEl.textContent = "Test bildirimi gonderildi - birkac saniye icinde cihazinizda gorunmeli. Gelmezse: cihazinizin bildirim izinlerini (isletim sistemi seviyesinde) ve pil optimizasyonu/rahatsiz etmeyin ayarlarini kontrol edin.";
+    } else {
+      sonucEl.style.color = "#f87171";
+      sonucEl.textContent = "Test bildirimi gonderilemedi (kod " + xhr.status + ").";
+    }
+  };
+  xhr.onerror = function() { if (sonucEl) { sonucEl.style.color = "#f87171"; sonucEl.textContent = "Sunucuya ulasilamadi."; } };
   xhr.send();
 }
 
