@@ -4438,7 +4438,19 @@ function coinPerformansOdaFiltre(oda, btn) {
   coinPerformansGoster();
 }
 
-function coinPerformansSatirIcerik(sembol, odalar, yon, gosterilecekOdalar, odaSirasi) {
+function coinPerformansStopKirilimHtml(yonOdaVerisi, oda) {
+  // Oda hucresindeki toplam Stop sayisinin kacinin LONG kacinin SHORT
+  // oldugunu (2L 1S) seklinde kucuk, kirmizimsi bir alt-satir olarak
+  // gosterir - "stop long mu short mu belli olmuyor" sikayeti icin.
+  var d = yonOdaVerisi && yonOdaVerisi[oda];
+  if (!d) return "";
+  var longStop = (d.LONG || {}).stop || 0;
+  var shortStop = (d.SHORT || {}).stop || 0;
+  if (longStop + shortStop === 0) return "";
+  return '<div style="font-size:9.5px;color:#f87171;opacity:0.8;margin-top:1px">(' + longStop + 'L ' + shortStop + 'S)</div>';
+}
+
+function coinPerformansSatirIcerik(sembol, odalar, yon, gosterilecekOdalar, odaSirasi, yonOdaVerisi) {
   var enIyiOda = null, enIyiOran = -1;
   if (coinPerformansOdaFiltresi === "hepsi") {
     for (var o = 0; o < odaSirasi.length; o++) {
@@ -4462,10 +4474,13 @@ function coinPerformansSatirIcerik(sembol, odalar, yon, gosterilecekOdalar, odaS
       html += '<span style="color:#475569">-</span>';
     } else {
       toplamTp += d.tp; toplamStop += d.stop;
-      html += '<div style="display:flex;justify-content:center;align-items:center;gap:8px">';
+      html += '<div style="display:flex;justify-content:center;align-items:flex-start;gap:8px">';
       html += '<span style="width:30px;text-align:center;color:#60a5fa;font-weight:600;cursor:pointer" onclick="sinyaleGit(\'' + oda + '\',\'' + sembol + '\')">&#10003;' + d.acilan + '</span>';
       html += '<span style="width:26px;text-align:center;color:' + (d.tp > 0 ? '#4ade80' : '#334155') + '">' + (d.tp > 0 ? ('&#10003;' + d.tp) : '-') + '</span>';
-      html += '<span style="width:26px;text-align:center;color:' + (d.stop > 0 ? '#f87171' : '#334155') + '">' + (d.stop > 0 ? ('&#10007;' + d.stop) : '-') + '</span>';
+      html += '<div style="width:26px;text-align:center">';
+      html += '<span style="color:' + (d.stop > 0 ? '#f87171' : '#334155') + '">' + (d.stop > 0 ? ('&#10007;' + d.stop) : '-') + '</span>';
+      html += coinPerformansStopKirilimHtml(yonOdaVerisi, oda);
+      html += '</div>';
       html += '</div>';
     }
     html += '</td>';
@@ -4518,6 +4533,7 @@ function coinPerformansGoster() {
     var yanit = JSON.parse(xhr.responseText);
     var veri = yanit.coin_oda || {};
     var yonVerisi = yanit.coin_yon || {};
+    var yonOdaVerisi = yanit.coin_yon_oda || {};
     var odaSirasi = ["SINYAL_ODA_1", "SINYAL_ODA_2", "SINYAL_ODA_3", "SINYAL_ODA_4"];
     var gosterilecekOdalar = coinPerformansOdaFiltresi === "hepsi" ? odaSirasi : [coinPerformansOdaFiltresi];
     var aramaEl = document.getElementById("coinperformans-arama");
@@ -4597,9 +4613,9 @@ function coinPerformansGoster() {
         var tr = document.createElement("tr");
         tr.style.borderBottom = "1px solid #1e293b";
         tr.setAttribute("data-coin", sembol);
-        tr.innerHTML = coinPerformansSatirIcerik(sembol, veri[sembol], yonVerisi[sembol], gosterilecekOdalar, odaSirasi);
+        tr.innerHTML = coinPerformansSatirIcerik(sembol, veri[sembol], yonVerisi[sembol], gosterilecekOdalar, odaSirasi, yonOdaVerisi[sembol]);
         tbody.appendChild(tr);
-        coinPerformansSatirlar[sembol] = { tr: tr, snapshot: JSON.stringify([veri[sembol], yonVerisi[sembol] || null]) };
+        coinPerformansSatirlar[sembol] = { tr: tr, snapshot: JSON.stringify([veri[sembol], yonVerisi[sembol] || null, yonOdaVerisi[sembol] || null]) };
       }
 
       var sarmalayici = document.createElement("div");
@@ -4615,11 +4631,11 @@ function coinPerformansGoster() {
     if (!tbody) return;
     for (var k = 0; k < coinler.length; k++) {
       var sembol2 = coinler[k];
-      var yeniSnapshot = JSON.stringify([veri[sembol2], yonVerisi[sembol2] || null]);
+      var yeniSnapshot = JSON.stringify([veri[sembol2], yonVerisi[sembol2] || null, yonOdaVerisi[sembol2] || null]);
       var mevcut = coinPerformansSatirlar[sembol2];
       if (mevcut) {
         if (mevcut.snapshot !== yeniSnapshot) {
-          mevcut.tr.innerHTML = coinPerformansSatirIcerik(sembol2, veri[sembol2], yonVerisi[sembol2], gosterilecekOdalar, odaSirasi);
+          mevcut.tr.innerHTML = coinPerformansSatirIcerik(sembol2, veri[sembol2], yonVerisi[sembol2], gosterilecekOdalar, odaSirasi, yonOdaVerisi[sembol2]);
           mevcut.snapshot = yeniSnapshot;
           coinPerformansYanip(mevcut.tr);
         }
@@ -4627,7 +4643,7 @@ function coinPerformansGoster() {
         var yeniTr = document.createElement("tr");
         yeniTr.style.borderBottom = "1px solid #1e293b";
         yeniTr.setAttribute("data-coin", sembol2);
-        yeniTr.innerHTML = coinPerformansSatirIcerik(sembol2, veri[sembol2], yonVerisi[sembol2], gosterilecekOdalar, odaSirasi);
+        yeniTr.innerHTML = coinPerformansSatirIcerik(sembol2, veri[sembol2], yonVerisi[sembol2], gosterilecekOdalar, odaSirasi, yonOdaVerisi[sembol2]);
         tbody.appendChild(yeniTr);
         coinPerformansSatirlar[sembol2] = { tr: yeniTr, snapshot: yeniSnapshot };
         coinPerformansYanip(yeniTr);
