@@ -682,6 +682,7 @@
 
     <div id="yonetici-genel-icerik">
       <div id="yonetici-bot-durumu-icerik" style="margin-bottom:14px"></div>
+      <div id="yonetici-push-icerik" style="margin-bottom:14px"></div>
       <div id="yonetici-bakim-icerik" style="margin-bottom:14px"></div>
       <div id="yonetici-buyume-icerik"></div>
       <div id="yonetici-ziyaret-ozet"></div>
@@ -3367,7 +3368,7 @@ function yoneticiAltSekmeSec(tip) {
   document.getElementById("yonetici-genel-icerik").style.display = tip === "genel" ? "" : "none";
   document.getElementById("yonetici-bist-icerik").style.display = tip === "bist" ? "" : "none";
   if (tip === "bist") yoneticiBistAnalizGoster();
-  else { botDurumuGoster(); buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); guvenlikHaritasiGoster(); }
+  else { botDurumuGoster(); pushDurumGoster(); buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); guvenlikHaritasiGoster(); }
 }
 
 function portfoyAltSekmeSec(tip) {
@@ -6222,7 +6223,7 @@ function sekmeAc(id, el) {
   if (id === "analiz") { kriptoAnalizGoster(); hisseAnalizGoster(); bistAnalizGoster(); }
   if (id === "yonetici") {
     if (yoneticiAltSekme === "bist") yoneticiBistAnalizGoster();
-    else { botDurumuGoster(); buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); guvenlikHaritasiGoster(); }
+    else { botDurumuGoster(); pushDurumGoster(); buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); guvenlikHaritasiGoster(); }
   }
   if (id === "piyasa") altinFiyatlariGoster();
   if (id === "genelbakis") genelBakisDoldur("genelbakis-icerik");
@@ -6338,6 +6339,45 @@ function guvenlikBasligi(baslik) {
 // (piyasa uygun firsat vermiyor olabilir) heartbeat gelmeye devam
 // ediyorsa hala saglikli sayilir; heartbeat kesilmesi botun GERCEKTEN
 // coktugunu/durdugunu gosterir.
+function pushDurumGoster() {
+  // "Bildirimler acik gorunuyor ama gelmiyor" sikayetlerini kod okumadan
+  // teshis edebilmek icin: VAPID anahtarlari Railway'de tanimli mi, bu
+  // hesabin cihazda kayitli bir push abonesi var mi, sessiz saat aktif mi -
+  // hepsini tek bakista gosterir. Bu 3 sart hepsi saglanmadan bildirim
+  // HICBIR ZAMAN gitmez - oda "sessize alma" cani (Veriler sekmesi) bunlarla
+  // ILGISIZDIR, o sadece o oda icin bildirim istenip istenmedigini belirler.
+  var kutu = document.getElementById("yonetici-push-icerik");
+  if (!kutu) return;
+  kutu.innerHTML = '<div class="signal-card"><div class="loading">Bildirim durumu kontrol ediliyor...</div></div>';
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/admin/push-durum", true);
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status !== 200) { kutu.innerHTML = ""; return; }
+    var v;
+    try { v = JSON.parse(xhr.responseText); } catch (e) { return; }
+    var satir = function(etiket, tamamMi, detay) {
+      return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #1e293b;font-size:12.5px">' +
+        '<span>' + etiket + '</span><span style="font-weight:600;color:' + (tamamMi ? "#4ade80" : "#f87171") + '">' + (tamamMi ? "✅" : "❌") + (detay ? " " + detay : "") + '</span></div>';
+    };
+    var tarayiciDestekMi = ("Notification" in window) && ("serviceWorker" in navigator) && ("PushManager" in window);
+    var izinDurumu = ("Notification" in window) ? Notification.permission : "yok";
+    var html = '<div class="signal-card">';
+    html += '<div style="font-size:13px;color:#94a3b8;margin-bottom:10px">Push Bildirim Durumu (bu hesap: ' + (girisliKullanici || "-") + ')</div>';
+    html += satir("Railway VAPID anahtarlari tanimli", v.vapid_tanimli);
+    html += satir("Bu hesapta kayitli cihaz (push abonesi)", v.abonelik_sayisi > 0, "(" + v.abonelik_sayisi + " cihaz)");
+    html += satir("Sessiz saat suanda AKTIF DEGIL", !v.sessiz_saatte, v.sessiz_saatte ? "(su an sessiz saatler icinde - bildirim gitmez)" : "");
+    html += satir("Bu tarayici Push API destekliyor", tarayiciDestekMi);
+    html += satir("Bu tarayicida bildirim izni verilmis", izinDurumu === "granted", "(" + izinDurumu + ")");
+    html += '<div style="font-size:10.5px;color:#64748b;margin-top:10px;line-height:1.5">Yukaridaki 5 satirin HEPSI ✅ olmadan bildirim gelmez. Oda basindaki 🔔 (sessize alma) butonu bunlardan BAGIMSIZDIR - o sadece o odadan bildirim isteyip istemediginizi belirler, cihazi push icin abone etmez.</div>';
+    html += '<div style="margin-top:10px"><button class="refresh-btn" onclick="pushDurumGoster()">Yenile</button></div>';
+    html += '</div>';
+    kutu.innerHTML = html;
+  };
+  xhr.onerror = function() { kutu.innerHTML = ""; };
+  xhr.send();
+}
+
 function botDurumuGoster() {
   var kutu = document.getElementById("yonetici-bot-durumu-icerik");
   if (!kutu) return;
