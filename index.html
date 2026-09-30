@@ -1530,7 +1530,19 @@ function destekDirencYogunlukHesapla(mumlar, guncelFiyat, adet) {
   // hassas bir esik yaratabilir - bunu onlemek icin genel ortalamanin ufak
   // bir payini (%20'sini) her zaman esige taban olarak ekliyoruz.
   var genelOrtalama = toplamMumAgirligi / binSayisi;
-  var esikCarpani = 1.5;
+  // NOT (2026-10): 15 dakikalik gibi daha gurultulu/kisa zaman dilimlerinde
+  // 1.5 katsayisi cok siki kaliyordu - fiyata yakin, GENIS ama ORTA
+  // yogunluklu gercek konsolidasyon bantlari (kullanicinin ekran
+  // goruntusunde isaretledigi gibi), civarlarindaki genel piyasa gurultusu
+  // da zaten belli bir yogunluga sahip oldugu icin yerel ortalamayi %50
+  // gecemiyor ve tamamen eleniyordu - bunun yerine cok daha eski/dar ama
+  // "sivri" bir bolge one cikiyordu. 1.15'e dusurulerek bu genis/orta
+  // bantlar da yakalanabiliyor; duz/gurultusuz bir trendde (gercek
+  // konsolidasyon hic yoksa) cok zayif (dusuk "guc") bir-iki sahte aday
+  // cikabiliyor ama bu, gercek piyasa verisinde (her zaman bir miktar
+  // gurultu/dalgalanma oldugu icin) pratikte nadir goruleceginden kabul
+  // edilebilir bir degis-tokus.
+  var esikCarpani = 1.15;
 
   // Esigi gecen bitisik dilimleri tek bolge (connected segment) olarak topla
   var bolgeler = [];
