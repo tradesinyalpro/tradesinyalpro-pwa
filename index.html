@@ -1459,44 +1459,106 @@ function pivotDusukleriBul(mumlar, pencere) {
   return pivotlar;
 }
 
-function destekDirencBul(mumlar, guncelFiyat) {
-  var yuksekPivotlar = pivotYuksekleriBul(mumlar, 2);
-  var dusukPivotlar = pivotDusukleriBul(mumlar, 2);
-  var tolerans = guncelFiyat * 0.004; // yakin pivotlari ayni seviye sayabilmek icin %0.4 tolerans
+function destekDirencYogunlukHesapla(mumlar, guncelFiyat, adet) {
+  // "Fiyat yogunlugu" (time-at-price) yaklasimi. Eski yontem, pivot
+  // noktalarini (keskin tek-mumluk dip/tepe fitillerini) birbirine
+  // eslestirip SADECE fiyatin neredeyse AYNI noktaya en az 2 kez donmesini
+  // sayiyordu - bu da fiyatin bir sure YATAY/dalgali seyrederek konsolide
+  // oldugu (her dokunusun biraz farkli seviyede oldugu) gercek destek/direnc
+  // bolgelerini tamamen kaciriyor, buna karsilik nadir/rastlantisal ama
+  // birbirine yakin birkac keskin fitili one cikariyordu (kullanicinin
+  // ekran goruntusuyle gosterdigi sorun).
+  //
+  // Bunun yerine: fiyat araligini kucuk dilimlere (bin) bolup, her mumun
+  // yuksek-dusuk araligini kapsadigi dilimlere yayiyoruz (klasik "volume
+  // profile"a benzer bir TPO/zaman-fiyat mantigi). Fiyatin uzun sure
+  // takildigi/konsolide oldugu bolgeler dogal olarak yuksek yogunluk
+  // biriktirir - grafikte goz kararli sekilde "burada bir sure kaldi"
+  // denilen bolgelerle ayni sonucu verir.
+  adet = adet || 3;
+  var enDusuk = Math.min.apply(null, mumlar.map(function(m) { return m.dusuk; }));
+  var enYuksek = Math.max.apply(null, mumlar.map(function(m) { return m.yuksek; }));
+  var araGenislik = enYuksek - enDusuk;
+  if (!araGenislik || araGenislik <= 0) return { destekler: [], direncler: [] };
 
-  function enGucluSeviye(pivotlar, ustMu) {
-    var adaylar = [];
-    for (var i = 0; i < pivotlar.length; i++) {
-      var p = pivotlar[i];
-      if (ustMu ? (p.deger > guncelFiyat) : (p.deger < guncelFiyat)) adaylar.push(p);
-    }
-    if (adaylar.length === 0) return null;
-    var gruplar = [];
-    for (var a = 0; a < adaylar.length; a++) {
-      var deger = adaylar[a].deger;
-      var bulunanGrup = null;
-      for (var g = 0; g < gruplar.length; g++) {
-        if (Math.abs(gruplar[g].ort - deger) <= tolerans) { bulunanGrup = gruplar[g]; break; }
-      }
-      if (bulunanGrup) {
-        bulunanGrup.degerler.push(deger);
-        var toplam = 0;
-        for (var d = 0; d < bulunanGrup.degerler.length; d++) toplam += bulunanGrup.degerler[d];
-        bulunanGrup.ort = toplam / bulunanGrup.degerler.length;
-      } else {
-        gruplar.push({ ort: deger, degerler: [deger] });
-      }
-    }
-    // en cok "dokunulan" (test edilen) seviye once gelsin; esitlikte fiyata en yakin olan kazansin
-    gruplar.sort(function(x, y) {
-      if (y.degerler.length !== x.degerler.length) return y.degerler.length - x.degerler.length;
-      return Math.abs(x.ort - guncelFiyat) - Math.abs(y.ort - guncelFiyat);
-    });
-    return gruplar[0].ort;
+  var binSayisi = 200;
+  var binGenisligi = araGenislik / binSayisi;
+  var yogunluk = new Array(binSayisi).fill(0);
+
+  function binIndex(fiyat) {
+    var idx = Math.floor((fiyat - enDusuk) / binGenisligi);
+    if (idx < 0) idx = 0;
+    if (idx > binSayisi - 1) idx = binSayisi - 1;
+    return idx;
   }
 
-  var direnc = enGucluSeviye(yuksekPivotlar, true);
-  var destek = enGucluSeviye(dusukPivotlar, false);
+  var toplamMumAgirligi = 0;
+  for (var i = 0; i < mumlar.length; i++) {
+    var alt = binIndex(mumlar[i].dusuk);
+    var ust = binIndex(mumlar[i].yuksek);
+    if (ust < alt) { var tmp = ust; ust = alt; alt = tmp; }
+    var binAdedi = (ust - alt + 1);
+    var pay = 1 / binAdedi; // her mum toplamda 1 birimlik agirligini kapladigi dilimlere esit paylastirir
+    for (var b = alt; b <= ust; b++) yogunluk[b] += pay;
+    toplamMumAgirligi += 1;
+  }
+
+  // Dilimleri "kalabalik" (destek/direnc bolgesi olabilecek) sayabilmek icin
+  // bir esik belirliyoruz: butun dilimlerin ORTALAMASININ 1.4 katindan daha
+  // yogun olan dilimler "bolge" sayilir. NOT: burada bilerek "yerel tepe"
+  // (komsusundan yuksek) yerine "ortalamanin uzerinde" tanimi kullaniyoruz -
+  // genis bir konsolidasyon platosunda onlarca bitisik dilim BIRBIRINE ESIT
+  // yogunlukta olabiliyor (hicbiri digerinden "daha yuksek" degil), bu da
+  // "komsudan yuksek" tanimiyla platoyu tek bir bolge olarak yakalamayi
+  // imkansiz kiliyordu. Esik-tabanli yaklasim, bitisik yogun dilimleri
+  // (esigin altina hic dusmeden) TEK bir "baglantili bolge" (connected
+  // segment) olarak dogal biciminde birlestiriyor - araya giren gecis/rampa
+  // bolgeleri (dusuk yogunluklu) iki gercek bolgeyi asla birbirine
+  // baglayamiyor, ki asil aranan davranis bu.
+  var ortalamaYogunluk = toplamMumAgirligi / binSayisi;
+  var esikYogunluk = ortalamaYogunluk * 1.4;
+
+  // Esigi gecen bitisik dilimleri tek bolge (connected segment) olarak topla
+  var bolgeler = [];
+  var aktifBolge = null;
+  for (var k = 0; k < binSayisi; k++) {
+    if (yogunluk[k] >= esikYogunluk) {
+      var fiyat = enDusuk + (k + 0.5) * binGenisligi;
+      if (!aktifBolge) {
+        aktifBolge = { toplamGuc: 0, agirlikliToplam: 0 };
+        bolgeler.push(aktifBolge);
+      }
+      aktifBolge.toplamGuc += yogunluk[k];
+      aktifBolge.agirlikliToplam += fiyat * yogunluk[k];
+    } else {
+      aktifBolge = null; // esigin altina dusen dilim, bolgeyi burada keser
+    }
+  }
+  var tumBolgeler = bolgeler.map(function(b) {
+    return { deger: b.agirlikliToplam / b.toplamGuc, guc: Math.round(b.toplamGuc * 10) / 10 };
+  });
+
+  function gruplaVeSirala(ustMu) {
+    var adaylar = tumBolgeler.filter(function(t) {
+      return ustMu ? (t.deger > guncelFiyat) : (t.deger < guncelFiyat);
+    });
+    // Gecerli bolgeler arasinda FIYATA EN YAKIN olan once gelsin - pratikte
+    // trader icin en anlamli olan "su an fiyata en yakin gercek destek/
+    // direnc" seviyesidir, illa "tum grafigin en guclusu" degil.
+    adaylar.sort(function(x, y) { return Math.abs(x.deger - guncelFiyat) - Math.abs(y.deger - guncelFiyat); });
+    return adaylar.slice(0, adet);
+  }
+
+  return {
+    direncler: gruplaVeSirala(true),
+    destekler: gruplaVeSirala(false)
+  };
+}
+
+function destekDirencBul(mumlar, guncelFiyat) {
+  var sonuc = destekDirencYogunlukHesapla(mumlar, guncelFiyat, 1);
+  var direnc = sonuc.direncler.length ? sonuc.direncler[0].deger : null;
+  var destek = sonuc.destekler.length ? sonuc.destekler[0].deger : null;
 
   if (direnc === null) direnc = Math.max.apply(null, mumlar.map(function(m) { return m.yuksek; }));
   if (destek === null) destek = Math.min.apply(null, mumlar.map(function(m) { return m.dusuk; }));
@@ -1504,50 +1566,7 @@ function destekDirencBul(mumlar, guncelFiyat) {
 }
 
 function destekDirencCokluBul(mumlar, guncelFiyat, adet) {
-  // destekDirencBul() ile AYNI pivot/gruplama mantigini kullanir, ama TEK
-  // bir en guclu seviye yerine, en guclu (en cok test edilmis) EN FAZLA
-  // `adet` kadar seviyeyi dondurur. SADECE en az 2 kez test edilmis
-  // gruplar sayiliyor - tek seferlik bir fitil "rastgele" bir seviye
-  // olarak grafige cizilmesin diye.
-  adet = adet || 3;
-  var yuksekPivotlar = pivotYuksekleriBul(mumlar, 2);
-  var dusukPivotlar = pivotDusukleriBul(mumlar, 2);
-  var tolerans = guncelFiyat * 0.004;
-
-  function gruplaVeSirala(pivotlar, ustMu) {
-    var adaylar = [];
-    for (var i = 0; i < pivotlar.length; i++) {
-      var p = pivotlar[i];
-      if (ustMu ? (p.deger > guncelFiyat) : (p.deger < guncelFiyat)) adaylar.push(p);
-    }
-    var gruplar = [];
-    for (var a = 0; a < adaylar.length; a++) {
-      var deger = adaylar[a].deger;
-      var bulunanGrup = null;
-      for (var g = 0; g < gruplar.length; g++) {
-        if (Math.abs(gruplar[g].ort - deger) <= tolerans) { bulunanGrup = gruplar[g]; break; }
-      }
-      if (bulunanGrup) {
-        bulunanGrup.degerler.push(deger);
-        var toplam = 0;
-        for (var d = 0; d < bulunanGrup.degerler.length; d++) toplam += bulunanGrup.degerler[d];
-        bulunanGrup.ort = toplam / bulunanGrup.degerler.length;
-      } else {
-        gruplar.push({ ort: deger, degerler: [deger] });
-      }
-    }
-    gruplar = gruplar.filter(function(g) { return g.degerler.length >= 2; });
-    gruplar.sort(function(x, y) {
-      if (y.degerler.length !== x.degerler.length) return y.degerler.length - x.degerler.length;
-      return Math.abs(x.ort - guncelFiyat) - Math.abs(y.ort - guncelFiyat);
-    });
-    return gruplar.slice(0, adet).map(function(g) { return { deger: g.ort, guc: g.degerler.length }; });
-  }
-
-  return {
-    direncler: gruplaVeSirala(yuksekPivotlar, true),
-    destekler: gruplaVeSirala(dusukPivotlar, false)
-  };
+  return destekDirencYogunlukHesapla(mumlar, guncelFiyat, adet || 3);
 }
 
 function uyumsuzlukBul(mumlar, rsiDizisi) {
