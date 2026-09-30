@@ -1504,24 +1504,39 @@ function destekDirencYogunlukHesapla(mumlar, guncelFiyat, adet) {
   }
 
   // Dilimleri "kalabalik" (destek/direnc bolgesi olabilecek) sayabilmek icin
-  // bir esik belirliyoruz: butun dilimlerin ORTALAMASININ 1.4 katindan daha
-  // yogun olan dilimler "bolge" sayilir. NOT: burada bilerek "yerel tepe"
-  // (komsusundan yuksek) yerine "ortalamanin uzerinde" tanimi kullaniyoruz -
-  // genis bir konsolidasyon platosunda onlarca bitisik dilim BIRBIRINE ESIT
-  // yogunlukta olabiliyor (hicbiri digerinden "daha yuksek" degil), bu da
-  // "komsudan yuksek" tanimiyla platoyu tek bir bolge olarak yakalamayi
-  // imkansiz kiliyordu. Esik-tabanli yaklasim, bitisik yogun dilimleri
-  // (esigin altina hic dusmeden) TEK bir "baglantili bolge" (connected
-  // segment) olarak dogal biciminde birlestiriyor - araya giren gecis/rampa
-  // bolgeleri (dusuk yogunluklu) iki gercek bolgeyi asla birbirine
-  // baglayamiyor, ki asil aranan davranis bu.
-  var ortalamaYogunluk = toplamMumAgirligi / binSayisi;
-  var esikYogunluk = ortalamaYogunluk * 1.4;
+  // bir esik belirliyoruz: NOT sabit/global bir ortalama degil, her dilimin
+  // KENDI CIVARINA gore YEREL bir esik kullaniyoruz. Neden: pencerede hem
+  // cok uzun/genis eski bir taban (once yuzlerce mum boyunca surmus) hem de
+  // daha KISA ama gercek omuz/konsolidasyon bolgeleri varsa, o dev tabanin
+  // yogunlugu GENEL ortalamayi asiri yukari cekiyor ve kisa (ama gozle
+  // bariz) omuzlar bu sisirilmis esigi hic gecemeyip tamamen eleniyordu -
+  // kullanicinin ekran goruntusunde bildirdigi tam olarak bu sorundu. Yerel
+  // ortalama (her dilimin solundaki/sagindaki genis bir pencerenin
+  // ortalamasi) kullanarak, her bolgeyi SADECE KENDI CEVRESINE gore
+  // "kalabalik miydi" diye degerlendiriyoruz - boylece kisa bir omuz,
+  // kendi civarindaki gecis/rampa yogunluguna gore hala bariz bir yigilma
+  // olarak tespit edilebiliyor.
+  var yerelPencere = Math.max(10, Math.round(binSayisi * 0.12));
+  var yerelOrtalama = new Array(binSayisi);
+  for (var yp = 0; yp < binSayisi; yp++) {
+    var altSinir = Math.max(0, yp - yerelPencere);
+    var ustSinir = Math.min(binSayisi - 1, yp + yerelPencere);
+    var toplam = 0;
+    for (var yq = altSinir; yq <= ustSinir; yq++) toplam += yogunluk[yq];
+    yerelOrtalama[yp] = toplam / (ustSinir - altSinir + 1);
+  }
+  // Cok duz/gurultusuz bolgelerde (ornegin hicbir yerde konsolidasyon
+  // olmayan duzgun bir trend) yerel ortalama sifira cok yakin olup asiri
+  // hassas bir esik yaratabilir - bunu onlemek icin genel ortalamanin ufak
+  // bir payini (%20'sini) her zaman esige taban olarak ekliyoruz.
+  var genelOrtalama = toplamMumAgirligi / binSayisi;
+  var esikCarpani = 1.5;
 
   // Esigi gecen bitisik dilimleri tek bolge (connected segment) olarak topla
   var bolgeler = [];
   var aktifBolge = null;
   for (var k = 0; k < binSayisi; k++) {
+    var esikYogunluk = Math.max(yerelOrtalama[k], genelOrtalama * 0.2) * esikCarpani;
     if (yogunluk[k] >= esikYogunluk) {
       var fiyat = enDusuk + (k + 0.5) * binGenisligi;
       if (!aktifBolge) {
