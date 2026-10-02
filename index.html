@@ -2407,6 +2407,10 @@ function kartLwGrafikGuncelle(sembol, oncedenYakalananScrollTop) {
         grid: { vertLines: { color: "#141d33" }, horzLines: { color: "#141d33" } },
         timeScale: { timeVisible: true, borderColor: "#1e293b" },
         rightPriceScale: { borderColor: "#1e293b" },
+        // Varsayilan "Magnet" modu, cizgiyi mumun tam tepesine/dibine
+        // "mikniatislayip" yapismasina sebep oluyordu - "Normal" modda imlec
+        // tam fare konumunu serbestce takip eder.
+        crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
         width: kutu2.clientWidth, height: 400
       });
       kartSeries = kartChart.addCandlestickSeries({
@@ -7145,6 +7149,7 @@ function ddGrafikCiz(candleData, destek, direnc, coinDegisti) {
       grid: { vertLines: { color: "#141d33" }, horzLines: { color: "#141d33" } },
       timeScale: { timeVisible: true, borderColor: "#1e293b" },
       rightPriceScale: { borderColor: "#1e293b" },
+      crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
       width: kutu.clientWidth, height: 400
     });
     ddSeries = ddChart.addCandlestickSeries({
