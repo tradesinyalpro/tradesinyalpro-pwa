@@ -2404,7 +2404,7 @@ function kartLwGrafikGuncelle(sembol, oncedenYakalananScrollTop) {
       kartFiyatCizgileriGizliMi = false;
       kartChart = LightweightCharts.createChart(kutu2, {
         layout: { background: { color: "#0a0f1e" }, textColor: "#94a3b8" },
-        grid: { vertLines: { color: "#141d33" }, horzLines: { color: "#141d33" } },
+        grid: { vertLines: { visible: false }, horzLines: { visible: false } },
         timeScale: { timeVisible: true, borderColor: "#1e293b" },
         rightPriceScale: { borderColor: "#1e293b" },
         // Varsayilan "Magnet" modu, cizgiyi mumun tam tepesine/dibine
@@ -7025,18 +7025,7 @@ var ddSonMumlarHam = null;  // en son cekilen ham mum verisi (Ichimoku hesaplama
 // basliyor - isterseniz her satiri ayri ayri degistirebilirsiniz.
 var DD_ICHIMOKU_AYARLARI = {
   "15m": { donusum: 3, temel: 40, oncuB: 45, gecikme: 1 },
-  // 1 saatlik: asil sorun periyot UZUNLUGU degil, temel ve oncuB
-  // periyotlarinin BIRBIRINE COK YAKIN olmasiymis (40/45 - sadece 5 fark).
-  // Bu, Senkou A ve B degerlerini neredeyse esitleyip bulutu kagit kadar
-  // ince yapiyor - ufak bir gurultu bile hangisinin buyuk oldugunu
-  // degistirip rengi surekli ceviriyor. (Ilk denemede 20/24'e kisaltmak
-  // ayni orani korudugu icin islemedi, hatta sentetik testte flip sayisini
-  // ARTIRDI.) Cozum: periyotlar arasindaki FARKI acmak - klasik Ichimoku'nun
-  // orijinal 9/26/52 degerlerine donuldu (bu zaten standart, iyi test
-  // edilmis bir oran). Sentetik gurultulu veriyle test edildi: eski 40/45
-  // ort. 13.2 renk degisimine sebep olurken, 9/26/52 ort. 7.6'ya dusuyor
-  // ve bulut ~%35 daha kalin (daha az "kagit inceligi" gorunum).
-  "1h":  { donusum: 9, temel: 26, oncuB: 52, gecikme: 1 },
+  "1h":  { donusum: 3, temel: 40, oncuB: 45, gecikme: 1 },
   "4h":  { donusum: 3, temel: 40, oncuB: 45, gecikme: 1 },
   "1d":  { donusum: 3, temel: 40, oncuB: 45, gecikme: 1 },
   "1w":  { donusum: 3, temel: 40, oncuB: 45, gecikme: 1 }
@@ -7157,7 +7146,7 @@ function ddGrafikCiz(candleData, destek, direnc, coinDegisti) {
   if (ilkOlusturma) {
     ddChart = LightweightCharts.createChart(kutu, {
       layout: { background: { color: "#0a0f1e" }, textColor: "#94a3b8" },
-      grid: { vertLines: { color: "#141d33" }, horzLines: { color: "#141d33" } },
+      grid: { vertLines: { visible: false }, horzLines: { visible: false } },
       timeScale: { timeVisible: true, borderColor: "#1e293b" },
       rightPriceScale: { borderColor: "#1e293b" },
       crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
