@@ -6913,6 +6913,13 @@ function ddRsiHesapla(closes, period) {
   return Math.round((100 - (100 / (1 + (up / down)))) * 10) / 10;
 }
 
+// Destek/Direnç fiyatini coinin kendi basamak sayisina yuvarlar (grafikteki fiyat
+// ekseniyle AYNI kural: >=100 -> 2, >=1 -> 4, >=0.01 -> 5, daha kucuk -> 8 basamak).
+function ddSeviyeYaz(deger, ornekFiyat) {
+  if (deger === null || deger === undefined || isNaN(parseFloat(deger))) return deger;
+  return parseFloat(deger).toFixed(fiyatPriceFormatAyari(ornekFiyat).precision);
+}
+
 function ddSeviyeSatiri(etiket, deger, renk) {
   if (deger === null || deger === undefined) return "";
   return '<div style="display:flex;justify-content:space-between;padding:3px 0">' +
@@ -6991,8 +6998,8 @@ function ddYukle(symbol) {
       var html = "";
       html += ddSeviyeSatiri("Güncel Fiyat", guncelFiyat, "#e2e8f0");
       html += '<div id="dd-sr-satirlar" style="' + (ddSrAcik ? "" : "display:none") + '">' +
-        ddSeviyeSatiri("Destek", destek, "#3b82f6") +
-        ddSeviyeSatiri("Direnç", direnc, "#f59e0b") + '</div>';
+        ddSeviyeSatiri("Destek", ddSeviyeYaz(destek, guncelFiyat), "#3b82f6") +
+        ddSeviyeSatiri("Direnç", ddSeviyeYaz(direnc, guncelFiyat), "#f59e0b") + '</div>';
       html += ddSeviyeSatiri("RSI (14)", rsi, rsi <= 35 ? "#4ade80" : (rsi >= 65 ? "#f87171" : "#e2e8f0"));
 
       if (acikSinyal) {
