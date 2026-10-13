@@ -6501,6 +6501,10 @@ function srDurumGoster() {
     h += "Taranan coin listesi: <b>" + (d.liste_sayisi || 0) + "</b> &nbsp;|&nbsp; Seviyesi hesaplanan: <b>" + (d.seviyesi_hesaplanan_coin || 0) + "</b><br>";
     h += "Fiyatı alınan coin: <b>" + (d.son_fiyat_sayisi || 0) + "</b><br>";
     h += "Toplam bölge: <b>" + (d.toplam_bolge || 0) + "</b> &nbsp;|&nbsp; " + (ay.min_test || 3) + "+ test şartını geçen: <b>" + (d.test_sartini_gecen_bolge || 0) + "</b><br>";
+    var haric = d.haric_liste || [];
+    h += "Coin olmadığı için elenen (hisse/emtia/ETF): <b>" + haric.length + "</b>" +
+      (haric.length ? ' <span style="color:#64748b">(' + haric.slice(0, 40).join(", ").replace(/</g, "") + (haric.length > 40 ? ", ..." : "") + ')</span>' : "") +
+      ' <span style="color:#64748b">[kaynak: ' + String(d.haric_kaynak || "-").replace(/</g, "&lt;") + ']</span><br>';
     h += "Son bildirim: <b>" + (d.son_bildirim || "yok") + "</b> &nbsp;|&nbsp; Son 24 saatte bildirilen coin: <b>" + (d.son_24s_bildirilen_coin || 0) + "</b><br>";
     if (hata) {
       h += '<span style="color:#f87171">Hata: ' + String(hata).replace(/</g, "&lt;") + '</span>';
@@ -7287,7 +7291,7 @@ function ddPriceLinelerCiz(acikSinyal, destek, direnc) {
     ddPriceLines.push(ddSeries.createPriceLine({
       price: d, color: "#3b82f680", lineWidth: 1,
       lineStyle: LightweightCharts.LineStyle.Dotted,
-      axisLabelVisible: true, title: "Destek " + ekSayac
+      axisLabelVisible: true, title: "Destek"
     }));
     ekSayac++;
   }
@@ -7298,7 +7302,7 @@ function ddPriceLinelerCiz(acikSinyal, destek, direnc) {
     ddPriceLines.push(ddSeries.createPriceLine({
       price: r, color: "#f59e0b80", lineWidth: 1,
       lineStyle: LightweightCharts.LineStyle.Dotted,
-      axisLabelVisible: true, title: "Direnç " + ekSayac
+      axisLabelVisible: true, title: "Direnç"
     }));
     ekSayac++;
   }
