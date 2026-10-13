@@ -7032,6 +7032,7 @@ function ddYukle(symbol) {
         html += '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #1e293b;color:#475569">Bu coin icin su an acik bir sinyal yok.</div>';
       }
       bilgiKutu.innerHTML = html;
+      ddGrafikBoyutla();
 
       ddSonAcikSinyal = acikSinyal;
       ddSonDestekDeger = destek;
@@ -7201,6 +7202,18 @@ function ddIchimokuUygula() {
   }
 }
 
+// Grafigi ekranin kalan yuksekligine yayar (en az 400px): sekmeye girince
+// altta bos alan kalmasin. Bilgi satirlari (Guncel Fiyat, RSI, Acik Sinyal)
+// grafikten ONCE geldigi icin, onlar yuklenince de yeniden hesaplanir.
+function ddGrafikBoyutla() {
+  var kutu = document.getElementById("dd-chart");
+  if (!kutu || !ddChart) return;
+  var ustMesafe = kutu.getBoundingClientRect().top + (window.pageYOffset || 0);
+  var h = Math.max(400, Math.floor(window.innerHeight - ustMesafe - 16));
+  if (kutu.style.height !== h + "px") kutu.style.height = h + "px";
+  ddChart.applyOptions({ width: kutu.clientWidth, height: h });
+}
+
 function ddGrafikCiz(candleData, destek, direnc, coinDegisti) {
   var kutu = document.getElementById("dd-chart");
   var ilkOlusturma = !ddChart;
@@ -7217,10 +7230,12 @@ function ddGrafikCiz(candleData, destek, direnc, coinDegisti) {
       upColor: "#4ade80", downColor: "#f87171", borderVisible: false,
       wickUpColor: "#4ade80", wickDownColor: "#f87171"
     });
-    window.addEventListener("resize", function() { if (ddChart) ddChart.applyOptions({ width: kutu.clientWidth }); });
+    window.addEventListener("resize", function() { if (ddChart) { ddChart.applyOptions({ width: kutu.clientWidth }); ddGrafikBoyutla(); } });
     grafikOlcumAraciKur("dd-chart", function() { return ddChart; }, function() { return ddSeries; });
     grafikOhlcBilgisiKur("dd-chart", ddChart, function() { return ddSeries; });
   }
+
+  ddGrafikBoyutla();
 
   if (coinDegisti || ilkOlusturma) {
     // Yeni bir coin secildi (ya da ilk yukleme) - kutuphane fiyat eksenindeki
