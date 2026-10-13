@@ -686,6 +686,7 @@
         <span class="oda-sessiz-btn" data-oda="SR_BILDIRIM" onclick="odaSessizToggle('SR_BILDIRIM')">&#128276;</span>
         <span class="sessiz-durum-metin" data-oda="SR_BILDIRIM" style="font-size:12px;font-weight:600"></span>
       </div>
+      <div id="yonetici-sr-durum-icerik" style="margin-bottom:14px"></div>
       <div id="yonetici-bot-durumu-icerik" style="margin-bottom:14px"></div>
       <div id="yonetici-push-icerik" style="margin-bottom:14px"></div>
       <div id="yonetici-bakim-icerik" style="margin-bottom:14px"></div>
@@ -3427,7 +3428,7 @@ function yoneticiAltSekmeSec(tip) {
   document.getElementById("yonetici-genel-icerik").style.display = tip === "genel" ? "" : "none";
   document.getElementById("yonetici-bist-icerik").style.display = tip === "bist" ? "" : "none";
   if (tip === "bist") yoneticiBistAnalizGoster();
-  else { botDurumuGoster(); pushDurumGoster(); buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); guvenlikHaritasiGoster(); }
+  else { srDurumGoster(); botDurumuGoster(); pushDurumGoster(); buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); guvenlikHaritasiGoster(); }
 }
 
 function portfoyAltSekmeSec(tip) {
@@ -6298,7 +6299,7 @@ function sekmeAc(id, el) {
   if (id === "analiz") { kriptoAnalizGoster(); hisseAnalizGoster(); bistAnalizGoster(); }
   if (id === "yonetici") {
     if (yoneticiAltSekme === "bist") yoneticiBistAnalizGoster();
-    else { botDurumuGoster(); pushDurumGoster(); buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); guvenlikHaritasiGoster(); }
+    else { srDurumGoster(); botDurumuGoster(); pushDurumGoster(); buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); guvenlikHaritasiGoster(); }
   }
   if (id === "piyasa") altinFiyatlariGoster();
   if (id === "genelbakis") genelBakisDoldur("genelbakis-icerik");
@@ -6473,6 +6474,44 @@ function pushTestGonder() {
     }
   };
   xhr.onerror = function() { if (sonucEl) { sonucEl.style.color = "#f87171"; sonucEl.textContent = "Sunucuya ulasilamadi."; } };
+  xhr.send();
+}
+
+function srDurumGoster() {
+  var kutu = document.getElementById("yonetici-sr-durum-icerik");
+  if (!kutu) return;
+  function yaz(renk, ic) {
+    kutu.innerHTML = '<div class="section-title">Destek/Direnç Alarm Durumu</div>' +
+      '<div class="stat-card" style="border-left:3px solid ' + renk + ';font-size:12px;line-height:1.7">' + ic + '</div>';
+  }
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/admin/sr-bildirim-durum", true);
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status === 404) { yaz("#f87171", "Sunucuda bu özellik yok (404). Yeni main.py Railway'e yüklenmemiş olabilir."); return; }
+    if (xhr.status !== 200) { yaz("#f87171", "Durum alınamadı (kod " + xhr.status + ")."); return; }
+    var d;
+    try { d = JSON.parse(xhr.responseText); } catch (e) { yaz("#f87171", "Geçersiz yanıt."); return; }
+    var ay = d.ayarlar || {};
+    var hata = d.son_hata || "";
+    var renk = hata ? "#f87171" : (d.son_tarama ? "#4ade80" : "#fbbf24");
+    var h = "";
+    h += "Son tarama: <b>" + (d.son_tarama || "henüz yapılmadı") + "</b><br>";
+    h += "Taranan coin listesi: <b>" + (d.liste_sayisi || 0) + "</b> &nbsp;|&nbsp; Seviyesi hesaplanan: <b>" + (d.seviyesi_hesaplanan_coin || 0) + "</b><br>";
+    h += "Fiyatı alınan coin: <b>" + (d.son_fiyat_sayisi || 0) + "</b><br>";
+    h += "Toplam bölge: <b>" + (d.toplam_bolge || 0) + "</b> &nbsp;|&nbsp; " + (ay.min_test || 3) + "+ test şartını geçen: <b>" + (d.test_sartini_gecen_bolge || 0) + "</b><br>";
+    h += "Son bildirim: <b>" + (d.son_bildirim || "yok") + "</b> &nbsp;|&nbsp; Son 24 saatte bildirilen coin: <b>" + (d.son_24s_bildirilen_coin || 0) + "</b><br>";
+    if (hata) {
+      h += '<span style="color:#f87171">Hata: ' + String(hata).replace(/</g, "&lt;") + '</span>';
+      if (/451|restricted|region/i.test(hata)) h += '<br><span style="color:#fbbf24">Binance bu sunucunun bölgesini engelliyor olabilir.</span>';
+    } else if (!d.son_tarama) {
+      h += '<span style="color:#fbbf24">Tarama henüz başlamadı (sunucu açıldıktan ~1 dk sonra başlar).</span>';
+    } else {
+      h += '<span style="color:#4ade80">Hata yok.</span>';
+    }
+    yaz(renk, h);
+  };
+  xhr.onerror = function() { yaz("#f87171", "Sunucuya ulaşılamadı."); };
   xhr.send();
 }
 
