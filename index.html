@@ -640,6 +640,7 @@
       <button class="bot-btn" id="dd-zaman-1w" onclick="ddZamanDegistir('1w',this)">Haftalık</button>
       <button class="bot-btn" onclick="olcumAraciToggle(this,'dd-chart')" title="Olcum araci: grafikte suruklayin">📏 Olcum</button>
       <button class="bot-btn" id="dd-ichimoku-btn" onclick="ddIchimokuToggle(this)">TradeSinyalPro</button>
+      <button class="bot-btn" id="dd-sr-btn" onclick="ddSrToggle(this)">Oto-Destek/Direnç</button>
     </div>
     <div id="dd-seviye-bilgi" style="font-size:12.5px;color:#94a3b8;margin-bottom:10px;line-height:1.7"></div>
     <div id="dd-chart" style="width:100%;height:400px;border-radius:10px;overflow:hidden;background:#0a0f1e"></div>
@@ -6882,6 +6883,12 @@ function ddZamanDegistir(zaman, el) {
   var butonlar = document.querySelectorAll("#destekdirenc .bot-btn");
   for (var i = 0; i < butonlar.length; i++) butonlar[i].classList.remove("active");
   el.classList.add("active");
+  // Yukaridaki dongu TUM butonlarin "active" sinifini siliyor; acik olan
+  // gostergelerin (TradeSinyalPro, Oto-Destek/Direnç) vurgusunu geri koy
+  var ichBtn = document.getElementById("dd-ichimoku-btn");
+  if (ichBtn && ddIchimokuAcik) ichBtn.classList.add("active");
+  var srBtn = document.getElementById("dd-sr-btn");
+  if (srBtn && ddSrAcik) srBtn.classList.add("active");
   ddYukle(ddSeciliCoin);
 }
 
@@ -6979,8 +6986,9 @@ function ddYukle(symbol) {
 
       var html = "";
       html += ddSeviyeSatiri("Güncel Fiyat", guncelFiyat, "#e2e8f0");
-      html += ddSeviyeSatiri("Destek", destek, "#3b82f6");
-      html += ddSeviyeSatiri("Direnç", direnc, "#f59e0b");
+      html += '<div id="dd-sr-satirlar" style="' + (ddSrAcik ? "" : "display:none") + '">' +
+        ddSeviyeSatiri("Destek", destek, "#3b82f6") +
+        ddSeviyeSatiri("Direnç", direnc, "#f59e0b") + '</div>';
       html += ddSeviyeSatiri("RSI (14)", rsi, rsi <= 35 ? "#4ade80" : (rsi >= 65 ? "#f87171" : "#e2e8f0"));
 
       if (acikSinyal) {
@@ -7059,6 +7067,7 @@ function ddAcikSinyalDetayToggle() {
 // ICHIMOKU BULUTU (Destek/Direnc grafigi icin, isteğe bagli)
 // ============================================================
 var ddIchimokuAcik = false;
+var ddSrAcik = false; // "Oto-Destek/Direnç" butonu: varsayilan KAPALI, tiklayinca destek/direnç çizgileri çizilir
 var ddIchimokuSeriler = []; // her yeniden cizimde temizlenip yeniden olusturuluyor
 var ddSonMumlarHam = null;  // en son cekilen ham mum verisi (Ichimoku hesaplamak icin sakliyoruz)
 
@@ -7074,6 +7083,14 @@ var DD_ICHIMOKU_AYARLARI = {
   "1d":  { donusum: 3, temel: 40, oncuB: 45, gecikme: 1 },
   "1w":  { donusum: 3, temel: 40, oncuB: 45, gecikme: 1 }
 };
+
+function ddSrToggle(el) {
+  ddSrAcik = !ddSrAcik;
+  el.classList.toggle("active", ddSrAcik);
+  var satirlar = document.getElementById("dd-sr-satirlar");
+  if (satirlar) satirlar.style.display = ddSrAcik ? "" : "none";
+  ddPriceLinelerCiz(ddSonAcikSinyal, ddSonDestekDeger, ddSonDirencDeger);
+}
 
 function ddIchimokuToggle(el) {
   ddIchimokuAcik = !ddIchimokuAcik;
@@ -7241,6 +7258,7 @@ function ddPriceLinelerCiz(acikSinyal, destek, direnc) {
     }));
   }
 
+  if (ddSrAcik) {
   ekle(destek, "#3b82f6", "Destek");
   ekle(direnc, "#f59e0b", "Direnç");
 
@@ -7269,6 +7287,7 @@ function ddPriceLinelerCiz(acikSinyal, destek, direnc) {
     }));
     ekSayac++;
   }
+  } // ddSrAcik sonu
 
   // Giris/Hedef/Stop/E1/E2/E3 cizgileri, kullanicinin "Gizle" butonuyla
   // kapatabildigi ayni anahtara bagli - grafik cok kalabalik olup fiyat
