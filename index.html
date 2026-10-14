@@ -7931,6 +7931,8 @@ function girisBasarili() {
   erisimGuncelle();
   veriYukle();
   setInterval(veriYukle, 10000);
+  // Bildirime tiklayarak (site kapaliyken) acildiysa ilgili sekmeye/coine git
+  if (bekleyenGit) { var gitP = bekleyenGit; bekleyenGit = null; bildirimdenGit(gitP); }
 }
 
 function ziyaretKaydet(kullaniciAdi) {
@@ -8467,6 +8469,73 @@ function sayfaBaslat() {
     if (localStorage.getItem("ts_admin_cihazi") !== "1") ziyaretKaydet("misafir");
   };
   xhr.send();
+}
+
+// ==================== BILDIRIMDEN ILGILI YERE GIT ====================
+// Push bildirimi adresi: /?git=sinyal&bot=SINYAL_ODA_2&coin=SOLUSDT (Oda 1-4 bildirimleri),
+// /?git=dd&coin=SOLUSDT (Destek/Direnc alarmi), /?git=sekme&sekme=analiz (BIST vb.)
+var bekleyenGit = null;
+function gitParametreleriOku(aramaMetni) {
+  try {
+    var q = new URLSearchParams(aramaMetni || "");
+    var g = q.get("git");
+    if (!g) return null;
+    return { git: g, bot: q.get("bot") || "", coin: (q.get("coin") || "").toUpperCase(), sekme: q.get("sekme") || "" };
+  } catch (e) { return null; }
+}
+function sekmeButonuBul(sekmeId) {
+  var tablar = document.querySelectorAll("#tabs-alani .tab");
+  for (var i = 0; i < tablar.length; i++) {
+    if ((tablar[i].getAttribute("onclick") || "").indexOf("'" + sekmeId + "'") !== -1) return tablar[i];
+  }
+  return null;
+}
+function bildirimdenGit(p, deneme) {
+  if (!p) return;
+  deneme = deneme || 0;
+  // Giris/ilk veri henuz hazir degilse biraz bekle (en fazla ~10 sn)
+  if (!authToken) {
+    if (deneme < 40) setTimeout(function() { bildirimdenGit(p, deneme + 1); }, 250);
+    return;
+  }
+  var coinGecerli = /^[A-Z0-9]{2,20}$/.test(p.coin);
+  if (p.git === "sinyal" && coinGecerli && /^SINYAL_ODA_[1-4]$/.test(p.bot)) {
+    if (Object.keys(tumVeriler).length === 0 && deneme < 40) {
+      setTimeout(function() { bildirimdenGit(p, deneme + 1); }, 250);
+      return;
+    }
+    sinyaleGit(p.bot, p.coin);
+  } else if (p.git === "dd" && coinGecerli) {
+    var ddTab = sekmeButonuBul("destekdirenc");
+    if (!ddTab) return;
+    // Bu bildirim bir destek/direnc alarmi - cizgiler hemen gorunsun
+    var srBtn = document.getElementById("dd-sr-btn");
+    if (srBtn && !ddSrAcik) ddSrToggle(srBtn);
+    ddSeciliCoin = p.coin;
+    var ddEtiket = document.getElementById("dd-secili-coin");
+    if (ddEtiket) ddEtiket.textContent = p.coin;
+    var ddArama = document.getElementById("dd-arama");
+    if (ddArama) ddArama.value = "";
+    sekmeAc("destekdirenc", ddTab);
+  } else if (p.git === "sekme" && /^[a-z]{3,20}$/.test(p.sekme)) {
+    var sekmeTab = sekmeButonuBul(p.sekme);
+    if (sekmeTab) sekmeAc(p.sekme, sekmeTab);
+  }
+}
+(function() {
+  var p = gitParametreleriOku(window.location.search);
+  if (p) {
+    bekleyenGit = p;
+    try { window.history.replaceState(null, "", window.location.pathname); } catch (e) {}
+  }
+})();
+if ("serviceWorker" in navigator) {
+  // Site zaten aciksa bildirime tiklaninca service worker buraya mesaj yollar
+  navigator.serviceWorker.addEventListener("message", function(e) {
+    var d = e.data;
+    if (!d || d.tip !== "bildirim-git" || !d.url) return;
+    try { bildirimdenGit(gitParametreleriOku(new URL(d.url, window.location.origin).search)); } catch (err) {}
+  });
 }
 
 favoriYukle();
