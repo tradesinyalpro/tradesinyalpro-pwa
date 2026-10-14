@@ -299,7 +299,7 @@
       <p>Finansal kararlarınızı almadan önce, kendi araştırmanızı yapmanız ve yetkili finansal danışmanlardan destek almanız önemlidir. Piyasalarda yatırım yapmak risk içerir ve her yatırımcı kendi risklerini yönetmekten sorumludur.</p>
       <p>Kaldıraçlı işlemler, yatırılan anaparanın tamamının veya fazlasının kaybedilmesine yol açabilecek yüksek risk içerir.</p>
       <p>Geçmiş performans verileri gelecekteki sonuçların garantisi niteliğinde değildir.</p>
-      <p>TradeSinyalPro, paylaşılan veri, analiz veya sinyallerin kullanılması sonucu doğabilecek doğrudan veya dolaylı hiçbir kayıp veya zarardan sorumlu tutulamaz.</p>
+      <p>TradeSinyalPro, paylaşılan veri veya analizlerin kullanılması sonucu doğabilecek doğrudan veya dolaylı hiçbir kayıp veya zarardan sorumlu tutulamaz.</p>
       <p>Platforma kayıt olarak, 18 yaşından büyük olduğunuzu ve yukarıdaki şartları okuyup kabul ettiğinizi beyan etmiş olursunuz.</p>
     </div>
     <div style="padding:14px 18px;border-top:1px solid #1e293b;display:flex;gap:10px;justify-content:flex-end">
@@ -3475,7 +3475,7 @@ function portfoySimulasyonGoster() {
       '</div>' +
       '<div id="sim-ozet"></div>' +
       '<div id="sim-chart" style="width:100%;height:320px;border-radius:10px;overflow:hidden;background:#0a0f1e;margin-top:10px"></div>' +
-      '<div style="font-size:10.5px;color:#475569;margin-top:8px;line-height:1.5">Bu bir SIMULASYONDUR, gercek islem degildir. Her sinyalde bakiyenin belirttiginiz yuzdesinin risk edildigi ve 8x sabit kaldirac (odanin kendi seviyeleri uzerinden) varsayilarak GECMISE DONUK hesaplanmistir. Gecmis performans gelecegi garanti etmez, kisisel yatirim tavsiyesi degildir.</div>';
+      '<div style="font-size:10.5px;color:#475569;margin-top:8px;line-height:1.5">Bu bir SIMULASYONDUR, gercek islem degildir. Her veride bakiyenin belirttiginiz yuzdesinin risk edildigi ve 8x sabit kaldirac (odanin kendi seviyeleri uzerinden) varsayilarak GECMISE DONUK hesaplanmistir. Gecmis performans gelecegi garanti etmez, kisisel yatirim tavsiyesi degildir.</div>';
   }
   simHesapla();
 }
@@ -3544,7 +3544,7 @@ function simHesapla() {
   var chartKutu = document.getElementById("sim-chart");
   if (!egriVeri.length) {
     if (simChart) { try { simChart.remove(); } catch (e) {} simChart = null; simSeries = null; }
-    chartKutu.innerHTML = '<div class="empty" style="padding:30px 0;text-align:center">Bu oda için henüz kapanmış (BAŞARILI/BAŞARISIZ) sinyal yok</div>';
+    chartKutu.innerHTML = '<div class="empty" style="padding:30px 0;text-align:center">Bu oda için henüz kapanmış (BAŞARILI/BAŞARISIZ) veri yok</div>';
     return;
   }
   if (!simChart) {
@@ -3600,7 +3600,7 @@ function paperTradingGoster() {
   if (!kutu) return;
   if (!document.getElementById("paper-kartlar")) {
     kutu.innerHTML =
-      '<div style="font-size:10.5px;color:#64748b;margin-bottom:10px;line-height:1.5">Her oda 1000 USD sanal bakiye ile bu ozelligin yayina girdigi andan itibaren CANLI takip edilir. Her sinyal kapandiginda (BAŞARILI/BAŞARISIZ), bakiyenin %2\'si risk edilip 8x sabit kaldirac varsayimiyla bilesik olarak guncellenir - Oda Simulasyonu ile ayni formul, ama gecmise degil bugunden itibaren ileriye bakar. Bu bir SIMULASYONDUR, gercek islem degildir.</div>' +
+      '<div style="font-size:10.5px;color:#64748b;margin-bottom:10px;line-height:1.5">Her oda 1000 USD sanal bakiye ile bu ozelligin yayina girdigi andan itibaren CANLI takip edilir. Her veri kapandiginda (BAŞARILI/BAŞARISIZ), bakiyenin %2\'si risk edilip 8x sabit kaldirac varsayimiyla bilesik olarak guncellenir - Oda Simulasyonu ile ayni formul, ama gecmise degil bugunden itibaren ileriye bakar. Bu bir SIMULASYONDUR, gercek islem degildir.</div>' +
       '<div id="paper-kartlar" class="stats-grid" style="grid-template-columns:repeat(2,1fr)"></div>' +
       '<div id="paper-chart" style="width:100%;height:300px;border-radius:10px;overflow:hidden;background:#0a0f1e;margin-top:10px"></div>' +
       '<div id="paper-siralama" style="margin-top:14px"></div>';
@@ -3651,7 +3651,7 @@ function paperTradingGoster() {
     var herhangiVeri = odalar.some(function(b) { return (veri[b].egri || []).length > 0; });
     if (!herhangiVeri) {
       if (paperChart) { try { paperChart.remove(); } catch (e) {} paperChart = null; paperSeriesMap = {}; }
-      chartKutu.innerHTML = '<div class="empty" style="padding:30px 0;text-align:center">Henuz hicbir odada kapanmis (BAŞARILI/BAŞARISIZ) sinyal yok</div>';
+      chartKutu.innerHTML = '<div class="empty" style="padding:30px 0;text-align:center">Henuz hicbir odada kapanmis (BAŞARILI/BAŞARISIZ) veri yok</div>';
       return;
     }
     if (!paperChart) {
@@ -4201,7 +4201,7 @@ function sinyalleriGoster() {
       var yonRengi = yon === "LONG" ? "#22c55e" : "#ef4444";
       genisBilgiHtml += ddSeviyeSatiri("Guncel Fiyat", canliFiyat || "-", "#e2e8f0");
       genisBilgiHtml += '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #1e293b">' +
-        '<div style="font-weight:700;margin-bottom:4px">📍 Acik Sinyal: <span style="color:' + yonRengi + '">' + yon + '</span></div></div>';
+        '<div style="font-weight:700;margin-bottom:4px">📍 Açık Veri: <span style="color:' + yonRengi + '">' + yon + '</span></div></div>';
       genisBilgiHtml += ddSeviyeSatiri("Giris/Maliyet", (s.giris || s.maliyet || "-"), "#e2e8f0");
       genisBilgiHtml += ddSeviyeSatiri("Hedef (TP)", (s.hedef || "-"), "#4ade80");
       genisBilgiHtml += ddSeviyeSatiri("Stop", (s.stop || "-"), "#f87171");
@@ -4837,7 +4837,7 @@ function replayAc(bot, sembol, acilisZaman) {
     if (liste[i].sembol === sembol && liste[i].zaman === acilisZaman) { sinyal = liste[i]; break; }
   }
   if (!sinyal || (sinyal.durum !== "tp" && sinyal.durum !== "stop")) {
-    alert("Bu sinyal icin replay verisi bulunamadi.");
+    alert("Bu veri icin replay verisi bulunamadi.");
     return;
   }
   var acilisMs = turkiyeZamanindanMs(sinyal.zaman);
@@ -5961,7 +5961,7 @@ function coinAramaAktifKartHtml(s, bot) {
       (fr >= 0 ? "+" : "") + fr.toFixed(4) + '%</span>';
   }
 
-  var kart = '<div class="signal-card ' + cls + '" style="cursor:pointer" onclick="sinyaleGit(\'' + bot + '\',\'' + s.sembol + '\')" title="Veriler sekmesinde bu sinyale git">';
+  var kart = '<div class="signal-card ' + cls + '" style="cursor:pointer" onclick="sinyaleGit(\'' + bot + '\',\'' + s.sembol + '\')" title="Veriler sekmesinde bu veriye git">';
   kart += '<div class="sig-header"><div class="sig-symbol">#' + s.sembol + '</div>';
   kart += '<div class="sig-badges">' + pnlHtml + '<span class="badge ' + cls + '">' + yon + '</span><span class="badge bot">' + botAdi(bot) + '</span>' + fundingHtml + '</div></div>';
   kart += canliFiyatHtml;
@@ -6178,7 +6178,7 @@ function coinAramaTekSembolGoster(sembol) {
     }
   }
   if (aktifKartlar.length > 0) {
-    html += '<div class="section-title">Aktif Sinyaller (' + aktifKartlar.length + ')</div>';
+    html += '<div class="section-title">Aktif Veriler (' + aktifKartlar.length + ')</div>';
     html += aktifKartlar.join("");
   }
 
@@ -6577,7 +6577,7 @@ function yoneticiBistAnalizGoster() {
   // Once bir "yukleniyor" yer tutucusu koyuyoruz - boylece istek
   // basarisiz olsa bile kutu TAMAMEN BOS/GORUNMEZ kalmaz, en azindan
   // fonksiyonun calistigini goruruz.
-  kutu.innerHTML = '<div class="section-title">BIST Analiz (sadece bilgilendirici - al/sat sinyali degil)</div><div class="loading">Yukleniyor...</div>';
+  kutu.innerHTML = '<div class="section-title">BIST Analiz (sadece bilgilendirici - al/sat verisi degil)</div><div class="loading">Yukleniyor...</div>';
   var xhr = new XMLHttpRequest();
   xhr.open("GET", API + "/bist/analiz", true);
   xhr.setRequestHeader("X-Auth-Token", authToken || "");
@@ -6593,9 +6593,9 @@ function yoneticiBistAnalizGoster() {
       // hacim<2.0x) gecen sinyalleri gonderiyor - digerleri hic buraya
       // dusmuyor, bu yuzden eskisine gore cok daha az kayit gorunmesi
       // BEKLENEN/NORMAL bir durum, hata degil.
-      var html = '<div class="section-title">BIST Analiz — sadece ⭐ Yüksek Güvenli sinyaller (sadece bilgilendirici, al/sat sinyali değil)</div>';
+      var html = '<div class="section-title">BIST Analiz — sadece ⭐ Yüksek Güvenli veriler (sadece bilgilendirici, al/sat verisi değil)</div>';
       if (kayitlar.length === 0) {
-        html += '<div class="empty" style="padding:10px 0">Henuz yuksek guvenli bir sinyal yok (borsa kapaliyken, fiyat henuz bir seviyeye yaklasmadiysa, veya yaklasan hisseler filtre esigini (RSI<=30 ve hacim<2.0x) gecmediyse normaldir)</div>';
+        html += '<div class="empty" style="padding:10px 0">Henuz yuksek guvenli bir veri yok (borsa kapaliyken, fiyat henuz bir seviyeye yaklasmadiysa, veya yaklasan hisseler filtre esigini (RSI<=30 ve hacim<2.0x) gecmediyse normaldir)</div>';
         kutu.innerHTML = html;
         return;
       }
@@ -6638,7 +6638,7 @@ function yoneticiBistAnalizGoster() {
         var renk = k.tip === "destek" ? "#4ade80" : "#f87171";
         var rsiMetin = k.rsi != null ? k.rsi : "-";
         var hacimMetin = k.hacim_orani != null ? (k.hacim_orani + "x") : "-";
-        var guvenEtiketi = k.yuksek_guven ? ' <span class="badge" style="background:#facc1522;color:#facc15" title="Backtest sonucuna gore (RSI<=30 ve hacim<2.0x) daha guvenilir bulunan sinyal turu - yine de al/sat tavsiyesi degildir">⭐ Yüksek Güven</span>' : '';
+        var guvenEtiketi = k.yuksek_guven ? ' <span class="badge" style="background:#facc1522;color:#facc15" title="Backtest sonucuna gore (RSI<=30 ve hacim<2.0x) daha guvenilir bulunan veri turu - yine de al/sat tavsiyesi degildir">⭐ Yüksek Güven</span>' : '';
         html += '<div class="signal-card" style="margin-bottom:6px;padding:10px 14px">' +
           '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">' +
           '<span style="font-weight:600;font-size:13px">#' + k.sembol + guvenEtiketi + '</span>' +
@@ -7028,7 +7028,7 @@ function ddYukle(symbol) {
 
         html += '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #1e293b">' +
           '<div style="font-weight:700;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">' +
-          '<span id="dd-acik-sinyal-baslik" style="' + (ddAcikSinyalDetayGizli ? "display:none" : "") + '">📍 Açık Sinyal: <span style="color:' + yonRengi + '">' + acikSinyal.yon + '</span></span>' +
+          '<span id="dd-acik-sinyal-baslik" style="' + (ddAcikSinyalDetayGizli ? "display:none" : "") + '">📍 Açık Veri: <span style="color:' + yonRengi + '">' + acikSinyal.yon + '</span></span>' +
           '<span onclick="ddAcikSinyalDetayToggle()" style="cursor:pointer;color:#64748b;font-size:12px;font-weight:400;display:flex;align-items:center;gap:4px;margin-left:auto">' +
           '<span id="dd-acik-sinyal-toggle-yazi">' + (ddAcikSinyalDetayGizli ? "Göster" : "Gizle") + '</span>' +
           '<svg id="dd-acik-sinyal-toggle-ikon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
@@ -7040,7 +7040,7 @@ function ddYukle(symbol) {
           '<div id="dd-acik-sinyal-detay" style="' + (ddAcikSinyalDetayGizli ? "display:none" : "") + '">' + detayHtml + '</div>' +
           '</div>';
       } else {
-        html += '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #1e293b;color:#475569">Bu coin icin su an acik bir sinyal yok.</div>';
+        html += '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #1e293b;color:#475569">Bu coin için şu an açık veri yok.</div>';
       }
       bilgiKutu.innerHTML = html;
       ddGrafikBoyutla();
@@ -7050,7 +7050,7 @@ function ddYukle(symbol) {
       ddSonDirencDeger = direnc;
       ddPriceLinelerCiz(acikSinyal, destek, direnc);
     };
-    xhr2.onerror = function() { bilgiKutu.innerHTML = '<div class="empty">Sinyal verisi alinamadi</div>'; };
+    xhr2.onerror = function() { bilgiKutu.innerHTML = '<div class="empty">Veri alinamadi</div>'; };
     xhr2.send();
   };
   xhr.onerror = function() { bilgiKutu.innerHTML = '<div class="empty">Binance verisi alinamadi</div>'; };
