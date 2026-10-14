@@ -29,6 +29,10 @@ self.addEventListener("push", function(event) {
   event.waitUntil(self.registration.showNotification(baslik, secenekler));
 });
 
+// Bildirime tiklaninca: site ZATEN aciksa yeni pencere/sekme ACILMAZ - mevcut
+// pencere one getirilir ve sayfaya "bildirim-git" mesaji gonderilir (sayfa
+// kendi icinde ilgili sekmeye/coine gecer). Site kapaliysa bildirimin adresiyle
+// (orn. /?git=dd&coin=SOLUSDT) yeni pencere acilir, sayfa acilista adresi okur.
 self.addEventListener("notificationclick", function(event) {
   event.notification.close();
   var hedefUrl = (event.notification.data && event.notification.data.url) || "/";
@@ -36,7 +40,12 @@ self.addEventListener("notificationclick", function(event) {
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function(clientList) {
       for (var i = 0; i < clientList.length; i++) {
         var c = clientList[i];
-        if ("focus" in c) return c.focus();
+        if ("focus" in c) {
+          var mesajGonder = function() {
+            try { c.postMessage({ tip: "bildirim-git", url: hedefUrl }); } catch (e) {}
+          };
+          return c.focus().then(mesajGonder, mesajGonder);
+        }
       }
       if (self.clients.openWindow) return self.clients.openWindow(hedefUrl);
     })
