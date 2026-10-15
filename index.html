@@ -8511,6 +8511,16 @@ function bildirimdenGit(p, deneme) {
     // Bu bildirim bir destek/direnc alarmi - cizgiler hemen gorunsun
     var srBtn = document.getElementById("dd-sr-btn");
     if (srBtn && !ddSrAcik) ddSrToggle(srBtn);
+    // Bildirimdeki seviyeler 1 saatlik mumlardan hesaplaniyor - grafik de 1 saatlik acilsin
+    ddSeciliZaman = "1h";
+    var ddZamanButonlari = document.querySelectorAll("#destekdirenc .bot-btn");
+    for (var zi = 0; zi < ddZamanButonlari.length; zi++) ddZamanButonlari[zi].classList.remove("active");
+    var dd1sBtn = document.getElementById("dd-zaman-1h");
+    if (dd1sBtn) dd1sBtn.classList.add("active");
+    var ddIchBtnGit = document.getElementById("dd-ichimoku-btn");
+    if (ddIchBtnGit && ddIchimokuAcik) ddIchBtnGit.classList.add("active");
+    var ddSrBtnGit = document.getElementById("dd-sr-btn");
+    if (ddSrBtnGit && ddSrAcik) ddSrBtnGit.classList.add("active");
     ddSeciliCoin = p.coin;
     var ddEtiket = document.getElementById("dd-secili-coin");
     if (ddEtiket) ddEtiket.textContent = p.coin;
