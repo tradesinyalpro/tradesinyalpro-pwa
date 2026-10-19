@@ -679,6 +679,7 @@
     <div class="bot-filter" style="margin-bottom:10px">
       <button class="bot-btn active" id="yonetici-alt-genel" onclick="yoneticiAltSekmeSec('genel')">Genel</button>
       <button class="bot-btn" id="yonetici-alt-bist" onclick="yoneticiAltSekmeSec('bist')">BIST Analiz</button>
+      <button class="bot-btn" id="yonetici-alt-pozisyon" onclick="yoneticiAltSekmeSec('pozisyon')">Pozisyonlar</button>
     </div>
 
     <div id="yonetici-genel-icerik">
@@ -688,7 +689,6 @@
         <span class="sessiz-durum-metin" data-oda="SR_BILDIRIM" style="font-size:12px;font-weight:600"></span>
       </div>
       <div id="yonetici-sr-durum-icerik" style="margin-bottom:14px"></div>
-      <div id="yonetici-sr-kayit-icerik" style="margin-bottom:14px"></div>
       <div id="yonetici-bot-durumu-icerik" style="margin-bottom:14px"></div>
       <div id="yonetici-push-icerik" style="margin-bottom:14px"></div>
       <div id="yonetici-bakim-icerik" style="margin-bottom:14px"></div>
@@ -708,6 +708,10 @@
       </div>
       <div id="yonetici-harita-icerik"></div>
       <div id="yonetici-bekleyen-icerik"><div class="loading">Yukleniyor...</div></div>
+    </div>
+
+    <div id="yonetici-pozisyon-icerik" style="display:none">
+      <div id="yonetici-sr-kayit-icerik" style="margin-bottom:14px"></div>
     </div>
 
     <div id="yonetici-bist-icerik" style="display:none">
@@ -3427,10 +3431,13 @@ function yoneticiAltSekmeSec(tip) {
   yoneticiAltSekme = tip;
   document.getElementById("yonetici-alt-genel").classList.toggle("active", tip === "genel");
   document.getElementById("yonetici-alt-bist").classList.toggle("active", tip === "bist");
+  document.getElementById("yonetici-alt-pozisyon").classList.toggle("active", tip === "pozisyon");
+  document.getElementById("yonetici-pozisyon-icerik").style.display = tip === "pozisyon" ? "" : "none";
   document.getElementById("yonetici-genel-icerik").style.display = tip === "genel" ? "" : "none";
   document.getElementById("yonetici-bist-icerik").style.display = tip === "bist" ? "" : "none";
   if (tip === "bist") yoneticiBistAnalizGoster();
-  else { srDurumGoster(); srKayitlariGoster(); botDurumuGoster(); pushDurumGoster(); buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); guvenlikHaritasiGoster(); }
+  else if (tip === "pozisyon") srKayitlariGoster();
+  else { srDurumGoster(); botDurumuGoster(); pushDurumGoster(); buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); guvenlikHaritasiGoster(); }
 }
 
 function portfoyAltSekmeSec(tip) {
@@ -6301,7 +6308,8 @@ function sekmeAc(id, el) {
   if (id === "analiz") { kriptoAnalizGoster(); hisseAnalizGoster(); bistAnalizGoster(); }
   if (id === "yonetici") {
     if (yoneticiAltSekme === "bist") yoneticiBistAnalizGoster();
-    else { srDurumGoster(); srKayitlariGoster(); botDurumuGoster(); pushDurumGoster(); buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); guvenlikHaritasiGoster(); }
+    else if (yoneticiAltSekme === "pozisyon") srKayitlariGoster();
+    else { srDurumGoster(); botDurumuGoster(); pushDurumGoster(); buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); guvenlikHaritasiGoster(); }
   }
   if (id === "piyasa") altinFiyatlariGoster();
   if (id === "genelbakis") genelBakisDoldur("genelbakis-icerik");
@@ -6553,7 +6561,8 @@ function srKayitlariGoster() {
     var sunucuZaman = d.sunucu_zamani || (Date.now() / 1000);
     var h = '<div class="section-title">Pozisyon Bildirimleri (butona basılmazsa ' + Math.round((d.sure_sn || 14400) / 3600) + ' saat sonra silinir)</div>';
     h += '<div class="stat-card" style="margin-bottom:8px;font-size:13px">🎯 Hedef: <b style="color:#4ade80">' + hedef +
-      '</b> &nbsp;|&nbsp; 🛑 Stop: <b style="color:#f87171">' + stop + '</b> &nbsp;|&nbsp; Hedef oranı: <b>' + (oran === "-" ? "-" : "%" + oran) + '</b></div>';
+      '</b> &nbsp;|&nbsp; 🛑 Stop: <b style="color:#f87171">' + stop + '</b> &nbsp;|&nbsp; Hedef oranı: <b>' + (oran === "-" ? "-" : "%" + oran) + '</b>' +
+      ' &nbsp; <button onclick="srSayacSifirla()" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:3px 8px;border-radius:8px;font-size:11px;cursor:pointer">Sayaçları sıfırla</button></div>';
     var k = d.kayitlar || [];
     if (!k.length) {
       h += '<div class="empty" style="padding:10px 0">Şu an bekleyen bildirim kartı yok.</div>';
@@ -6581,6 +6590,19 @@ function srKayitlariGoster() {
   xhr.send();
 }
 
+function srSayacSifirla() {
+  if (!confirm("Hedef ve stop sayaçları sıfırlansın mı? Bu geri alınamaz.")) return;
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/admin/sr-sayac-sifirla", true);
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status !== 200) alert("Sayaçlar sıfırlanamadı (kod " + xhr.status + ").");
+    srKayitlariGoster();
+  };
+  xhr.onerror = function() { alert("Sunucuya ulaşılamadı."); };
+  xhr.send();
+}
+
 function srKayitSonuc(id, sonuc) {
   var xhr = new XMLHttpRequest();
   xhr.open("POST", API + "/admin/sr-kayit-sonuc", true);
@@ -6599,7 +6621,7 @@ function srKayitSonuc(id, sonuc) {
 // Yönetici sekmesi açıkken kartlar kendiliğinden tazelenir (yeni bildirim gelince görünsün)
 setInterval(function() {
   var y = document.getElementById("yonetici");
-  if (y && y.style.display === "block" && yoneticiAltSekme === "genel" && !document.hidden) srKayitlariGoster();
+  if (y && y.style.display === "block" && yoneticiAltSekme === "pozisyon" && !document.hidden) srKayitlariGoster();
 }, 20000);
 
 function botDurumuGoster() {
