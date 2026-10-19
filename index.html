@@ -688,6 +688,7 @@
         <span class="sessiz-durum-metin" data-oda="SR_BILDIRIM" style="font-size:12px;font-weight:600"></span>
       </div>
       <div id="yonetici-sr-durum-icerik" style="margin-bottom:14px"></div>
+      <div id="yonetici-sr-kayit-icerik" style="margin-bottom:14px"></div>
       <div id="yonetici-bot-durumu-icerik" style="margin-bottom:14px"></div>
       <div id="yonetici-push-icerik" style="margin-bottom:14px"></div>
       <div id="yonetici-bakim-icerik" style="margin-bottom:14px"></div>
@@ -3429,7 +3430,7 @@ function yoneticiAltSekmeSec(tip) {
   document.getElementById("yonetici-genel-icerik").style.display = tip === "genel" ? "" : "none";
   document.getElementById("yonetici-bist-icerik").style.display = tip === "bist" ? "" : "none";
   if (tip === "bist") yoneticiBistAnalizGoster();
-  else { srDurumGoster(); botDurumuGoster(); pushDurumGoster(); buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); guvenlikHaritasiGoster(); }
+  else { srDurumGoster(); srKayitlariGoster(); botDurumuGoster(); pushDurumGoster(); buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); guvenlikHaritasiGoster(); }
 }
 
 function portfoyAltSekmeSec(tip) {
@@ -6300,7 +6301,7 @@ function sekmeAc(id, el) {
   if (id === "analiz") { kriptoAnalizGoster(); hisseAnalizGoster(); bistAnalizGoster(); }
   if (id === "yonetici") {
     if (yoneticiAltSekme === "bist") yoneticiBistAnalizGoster();
-    else { srDurumGoster(); botDurumuGoster(); pushDurumGoster(); buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); guvenlikHaritasiGoster(); }
+    else { srDurumGoster(); srKayitlariGoster(); botDurumuGoster(); pushDurumGoster(); buyumePaneliGoster(); bakimModuGoster(); guvenlikPaneliGoster(); guvenlikHaritasiGoster(); }
   }
   if (id === "piyasa") altinFiyatlariGoster();
   if (id === "genelbakis") genelBakisDoldur("genelbakis-icerik");
@@ -6519,6 +6520,87 @@ function srDurumGoster() {
   xhr.onerror = function() { yaz("#f87171", "Sunucuya ulaşılamadı."); };
   xhr.send();
 }
+
+// ---- Destek/Direnç bildirim kartları (sadece admin) ----
+// Sunucu her giden bildirim için bir kart tutar. Butonlar: "Hedef oldu" / "Stop oldu" (kart silinir, sayaç artar,
+// aynı coinden yeni bildirim için 4 saat beklemek gerekmez), "Pozisyona girmedim (sil)" (kart silinir, sayaç
+// değişmez, bekleme sürer). Butona basılmayan kart 4 saat sonra kendiliğinden silinir; sayaçlar silinmez.
+function srFiyatYaz(f) {
+  f = Number(f);
+  if (!isFinite(f)) return "-";
+  if (f >= 100) return f.toFixed(2);
+  if (f >= 1) return f.toFixed(4);
+  if (f >= 0.01) return f.toFixed(5);
+  return f.toFixed(8);
+}
+
+function srKayitlariGoster() {
+  var kutu = document.getElementById("yonetici-sr-kayit-icerik");
+  if (!kutu) return;
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/admin/sr-kayitlar", true);
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status !== 200) {
+      kutu.innerHTML = '<div class="section-title">Pozisyon Bildirimleri</div><div class="empty" style="padding:10px 0">Kayıtlar alınamadı (kod ' + xhr.status + ').</div>';
+      return;
+    }
+    var d;
+    try { d = JSON.parse(xhr.responseText); } catch (e) { return; }
+    var sayac = d.sayac || {};
+    var hedef = sayac.hedef || 0, stop = sayac.stop || 0, toplam = hedef + stop;
+    var oran = toplam > 0 ? (hedef * 100 / toplam).toFixed(1) : "-";
+    var sunucuZaman = d.sunucu_zamani || (Date.now() / 1000);
+    var h = '<div class="section-title">Pozisyon Bildirimleri (butona basılmazsa ' + Math.round((d.sure_sn || 14400) / 3600) + ' saat sonra silinir)</div>';
+    h += '<div class="stat-card" style="margin-bottom:8px;font-size:13px">🎯 Hedef: <b style="color:#4ade80">' + hedef +
+      '</b> &nbsp;|&nbsp; 🛑 Stop: <b style="color:#f87171">' + stop + '</b> &nbsp;|&nbsp; Hedef oranı: <b>' + (oran === "-" ? "-" : "%" + oran) + '</b></div>';
+    var k = d.kayitlar || [];
+    if (!k.length) {
+      h += '<div class="empty" style="padding:10px 0">Şu an bekleyen bildirim kartı yok.</div>';
+    }
+    for (var i = 0; i < k.length; i++) {
+      var x = k[i];
+      var lMi = x.yon === "LONG";
+      var renk = lMi ? "#4ade80" : "#f87171";
+      var dk = Math.max(0, Math.floor((sunucuZaman - x.zaman) / 60));
+      var once = dk < 1 ? "az önce" : (dk < 60 ? dk + " dk önce" : Math.floor(dk / 60) + " sa " + (dk % 60) + " dk önce");
+      var coin = String(x.sembol || "").replace(/[<>&"]/g, "");
+      var btn = 'style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;margin:4px 6px 0 0"';
+      h += '<div class="stat-card" style="margin-bottom:8px;border-left:3px solid ' + renk + ';font-size:12px;line-height:1.7">' +
+        '<div style="font-size:14px"><b>' + (lMi ? '🟢 LONG' : '🔴 SHORT') + ' · ' + coin + '</b> <span style="color:#64748b;font-size:11px">' + once + '</span></div>' +
+        (lMi ? 'Destek' : 'Direnç') + ': <b>' + srFiyatYaz(x.seviye) + '</b> &nbsp;|&nbsp; Giriş (bildirim fiyatı): <b>' + srFiyatYaz(x.fiyat) + '</b> &nbsp;|&nbsp; 15 dk RSI: <b>' + Number(x.rsi).toFixed(1) + '</b><br>' +
+        '🎯 Hedef: <b>' + srFiyatYaz(x.hedef) + '</b> &nbsp;|&nbsp; 🛑 Stop: <b>' + srFiyatYaz(x.stop) + '</b><br>' +
+        '<button ' + btn + ' onclick="srKayitSonuc(' + x.id + ',\'hedef\')">🎯 Hedef oldu</button>' +
+        '<button ' + btn + ' onclick="srKayitSonuc(' + x.id + ',\'stop\')">🛑 Stop oldu</button>' +
+        '<button ' + btn + ' onclick="srKayitSonuc(' + x.id + ',\'sil\')">🗑 Pozisyona girmedim (sil)</button>' +
+        '</div>';
+    }
+    kutu.innerHTML = h;
+  };
+  xhr.onerror = function() {};
+  xhr.send();
+}
+
+function srKayitSonuc(id, sonuc) {
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/admin/sr-kayit-sonuc", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status !== 200 && xhr.status !== 404) {
+      alert("Kayıt yapılamadı (kod " + xhr.status + ").");
+    }
+    srKayitlariGoster();
+  };
+  xhr.onerror = function() { alert("Sunucuya ulaşılamadı."); };
+  xhr.send(JSON.stringify({ id: id, sonuc: sonuc }));
+}
+
+// Yönetici sekmesi açıkken kartlar kendiliğinden tazelenir (yeni bildirim gelince görünsün)
+setInterval(function() {
+  var y = document.getElementById("yonetici");
+  if (y && y.style.display === "block" && yoneticiAltSekme === "genel" && !document.hidden) srKayitlariGoster();
+}, 20000);
 
 function botDurumuGoster() {
   var kutu = document.getElementById("yonetici-bot-durumu-icerik");
