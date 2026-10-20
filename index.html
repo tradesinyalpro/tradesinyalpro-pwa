@@ -6558,11 +6558,24 @@ function srKayitlariGoster() {
     var sayac = d.sayac || {};
     var hedef = sayac.hedef || 0, stop = sayac.stop || 0, toplam = hedef + stop;
     var oran = toplam > 0 ? (hedef * 100 / toplam).toFixed(1) : "-";
+    var oto = d.otomatik || {};
+    var oL = oto.LONG || {}, oS = oto.SHORT || {};
+    var oHedef = (oL.hedef || 0) + (oS.hedef || 0), oStop = (oL.stop || 0) + (oS.stop || 0), oToplam = oHedef + oStop;
+    var oOran = oToplam > 0 ? (oHedef * 100 / oToplam).toFixed(1) : "-";
+    function yonOran(o) { var t = (o.hedef || 0) + (o.stop || 0); return t > 0 ? "%" + ((o.hedef || 0) * 100 / t).toFixed(1) + " (" + t + ")" : "-"; }
     var sunucuZaman = d.sunucu_zamani || (Date.now() / 1000);
-    var h = '<div class="section-title">Pozisyon Bildirimleri (butona basılmazsa ' + Math.round((d.sure_sn || 14400) / 3600) + ' saat sonra silinir)</div>';
-    h += '<div class="stat-card" style="margin-bottom:8px;font-size:13px">🎯 Hedef: <b style="color:#4ade80">' + hedef +
+    var sifBtn = 'style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:3px 8px;border-radius:8px;font-size:11px;cursor:pointer"';
+    var h = '<div class="section-title">Otomatik Takip (sunucu, her bildirim için)</div>';
+    h += '<div class="stat-card" style="margin-bottom:8px;font-size:13px;line-height:1.8">' +
+      '🎯 Hedef: <b style="color:#4ade80">' + oHedef + '</b> &nbsp;|&nbsp; 🛑 Stop: <b style="color:#f87171">' + oStop +
+      '</b> &nbsp;|&nbsp; Hedef oranı: <b>' + (oOran === "-" ? "-" : "%" + oOran) + '</b> &nbsp;|&nbsp; Sonuçsuz: <b>' + (oto.sonucsuz || 0) + '</b> &nbsp;|&nbsp; Şu an takipte: <b>' + (d.takipteki || 0) + '</b><br>' +
+      '<span style="font-size:11px;color:#94a3b8">LONG hedef oranı: ' + yonOran(oL) + ' &nbsp;|&nbsp; SHORT hedef oranı: ' + yonOran(oS) + '</span><br>' +
+      '<span style="font-size:11px;color:#64748b">Başa baş için yaklaşık %81 hedef oranı gerekir (komisyon dahil). Aynı mumda hem hedef hem stop değerse stop sayılır. 24 saatte sonuçlanmazsa "sonuçsuz" sayılır.</span> ' +
+      '<button ' + sifBtn + ' onclick="srSayacSifirla(\'otomatik\')">Otomatik sayaçları sıfırla</button></div>';
+    h += '<div class="section-title">Pozisyon Bildirimleri (butona basılmazsa ' + Math.round((d.sure_sn || 14400) / 3600) + ' saat sonra silinir)</div>';
+    h += '<div class="stat-card" style="margin-bottom:8px;font-size:13px">Benim işaretlediklerim — 🎯 Hedef: <b style="color:#4ade80">' + hedef +
       '</b> &nbsp;|&nbsp; 🛑 Stop: <b style="color:#f87171">' + stop + '</b> &nbsp;|&nbsp; Hedef oranı: <b>' + (oran === "-" ? "-" : "%" + oran) + '</b>' +
-      ' &nbsp; <button onclick="srSayacSifirla()" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:3px 8px;border-radius:8px;font-size:11px;cursor:pointer">Sayaçları sıfırla</button></div>';
+      ' &nbsp; <button ' + sifBtn + ' onclick="srSayacSifirla(\'manuel\')">Sayaçları sıfırla</button></div>';
     var k = d.kayitlar || [];
     if (!k.length) {
       h += '<div class="empty" style="padding:10px 0">Şu an bekleyen bildirim kartı yok.</div>';
@@ -6575,14 +6588,24 @@ function srKayitlariGoster() {
       var once = dk < 1 ? "az önce" : (dk < 60 ? dk + " dk önce" : Math.floor(dk / 60) + " sa " + (dk % 60) + " dk önce");
       var coin = String(x.sembol || "").replace(/[<>&"]/g, "");
       var btn = 'style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;margin:4px 6px 0 0"';
+      var durum, butonlar;
+      if (x.otomatik) {
+        var sa = new Date((x.otomatik_zaman || 0) * 1000).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+        durum = x.otomatik === "hedef"
+          ? '<span style="color:#4ade80">✅ Hedef oldu (otomatik, ' + sa + ')</span>'
+          : '<span style="color:#f87171">❌ Stop oldu (otomatik, ' + sa + ')</span>';
+        butonlar = '<button ' + btn + ' onclick="srKayitSonuc(' + x.id + ',\'sil\')">🗑 Kartı sil</button>';
+      } else {
+        durum = '<span style="color:#fbbf24">⏳ Takipte</span>';
+        butonlar = '<button ' + btn + ' onclick="srKayitSonuc(' + x.id + ',\'hedef\')">🎯 Hedef oldu</button>' +
+          '<button ' + btn + ' onclick="srKayitSonuc(' + x.id + ',\'stop\')">🛑 Stop oldu</button>' +
+          '<button ' + btn + ' onclick="srKayitSonuc(' + x.id + ',\'sil\')">🗑 Pozisyona girmedim (sil)</button>';
+      }
       h += '<div class="stat-card" style="margin-bottom:8px;border-left:3px solid ' + renk + ';font-size:12px;line-height:1.7">' +
         '<div style="font-size:14px"><b>' + (lMi ? '🟢 LONG' : '🔴 SHORT') + ' · ' + coin + '</b> <span style="color:#64748b;font-size:11px">' + once + '</span></div>' +
         (lMi ? 'Destek' : 'Direnç') + ': <b>' + srFiyatYaz(x.seviye) + '</b> &nbsp;|&nbsp; Giriş (bildirim fiyatı): <b>' + srFiyatYaz(x.fiyat) + '</b> &nbsp;|&nbsp; 15 dk RSI: <b>' + Number(x.rsi).toFixed(1) + '</b><br>' +
-        '🎯 Hedef: <b>' + srFiyatYaz(x.hedef) + '</b> &nbsp;|&nbsp; 🛑 Stop: <b>' + srFiyatYaz(x.stop) + '</b><br>' +
-        '<button ' + btn + ' onclick="srKayitSonuc(' + x.id + ',\'hedef\')">🎯 Hedef oldu</button>' +
-        '<button ' + btn + ' onclick="srKayitSonuc(' + x.id + ',\'stop\')">🛑 Stop oldu</button>' +
-        '<button ' + btn + ' onclick="srKayitSonuc(' + x.id + ',\'sil\')">🗑 Pozisyona girmedim (sil)</button>' +
-        '</div>';
+        '🎯 Hedef: <b>' + srFiyatYaz(x.hedef) + '</b> &nbsp;|&nbsp; 🛑 Stop: <b>' + srFiyatYaz(x.stop) + '</b> &nbsp;|&nbsp; ' + durum + '<br>' +
+        butonlar + '</div>';
     }
     kutu.innerHTML = h;
   };
@@ -6590,17 +6613,19 @@ function srKayitlariGoster() {
   xhr.send();
 }
 
-function srSayacSifirla() {
-  if (!confirm("Hedef ve stop sayaçları sıfırlansın mı? Bu geri alınamaz.")) return;
+function srSayacSifirla(hangisi) {
+  var metin = hangisi === "otomatik" ? "OTOMATİK takip sayaçları (hedef, stop, sonuçsuz) sıfırlansın mı? Bu geri alınamaz." : "Benim işaretlediğim hedef ve stop sayaçları sıfırlansın mı? Bu geri alınamaz.";
+  if (!confirm(metin)) return;
   var xhr = new XMLHttpRequest();
   xhr.open("POST", API + "/admin/sr-sayac-sifirla", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
   xhr.setRequestHeader("X-Auth-Token", authToken || "");
   xhr.onload = function() {
     if (xhr.status !== 200) alert("Sayaçlar sıfırlanamadı (kod " + xhr.status + ").");
     srKayitlariGoster();
   };
   xhr.onerror = function() { alert("Sunucuya ulaşılamadı."); };
-  xhr.send();
+  xhr.send(JSON.stringify({ hangisi: hangisi }));
 }
 
 function srKayitSonuc(id, sonuc) {
