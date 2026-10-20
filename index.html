@@ -6580,8 +6580,10 @@ function srKayitlariGoster() {
     if (!k.length) {
       h += '<div class="empty" style="padding:10px 0">Şu an bekleyen bildirim kartı yok.</div>';
     }
+    srKartlar = {};
     for (var i = 0; i < k.length; i++) {
       var x = k[i];
+      srKartlar[x.id] = x;
       var lMi = x.yon === "LONG";
       var renk = lMi ? "#4ade80" : "#f87171";
       var dk = Math.max(0, Math.floor((sunucuZaman - x.zaman) / 60));
@@ -6605,7 +6607,7 @@ function srKayitlariGoster() {
         '<div style="font-size:14px"><b>' + (lMi ? '🟢 LONG' : '🔴 SHORT') + ' · ' + coin + '</b> <span style="color:#64748b;font-size:11px">' + once + '</span></div>' +
         (lMi ? 'Destek' : 'Direnç') + ': <b>' + srFiyatYaz(x.seviye) + '</b> &nbsp;|&nbsp; Giriş (bildirim fiyatı): <b>' + srFiyatYaz(x.fiyat) + '</b> &nbsp;|&nbsp; 15 dk RSI: <b>' + Number(x.rsi).toFixed(1) + '</b><br>' +
         '🎯 Hedef: <b>' + srFiyatYaz(x.hedef) + '</b> &nbsp;|&nbsp; 🛑 Stop: <b>' + srFiyatYaz(x.stop) + '</b> &nbsp;|&nbsp; ' + durum + '<br>' +
-        butonlar + '</div>';
+        butonlar + '<button ' + btn + ' onclick="srPaylas(' + x.id + ')">📣 Paylaşım metni</button></div>';
     }
     kutu.innerHTML = h;
   };
@@ -6641,6 +6643,218 @@ function srKayitSonuc(id, sonuc) {
   };
   xhr.onerror = function() { alert("Sunucuya ulaşılamadı."); };
   xhr.send(JSON.stringify({ id: id, sonuc: sonuc }));
+}
+
+// ---- Paylaşım metni üretici (X / Twitter için, sadece admin) ----
+// Kartın "📣 Paylaşım metni" butonu bir pencere açar. Metin her seferinde farklı cümle parçalarından kurulur,
+// elle düzenlenebilir; "Kopyala" panoya alır, "X'te aç" tweet yazma ekranını metin dolu açar (paylaşımı sen yaparsın).
+// Her metnin SONUNDA sabit uyarı cümlesi vardır.
+var srKartlar = {};
+var srPaylasDurum = { id: null, kip: "acilis", son: "" };
+var SR_UYARI = "⚠️Yatırım tavsiyesi değildir. Kendi pozisyonumdur.";
+
+function srRastgele(dizi) { return dizi[Math.floor(Math.random() * dizi.length)]; }
+
+function srFiyatKisa(f) {
+  var s = srFiyatYaz(f);
+  if (s.indexOf(".") >= 0) s = s.replace(/0+$/, "").replace(/\.$/, "");
+  return s;
+}
+
+function srEtiket(sembol) {
+  var c = String(sembol || "").toUpperCase().replace(/USDT$/, "").replace(/[^A-Z0-9]/g, "");
+  // 1000PEPE gibi katlı kontratlarda fiyatlar kontrata göre olduğu için adı olduğu gibi yazılır ($ etiketi kullanılmaz)
+  return /^\d/.test(c) ? c : "$" + c;
+}
+
+// X'in sayımına yakın: emoji ve simgeler 2 karakter
+function srTweetUzunluk(s) {
+  var n = 0, a = Array.from(s);
+  for (var i = 0; i < a.length; i++) {
+    var cp = a[i].codePointAt(0);
+    n += (cp >= 0x1F000 || (cp >= 0x2600 && cp <= 0x27BF)) ? 2 : 1;
+  }
+  return n;
+}
+
+function srMetinKur(x, kip) {
+  var c = srEtiket(x.sembol);
+  var lMi = x.yon === "LONG";
+  var yon = lMi ? "long" : "short";
+  var g = srFiyatKisa(x.fiyat), h = srFiyatKisa(x.hedef), s = srFiyatKisa(x.stop);
+  var base = Number(x.fiyat) || 1;
+  var hr = Math.round(Math.abs(Number(x.hedef) - base) / base * 800);
+  var sr = Math.round(Math.abs(Number(x.stop) - base) / base * 800);
+  var govde;
+  if (kip === "hedef") {
+    govde = srRastgele([
+      "✅ " + c + " " + yon + " hedefe ulaştı. " + g + " → " + h + " (8x izole, marjin üzerinden ≈ %" + hr + ")",
+      c + " " + yon + " pozisyonu hedefte kapandı ✅ Giriş " + g + ", çıkış " + h + ".",
+      "Hedef geldi ✅ " + c + " " + yon + ": " + g + " → " + h + ".",
+      c + " için hedefe ulaşıldı ✅ (" + yon + ", giriş " + g + ", hedef " + h + ")",
+      "Planlandığı gibi kapandı ✅ " + c + " " + yon + ", " + g + " → " + h + " (8x izole)."
+    ]);
+  } else if (kip === "stop") {
+    govde = srRastgele([
+      "❌ " + c + " " + yon + " stop oldu. " + g + " → " + s + " (8x izole, marjin üzerinden %" + sr + " kayıp)",
+      c + " " + yon + " pozisyonu stopta kapandı ❌ Giriş " + g + ", çıkış " + s + ". Bu sefer olmadı.",
+      "Stop çalıştı ❌ " + c + " " + yon + ": " + g + " → " + s + ".",
+      c + " için stop oldu ❌ (" + yon + ", giriş " + g + ", stop " + s + "). Risk yönetimi bunun için.",
+      "Bu sefer stop ❌ " + c + " " + yon + ", " + g + " → " + s + " (8x izole)."
+    ]);
+  } else {
+    var baslik = lMi ? srRastgele([
+      c + " destek bölgesine geldi, long denedim 🟢",
+      c + " için long pozisyon açtım 🟢 Destekten tepki arıyorum.",
+      "Bugünün long denemesi " + c + " 🟢 Fiyat desteğe yaklaştı.",
+      c + " desteğe oturdu, long girdim 🟢",
+      "Radarımdaki " + c + " desteğe gelince long açtım 🟢",
+      c + " aşağıda tutunabilir diye long denedim 🟢",
+      "Long pozisyon: " + c + " 🟢 Desteğe temas var."
+    ]) : srRastgele([
+      c + " direnç bölgesine geldi, short denedim 🔴",
+      c + " için short pozisyon açtım 🔴 Dirençten tepki arıyorum.",
+      "Bugünün short denemesi " + c + " 🔴 Fiyat dirence yaklaştı.",
+      c + " dirence dayandı, short girdim 🔴",
+      "Radarımdaki " + c + " dirence gelince short açtım 🔴",
+      c + " yukarıda zorlanabilir diye short denedim 🔴",
+      "Short pozisyon: " + c + " 🔴 Dirence temas var."
+    ]);
+    var deger = srRastgele([
+      "Giriş " + g + ", hedef " + h + ", stop " + s + ".",
+      "Giriş: " + g + " · Hedef: " + h + " · Stop: " + s,
+      "Giriş " + g + " | TP " + h + " | SL " + s,
+      "🎯 " + h + " · 🛑 " + s + " · giriş " + g,
+      "Hedef " + h + ", stop " + s + ". Giriş " + g + "."
+    ]);
+    var risk = srRastgele([
+      "8x izole. Stop'ta marjin kaybı %" + sr + ".",
+      "Kaldıraç 8x izole, stop zararı %" + sr + " (marjin üzerinden).",
+      "8x izole · stop olursa marjinde %" + sr + " kayıp.",
+      "8x izole. Hedefte kazanç ≈ %" + hr + ", stopta kayıp %" + sr + " (marjin üzerinden)."
+    ]);
+    var parcalar = [baslik];
+    if (Math.random() < 0.5) { parcalar.push(deger); parcalar.push(risk); } else { parcalar.push(risk); parcalar.push(deger); }
+    if (Math.random() < 0.7) parcalar.push(srRastgele([
+      "Marjin ve risk herkese göre değişir.",
+      "Risk yönetimi herkesin kendi sorumluluğunda.",
+      "Tutar ve risk kişiye göre değişir.",
+      "Marjin kişiseldir, risk herkesin kendi kararı."
+    ]));
+    if (Math.random() < 0.6) parcalar.push(srRastgele([
+      "Sonucu paylaşırım.",
+      "Gelişmeyi buradan aktaracağım.",
+      "Nasıl biteceğini göreceğiz.",
+      "Sonucu da yazarım.",
+      "Takipteyim."
+    ]));
+    govde = parcalar.join(Math.random() < 0.7 ? "\n" : " ");
+  }
+  return govde + "\n" + SR_UYARI;
+}
+
+function srPaylasUret() {
+  var x = srKartlar[srPaylasDurum.id];
+  var ta = document.getElementById("sr-paylas-metin");
+  if (!x || !ta) return;
+  var m = "";
+  for (var i = 0; i < 40; i++) {
+    m = srMetinKur(x, srPaylasDurum.kip);
+    if (m !== srPaylasDurum.son && srTweetUzunluk(m) <= 280) break;
+  }
+  srPaylasDurum.son = m;
+  ta.value = m;
+  srPaylasSayac();
+}
+
+function srPaylasSayac() {
+  var ta = document.getElementById("sr-paylas-metin");
+  var s = document.getElementById("sr-paylas-sayac");
+  if (!ta || !s) return;
+  var n = srTweetUzunluk(ta.value);
+  s.textContent = "≈ " + n + " / 280 karakter" + (n > 280 ? " (çok uzun, kısalt)" : "");
+  s.style.color = n > 280 ? "#f87171" : "#94a3b8";
+}
+
+function srPaylasKipler() {
+  var kutu = document.getElementById("sr-paylas-kipler");
+  if (!kutu) return;
+  var liste = [["acilis", "Açılış"], ["hedef", "🎯 Hedef sonucu"], ["stop", "🛑 Stop sonucu"]];
+  var h = "";
+  for (var i = 0; i < liste.length; i++) {
+    var aktif = srPaylasDurum.kip === liste[i][0];
+    h += '<button onclick="srPaylasKipSec(\'' + liste[i][0] + '\')" style="background:' + (aktif ? "#334155" : "#1e293b") +
+      ';border:1px solid ' + (aktif ? "#64748b" : "#334155") + ';color:#e2e8f0;padding:5px 9px;border-radius:8px;font-size:12px;cursor:pointer;margin:0 6px 6px 0">' + liste[i][1] + '</button>';
+  }
+  kutu.innerHTML = h;
+}
+
+function srPaylasKipSec(kip) {
+  srPaylasDurum.kip = kip;
+  srPaylasDurum.son = "";
+  srPaylasKipler();
+  srPaylasUret();
+}
+
+function srPaylas(id) {
+  var x = srKartlar[id];
+  if (!x) return;
+  var eski = document.getElementById("sr-paylas-perde");
+  if (eski) eski.parentNode.removeChild(eski);
+  srPaylasDurum = { id: id, kip: x.otomatik === "hedef" ? "hedef" : (x.otomatik === "stop" ? "stop" : "acilis"), son: "" };
+  var coin = String(x.sembol || "").replace(/[<>&"]/g, "");
+  var bs = 'style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:7px 11px;border-radius:8px;font-size:12px;cursor:pointer;margin:6px 6px 0 0"';
+  var p = document.createElement("div");
+  p.id = "sr-paylas-perde";
+  p.setAttribute("style", "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px");
+  p.onclick = function(e) { if (e.target === p) srPaylasKapat(); };
+  p.innerHTML = '<div style="background:#0f172a;border:1px solid #334155;border-radius:14px;max-width:520px;width:100%;padding:14px;color:#e2e8f0;max-height:92vh;overflow:auto">' +
+    '<div style="font-weight:600;margin-bottom:8px">📣 Paylaşım metni · ' + coin + '</div>' +
+    '<div id="sr-paylas-kipler"></div>' +
+    '<textarea id="sr-paylas-metin" rows="8" oninput="srPaylasSayac()" style="width:100%;box-sizing:border-box;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:8px;padding:8px;font-size:14px;line-height:1.5;resize:vertical"></textarea>' +
+    '<div id="sr-paylas-sayac" style="font-size:11px;color:#94a3b8;margin-top:4px"></div>' +
+    '<div style="margin-top:4px">' +
+    '<button ' + bs + ' onclick="srPaylasUret()">🔄 Başka cümle</button>' +
+    '<button id="sr-paylas-kopya" ' + bs + ' onclick="srPaylasKopyala()">📋 Kopyala</button>' +
+    '<button ' + bs + ' onclick="srPaylasXAc()">𝕏 X\'te aç</button>' +
+    '<button ' + bs + ' onclick="srPaylasKapat()">Kapat</button></div>' +
+    '<div style="font-size:11px;color:#64748b;margin-top:8px">Metin elle düzenlenebilir. Paylaşımı sen yaparsın; sistem hiçbir şeyi kendiliğinden göndermez.</div>' +
+    '</div>';
+  document.body.appendChild(p);
+  srPaylasKipler();
+  srPaylasUret();
+}
+
+function srPaylasKapat() {
+  var p = document.getElementById("sr-paylas-perde");
+  if (p && p.parentNode) p.parentNode.removeChild(p);
+}
+
+function srPaylasKopyala() {
+  var ta = document.getElementById("sr-paylas-metin");
+  var b = document.getElementById("sr-paylas-kopya");
+  if (!ta) return;
+  function bitti() {
+    if (!b) return;
+    b.textContent = "✔ Kopyalandı";
+    setTimeout(function() { if (b) b.textContent = "📋 Kopyala"; }, 1500);
+  }
+  function yedek() {
+    ta.focus();
+    ta.select();
+    try { document.execCommand("copy"); bitti(); } catch (e) { alert("Kopyalanamadı, metni elle seçip kopyalayın."); }
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(ta.value).then(bitti, yedek);
+  } else {
+    yedek();
+  }
+}
+
+function srPaylasXAc() {
+  var ta = document.getElementById("sr-paylas-metin");
+  if (!ta) return;
+  window.open("https://twitter.com/intent/tweet?text=" + encodeURIComponent(ta.value), "_blank");
 }
 
 // Yönetici sekmesi açıkken kartlar kendiliğinden tazelenir (yeni bildirim gelince görünsün)
