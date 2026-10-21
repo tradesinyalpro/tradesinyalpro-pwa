@@ -640,9 +640,11 @@
       <button class="bot-btn" id="dd-zaman-1w" onclick="ddZamanDegistir('1w',this)">Haftalık</button>
       <button class="bot-btn" onclick="olcumAraciToggle(this,'dd-chart')" title="Olcum araci: grafikte suruklayin">📏 Olcum</button>
       <button class="bot-btn" id="dd-ichimoku-btn" onclick="ddIchimokuToggle(this)">TradeSinyalPro</button>
+      <button class="bot-btn" id="dd-sma-btn" onclick="ddSmaToggle(this)" title="TradeSinyalPro V2">TradeSinyalPro V2</button>
       <button class="bot-btn" id="dd-sr-btn" onclick="ddSrToggle(this)">Oto-Destek/Direnç</button>
     </div>
     <div id="dd-seviye-bilgi" style="font-size:12.5px;color:#94a3b8;margin-bottom:10px;line-height:1.7"></div>
+    <div id="dd-sma-bilgi" style="display:none;font-size:12px;margin-bottom:6px;line-height:1.6"></div>
     <div id="dd-chart" style="width:100%;height:400px;border-radius:10px;overflow:hidden;background:#0a0f1e"></div>
   </div>
 
@@ -7236,6 +7238,8 @@ function ddZamanDegistir(zaman, el) {
   if (ichBtn && ddIchimokuAcik) ichBtn.classList.add("active");
   var srBtn = document.getElementById("dd-sr-btn");
   if (srBtn && ddSrAcik) srBtn.classList.add("active");
+  var smaBtn = document.getElementById("dd-sma-btn");
+  if (smaBtn && ddSmaAcik) smaBtn.classList.add("active");
   ddYukle(ddSeciliCoin);
 }
 
@@ -7321,6 +7325,7 @@ function ddYukle(symbol) {
     ddSonCandleData = candleData;
     ddGrafikCiz(candleData, destek, direnc, coinDegisti);
     ddIchimokuUygula();
+    ddSmaUygula();
 
     // Bu coin icin su an ACIK bir Oda2 sinyali var mi - backend'den kontrol
     var xhr2 = new XMLHttpRequest();
@@ -7451,6 +7456,7 @@ function ddIchimokuToggle(el) {
   ddIchimokuAcik = !ddIchimokuAcik;
   el.classList.toggle("active", ddIchimokuAcik);
   ddIchimokuUygula();
+  ddSmaUygula();   // Ichimoku mum serisini yeniden olusturdugu icin SMA cizgileri tekrar uste cizilir
 }
 
 function ddDonchianOrtasi(mumlar, i, periyot) {
@@ -7554,6 +7560,105 @@ function ddIchimokuUygula() {
     // seriyle birlikte kayboldugu icin yeni seri uzerinde tekrar ciziliyor.
     ddPriceLinelerCiz(ddSonAcikSinyal, ddSonDestekDeger, ddSonDirencDeger);
   }
+}
+
+// ============================================================
+// TRADESINYALPRO V2 (Destek/Direnc grafigi icin, isteğe bagli)
+// 50 / 110 / 200 periyotlu basit hareketli ortalama (kapanis), grafikte secili zaman diliminin mumlariyla.
+// Her SMA degeri sadece kendi periyodu kadar onceki mumdan hesaplanir (TradingView ile ayni formul, son mum dahil).
+// ============================================================
+var ddSmaAcik = false;
+var ddSmaSeriler = [];
+var ddSmaSon = null;               // en son mumdaki 3 SMA degeri (grafik disinda imlec yokken gosterilir)
+var ddSmaCrosshairChart = null;    // imlec dinleyicisi grafik basina bir kez baglanir
+var DD_SMA_AYAR = [
+  { periyot: 50,  renk: "#ff5c00", yazi: "#ff5c00", kalinlik: 2, stil: 0 },
+  { periyot: 110, renk: "#4a148c", yazi: "#a56ae0", kalinlik: 3, stil: 1 },   // stil 1 = noktali
+  { periyot: 200, renk: "#00ff84", yazi: "#00ff84", kalinlik: 2, stil: 0 }
+];
+
+function ddSmaToggle(el) {
+  ddSmaAcik = !ddSmaAcik;
+  el.classList.toggle("active", ddSmaAcik);
+  ddSmaUygula();
+}
+
+function ddSmaTemizle() {
+  for (var i = 0; i < ddSmaSeriler.length; i++) {
+    try { ddChart.removeSeries(ddSmaSeriler[i]); } catch (e) {}
+  }
+  ddSmaSeriler = [];
+  ddSmaSon = null;
+  var b = document.getElementById("dd-sma-bilgi");
+  if (b) b.style.display = "none";
+}
+
+function ddSmaHesapla(kapanislar, periyot) {
+  var out = new Array(kapanislar.length);
+  var toplam = 0;
+  for (var i = 0; i < kapanislar.length; i++) {
+    toplam += kapanislar[i];
+    if (i >= periyot) toplam -= kapanislar[i - periyot];
+    out[i] = i >= periyot - 1 ? toplam / periyot : null;
+  }
+  return out;
+}
+
+function ddSmaBilgiYaz(degerler) {
+  var b = document.getElementById("dd-sma-bilgi");
+  if (!b) return;
+  var h = '<span style="color:#94a3b8">TradeSinyalPro V2 close</span>';
+  for (var i = 0; i < DD_SMA_AYAR.length; i++) {
+    var v = degerler && degerler[i] != null ? srFiyatYaz(degerler[i]) : "-";
+    h += ' &nbsp;<span style="color:' + DD_SMA_AYAR[i].yazi + ';font-weight:600">' + v + '</span>';
+  }
+  b.innerHTML = h;
+  b.style.display = "";
+}
+
+function ddSmaCrosshairIsle(param) {
+  if (!ddSmaAcik || !ddSmaSeriler.length) return;
+  var d = [];
+  if (param && param.time && param.seriesData) {
+    for (var i = 0; i < ddSmaSeriler.length; i++) {
+      var v = param.seriesData.get(ddSmaSeriler[i]);
+      d.push(v && v.value != null ? v.value : null);
+    }
+  } else {
+    d = ddSmaSon;
+  }
+  ddSmaBilgiYaz(d);
+}
+
+function ddSmaUygula() {
+  if (!ddChart || !ddSonCandleData || !ddSonMumlarHam) return;
+  ddSmaTemizle();
+  if (!ddSmaAcik) return;
+  var kap = ddSonMumlarHam.map(function(m) { return parseFloat(m[4]); });
+  var pf = null;
+  try { pf = ddSeries.options().priceFormat; } catch (e) {}
+  var son = [];
+  for (var k = 0; k < DD_SMA_AYAR.length; k++) {
+    var a = DD_SMA_AYAR[k];
+    var dizi = ddSmaHesapla(kap, a.periyot);
+    var veri = [];
+    for (var i = 0; i < dizi.length && i < ddSonCandleData.length; i++) {
+      if (dizi[i] !== null) veri.push({ time: ddSonCandleData[i].time, value: dizi[i] });
+    }
+    son.push(dizi.length && dizi[dizi.length - 1] !== null ? dizi[dizi.length - 1] : null);
+    if (!veri.length) continue;
+    var opts = { color: a.renk, lineWidth: a.kalinlik, lineStyle: a.stil, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false };
+    if (pf) opts.priceFormat = pf;
+    var seri = ddChart.addLineSeries(opts);
+    seri.setData(veri);
+    ddSmaSeriler.push(seri);
+  }
+  ddSmaSon = son;
+  if (ddSmaCrosshairChart !== ddChart) {
+    ddChart.subscribeCrosshairMove(ddSmaCrosshairIsle);
+    ddSmaCrosshairChart = ddChart;
+  }
+  ddSmaBilgiYaz(son);
 }
 
 // Grafigi ekranin kalan yuksekligine yayar (en az 400px): sekmeye girince
@@ -8864,6 +8969,8 @@ function bildirimdenGit(p, deneme) {
     if (ddIchBtnGit && ddIchimokuAcik) ddIchBtnGit.classList.add("active");
     var ddSrBtnGit = document.getElementById("dd-sr-btn");
     if (ddSrBtnGit && ddSrAcik) ddSrBtnGit.classList.add("active");
+    var ddSmaBtnGit = document.getElementById("dd-sma-btn");
+    if (ddSmaBtnGit && ddSmaAcik) ddSmaBtnGit.classList.add("active");
     ddSeciliCoin = p.coin;
     var ddEtiket = document.getElementById("dd-secili-coin");
     if (ddEtiket) ddEtiket.textContent = p.coin;
