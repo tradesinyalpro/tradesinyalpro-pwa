@@ -5052,9 +5052,54 @@ document.addEventListener("keydown", function(e) {
   if (e.key === "Escape" && replayState) replayKapat();
 });
 
+// "Bugun" karti: gece 03:00'dan (Turkiye saati) simdiye kadar her odada kac BAŞARILI / BAŞARISIZ olmus.
+// Sunucunun her sonuclanan islem icin kaydettigi sonuc zamanindan sayilir; gece 03:00'te kendiliginden sifirlanir.
+// simdiMs sadece deneme icin (bos birakilirsa su an).
+function raporBugunKarti(simdiMs) {
+  if (!tumVeriler) return "";
+  var simdi = simdiMs !== undefined ? simdiMs : Date.now();
+  var tr = new Date(simdi + 3 * 60 * 60 * 1000);                 // Turkiye duvar saati (UTC alanlariyla okunur)
+  var sinirTR = Date.UTC(tr.getUTCFullYear(), tr.getUTCMonth(), tr.getUTCDate(), 3, 0, 0);
+  if (tr.getUTCHours() < 3) sinirTR -= 24 * 60 * 60 * 1000;      // 03:00'dan once: dunku 03:00 baslangic
+  var sinirMs = sinirTR - 3 * 60 * 60 * 1000;                    // gercek zaman damgasi
+  var bs = new Date(sinirTR);
+  var iki = function(n) { return (n < 10 ? "0" : "") + n; };
+  var etiket = iki(bs.getUTCDate()) + "." + iki(bs.getUTCMonth() + 1) + " 03:00";
+  var odalar = ["SINYAL_ODA_1", "SINYAL_ODA_2", "SINYAL_ODA_3", "SINYAL_ODA_4"];
+  var sayilar = [], topTp = 0, topStop = 0;
+  for (var i = 0; i < odalar.length; i++) {
+    var liste = (tumVeriler[odalar[i]] && tumVeriler[odalar[i]].sinyaller) || [];
+    var tp = 0, st = 0;
+    for (var j = 0; j < liste.length; j++) {
+      var s = liste[j];
+      if (s.durum !== "tp" && s.durum !== "stop") continue;
+      if (!s.sonuc_zamani || turkiyeZamanindanMs(s.sonuc_zamani) < sinirMs) continue;
+      if (s.durum === "tp") tp++; else st++;
+    }
+    sayilar.push({ bot: odalar[i], tp: tp, stop: st });
+    topTp += tp; topStop += st;
+  }
+  var topToplam = topTp + topStop;
+  var topBasari = topToplam > 0 ? Math.round(topTp / topToplam * 100) : 0;
+  var html = '<div class="section-title">BUGÜN (' + etiket + '\'dan beri) &nbsp;·&nbsp; Toplam: ' + topTp + ' BAŞARILI / ' + topStop + ' BAŞARISIZ (%' + topBasari + ')</div>';
+  for (var k = 0; k < sayilar.length; k++) {
+    var r = sayilar[k];
+    var toplam = r.tp + r.stop;
+    var basari = toplam > 0 ? Math.round(r.tp / toplam * 100) : 0;
+    html += '<div class="signal-card" style="margin-bottom:8px">';
+    html += '<div class="sig-header"><div class="sig-symbol">' + botAdi(r.bot) + '</div>';
+    html += '<span class="badge bot">' + (toplam > 0 ? basari + '% basari' : 'henuz yok') + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">BAŞARILI</span><span class="sig-val green">' + r.tp + '</span></div>';
+    html += '<div class="sig-row"><span class="sig-key">BAŞARISIZ</span><span class="sig-val red">' + r.stop + '</span></div>';
+    html += '</div>';
+  }
+  return html;
+}
+
 function raporGoster() {
+  var bugunKarti = raporBugunKarti();
   if (!tumRaporlar || tumRaporlar.length === 0) {
-    document.getElementById("rapor-icerik").innerHTML = '<div class="empty">Henuz gunluk rapor yok (ilk rapor gece 03:00\'te olusur)</div>';
+    document.getElementById("rapor-icerik").innerHTML = bugunKarti + '<div class="empty">Henuz gunluk rapor yok (ilk rapor gece 03:00\'te olusur)</div>';
     return;
   }
   var gruplar = {};
@@ -5066,7 +5111,7 @@ function raporGoster() {
   }
   tarihler.sort(function(a, b) { return b.localeCompare(a); });
 
-  var html = "";
+  var html = bugunKarti;
   for (var t = 0; t < tarihler.length; t++) {
     var tarih = tarihler[t];
     var kayitlar = gruplar[tarih].slice();
@@ -7456,7 +7501,7 @@ function ddIchimokuToggle(el) {
   ddIchimokuAcik = !ddIchimokuAcik;
   el.classList.toggle("active", ddIchimokuAcik);
   ddIchimokuUygula();
-  ddSmaUygula();   // Ichimoku mum serisini yeniden olusturdugu icin SMA cizgileri tekrar uste cizilir
+  ddSmaUygula(true);   // Ichimoku mum serisini yeniden olusturdugu icin SMA cizgileri tekrar uste cizilir
 }
 
 function ddDonchianOrtasi(mumlar, i, periyot) {
@@ -7571,6 +7616,7 @@ var ddSmaAcik = false;
 var ddSmaSeriler = [];
 var ddSmaSon = null;               // en son mumdaki 3 SMA degeri (grafik disinda imlec yokken gosterilir)
 var ddSmaCrosshairChart = null;    // imlec dinleyicisi grafik basina bir kez baglanir
+var ddSmaBilgiSon = null;          // gostergeye en son yazilan metin (ayni metni tekrar yazip ekrani titretmemek icin)
 var DD_SMA_AYAR = [
   { periyot: 50,  renk: "#ff5c00", yazi: "#ff5c00", kalinlik: 2, stil: 0 },
   { periyot: 110, renk: "#4a148c", yazi: "#a56ae0", kalinlik: 3, stil: 1 },   // stil 1 = noktali
@@ -7589,6 +7635,7 @@ function ddSmaTemizle() {
   }
   ddSmaSeriler = [];
   ddSmaSon = null;
+  ddSmaBilgiSon = null;
   var b = document.getElementById("dd-sma-bilgi");
   if (b) b.style.display = "none";
 }
@@ -7612,6 +7659,8 @@ function ddSmaBilgiYaz(degerler) {
     var v = degerler && degerler[i] != null ? srFiyatYaz(degerler[i]) : "-";
     h += ' &nbsp;<span style="color:' + DD_SMA_AYAR[i].yazi + ';font-weight:600">' + v + '</span>';
   }
+  if (h === ddSmaBilgiSon && b.style.display === "") return;
+  ddSmaBilgiSon = h;
   b.innerHTML = h;
   b.style.display = "";
 }
@@ -7630,13 +7679,24 @@ function ddSmaCrosshairIsle(param) {
   ddSmaBilgiYaz(d);
 }
 
-function ddSmaUygula() {
+function ddSmaUygula(yenidenKur) {
   if (!ddChart || !ddSonCandleData || !ddSonMumlarHam) return;
-  ddSmaTemizle();
-  if (!ddSmaAcik) return;
+  if (!ddSmaAcik) { ddSmaTemizle(); return; }
   var kap = ddSonMumlarHam.map(function(m) { return parseFloat(m[4]); });
   var pf = null;
   try { pf = ddSeries.options().priceFormat; } catch (e) {}
+
+  // 10 saniyelik yenilemede cizgileri SILIP YENIDEN EKLEMEK, kullanici grafigi kaydirirken
+  // cizgilerin mumlardan ayri kaymasina yol aciyordu. Bu yuzden seriler bir kez kurulur,
+  // sonraki yenilemelerde sadece verileri guncellenir. Yeniden kurma sadece sunlarda yapilir:
+  // ilk acilis, Ichimoku (mum serisini yeniden olusturdugu icin cizgilerin tekrar uste gelmesi gerekir).
+  var guncelle = !yenidenKur && !ddIchimokuAcik && ddSmaSeriler.length === DD_SMA_AYAR.length && ddSmaCrosshairChart === ddChart;
+  var aralik = null;
+  if (!guncelle) {
+    try { aralik = ddChart.timeScale().getVisibleLogicalRange(); } catch (e) {}
+    ddSmaTemizle();
+  }
+
   var son = [];
   for (var k = 0; k < DD_SMA_AYAR.length; k++) {
     var a = DD_SMA_AYAR[k];
@@ -7646,14 +7706,22 @@ function ddSmaUygula() {
       if (dizi[i] !== null) veri.push({ time: ddSonCandleData[i].time, value: dizi[i] });
     }
     son.push(dizi.length && dizi[dizi.length - 1] !== null ? dizi[dizi.length - 1] : null);
-    if (!veri.length) continue;
-    var opts = { color: a.renk, lineWidth: a.kalinlik, lineStyle: a.stil, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false };
-    if (pf) opts.priceFormat = pf;
-    var seri = ddChart.addLineSeries(opts);
+    var seri;
+    if (guncelle) {
+      seri = ddSmaSeriler[k];
+      if (pf) { try { seri.applyOptions({ priceFormat: pf }); } catch (e) {} }
+    } else {
+      var opts = { color: a.renk, lineWidth: a.kalinlik, lineStyle: a.stil, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false };
+      if (pf) opts.priceFormat = pf;
+      seri = ddChart.addLineSeries(opts);
+      ddSmaSeriler.push(seri);
+    }
     seri.setData(veri);
-    ddSmaSeriler.push(seri);
   }
   ddSmaSon = son;
+  if (!guncelle && aralik) {
+    try { ddChart.timeScale().setVisibleLogicalRange(aralik); } catch (e) {}
+  }
   if (ddSmaCrosshairChart !== ddChart) {
     ddChart.subscribeCrosshairMove(ddSmaCrosshairIsle);
     ddSmaCrosshairChart = ddChart;
