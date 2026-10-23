@@ -633,7 +633,16 @@
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
       <span id="dd-secili-coin" style="font-weight:700;font-size:16px;color:#e2e8f0"></span>
-      <button type="button" onclick="ddBinanceAc()" style="background:#f0b90b;color:#111827;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">Binance'de aç</button>
+      <div style="position:relative">
+        <button type="button" onclick="ddBorsaMenuToggle(event)" style="background:#f0b90b;color:#111827;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">Borsada aç ▾</button>
+        <div id="dd-borsa-menu" style="display:none;position:absolute;right:0;top:34px;z-index:50;background:#111827;border:1px solid #1e293b;border-radius:10px;padding:4px;min-width:130px;box-shadow:0 6px 18px rgba(0,0,0,.5)">
+          <div onclick="ddBorsaAc('binance')" style="padding:9px 12px;font-size:13px;color:#e2e8f0;cursor:pointer;border-radius:6px">Binance</div>
+          <div onclick="ddBorsaAc('bybit')" style="padding:9px 12px;font-size:13px;color:#e2e8f0;cursor:pointer;border-radius:6px">Bybit</div>
+          <div onclick="ddBorsaAc('bitget')" style="padding:9px 12px;font-size:13px;color:#e2e8f0;cursor:pointer;border-radius:6px">Bitget</div>
+          <div onclick="ddBorsaAc('okx')" style="padding:9px 12px;font-size:13px;color:#e2e8f0;cursor:pointer;border-radius:6px">OKX</div>
+          <div onclick="ddBorsaAc('mexc')" style="padding:9px 12px;font-size:13px;color:#e2e8f0;cursor:pointer;border-radius:6px">MEXC</div>
+        </div>
+      </div>
     </div>
     <div class="bot-filter" style="margin-bottom:10px">
       <button class="bot-btn active" id="dd-zaman-15m" onclick="ddZamanDegistir('15m',this)">15 Dakika</button>
@@ -7275,10 +7284,41 @@ function ddCoinSec(symbol) {
   ddYukle(ddSeciliCoin);
 }
 
-function ddBinanceAc() {
+function ddBorsaMenuToggle(e) {
+  if (e) e.stopPropagation();
+  var m = document.getElementById("dd-borsa-menu");
+  if (m) m.style.display = (m.style.display === "none" ? "block" : "none");
+}
+
+document.addEventListener("click", function() {
+  var m = document.getElementById("dd-borsa-menu");
+  if (m) m.style.display = "none";
+});
+
+function ddBorsaAc(borsa) {
+  var m = document.getElementById("dd-borsa-menu");
+  if (m) m.style.display = "none";
   var sem = String(ddSeciliCoin || "").toUpperCase();
   if (!/^[A-Z0-9]{3,20}$/.test(sem)) return;
-  window.open("https://www.binance.com/en/futures/" + sem, "_blank", "noopener");
+  var taban = sem.replace(/USDT$/, "");
+  var telefon = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  var url = "";
+  if (borsa === "binance") {
+    // Telefonda app.binance.com: Binance uygulamasinin "desteklenen web adresleri" listesinde bu alan adi var
+    url = (telefon ? "https://app.binance.com/en/futures/" : "https://www.binance.com/en/futures/") + sem;
+  } else if (borsa === "bybit") {
+    url = "https://www.bybit.com/trade/usdt/" + sem;
+  } else if (borsa === "bitget") {
+    url = "https://www.bitget.com/futures/usdt/" + sem;
+  } else if (borsa === "okx") {
+    url = "https://www.okx.com/trade-swap/" + taban.toLowerCase() + "-usdt-swap";
+  } else if (borsa === "mexc") {
+    url = "https://futures.mexc.com/exchange/" + taban + "_USDT";
+  }
+  if (!url) return;
+  // Telefonda sayfayi dogrudan acmak, Android'in linki uygulamaya yonlendirmesine izin verir
+  if (telefon) { window.location.href = url; }
+  else { window.open(url, "_blank", "noopener"); }
 }
 
 function ddZamanDegistir(zaman, el) {
