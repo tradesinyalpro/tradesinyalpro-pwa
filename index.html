@@ -631,7 +631,10 @@
         style="width:100%;background:#0a0f1e;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px">
       <div id="dd-arama-sonuc" style="display:none;position:absolute;top:44px;left:0;right:0;max-height:280px;overflow-y:auto;background:#0f1729;border:1px solid #1e293b;border-radius:10px;z-index:50"></div>
     </div>
-    <div id="dd-secili-coin" style="font-weight:700;font-size:16px;color:#e2e8f0;margin-bottom:8px"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
+      <span id="dd-secili-coin" style="font-weight:700;font-size:16px;color:#e2e8f0"></span>
+      <button type="button" onclick="ddBinanceAc()" style="background:#f0b90b;color:#111827;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">Binance'de aç</button>
+    </div>
     <div class="bot-filter" style="margin-bottom:10px">
       <button class="bot-btn active" id="dd-zaman-15m" onclick="ddZamanDegistir('15m',this)">15 Dakika</button>
       <button class="bot-btn" id="dd-zaman-1h" onclick="ddZamanDegistir('1h',this)">1 Saat</button>
@@ -7270,6 +7273,12 @@ function ddCoinSec(symbol) {
   document.getElementById("dd-arama").value = "";
   document.getElementById("dd-arama-sonuc").style.display = "none";
   ddYukle(ddSeciliCoin);
+}
+
+function ddBinanceAc() {
+  var sem = String(ddSeciliCoin || "").toUpperCase();
+  if (!/^[A-Z0-9]{3,20}$/.test(sem)) return;
+  window.open("https://www.binance.com/en/futures/" + sem, "_blank", "noopener");
 }
 
 function ddZamanDegistir(zaman, el) {
