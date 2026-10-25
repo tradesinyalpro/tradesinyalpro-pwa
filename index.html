@@ -167,6 +167,9 @@
     z-index: 8001; width: auto; height: auto; overflow-y: auto;
     box-shadow: 0 10px 44px rgba(0,0,0,0.65); border-color: #3b82f6;
   }
+  .kart-tam-baslik { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .kart-tam-isim { font-weight: 700; font-size: 16px; color: #e2e8f0; }
+  .kart-kapat-buyuk { font-size: 22px !important; padding: 2px 8px; margin-left: 0 !important; line-height: 1; }
   .kart-kapat-btn { display: none; cursor: pointer; font-size: 15px; color: #94a3b8; margin-left: 8px; }
   .signal-card.kart-genisletilmis .kart-kapat-btn { display: inline-block; }
   /* Kart tam ekrana genisledi ginde: grafik istatistiklerin ALTINA gecsin ve buyusun */
@@ -2437,7 +2440,7 @@ function kartLwGrafikGuncelle(sembol, oncedenYakalananScrollTop) {
         // "mikniatislayip" yapismasina sebep oluyordu - "Normal" modda imlec
         // tam fare konumunu serbestce takip eder.
         crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-        width: kutu2.clientWidth, height: 400
+        width: kutu2.clientWidth, height: Math.max(320, kutu2.clientHeight || 400)
       });
       kartSeries = kartChart.addCandlestickSeries({
         upColor: "#4ade80", downColor: "#f87171", borderVisible: false,
@@ -2445,7 +2448,7 @@ function kartLwGrafikGuncelle(sembol, oncedenYakalananScrollTop) {
       });
       window.addEventListener("resize", function() {
         var k = document.getElementById("kart-lw-chart");
-        if (kartChart && k) kartChart.applyOptions({ width: k.clientWidth });
+        if (kartChart && k) kartChart.applyOptions({ width: k.clientWidth, height: Math.max(320, k.clientHeight || 400) });
       });
       grafikOlcumAraciKur("kart-lw-chart", function() { return kartChart; }, function() { return kartSeries; });
       grafikCizimAraciKur("kart-lw-chart", function() { return kartChart; }, function() { return kartSeries; });
@@ -4189,9 +4192,15 @@ function sinyalleriGoster() {
     }
 
     html += '<div class="signal-card ' + cls + (genisletilmisMi ? " kart-genisletilmis" : "") + '" data-kart-anahtari="' + kartAnahtari + '">';
-    html += '<div class="sig-header"><div class="sig-symbol"><span class="sig-symbol-tikla" onclick="kartSec(\'' + kartAnahtari.replace(/'/g, "\\'") + '\')">#' + s.sembol + '</span>' + yildizHtml + takipHtml + gorselBtnHtml + kapatBtnHtml + '</div>';
-    html += '<div class="sig-badges">' + pnlHtml + '<span class="badge ' + cls + '">' + yon + '</span>';
-    html += '<span class="badge bot">' + botAdi(bot) + '</span>' + fundingRateHtml + '</div></div>';
+    if (genisletilmisMi) {
+      // Tam ekran kart: sadece sol ustte coin adi, sag ustte kapat (X). Baska yazi yok.
+      html += '<div class="sig-header kart-tam-baslik"><span class="kart-tam-isim">#' + s.sembol + '</span>' +
+        '<span class="kart-kapat-btn kart-kapat-buyuk" onclick="event.stopPropagation();kartKapat()" title="Kapat">&#10005;</span></div>';
+    } else {
+      html += '<div class="sig-header"><div class="sig-symbol"><span class="sig-symbol-tikla" onclick="kartSec(\'' + kartAnahtari.replace(/'/g, "\\'") + '\')">#' + s.sembol + '</span>' + yildizHtml + takipHtml + gorselBtnHtml + kapatBtnHtml + '</div>';
+      html += '<div class="sig-badges">' + pnlHtml + '<span class="badge ' + cls + '">' + yon + '</span>';
+      html += '<span class="badge bot">' + botAdi(bot) + '</span>' + fundingRateHtml + '</div></div>';
+    }
     html += genisletilmisMi ? "" : canliFiyatHtml;
 
     var satirlar = [
@@ -4238,7 +4247,7 @@ function sinyalleriGoster() {
     }
 
     html += '<div class="sig-stats-row">';
-    html += '<div class="sig-stats-left">' + (genisletilmisMi ? genisBilgiHtml : satirlarHtml) + '</div>';
+    if (!genisletilmisMi) html += '<div class="sig-stats-left">' + satirlarHtml + '</div>';
     html += '<div class="sig-stats-chart">';
     if (genisletilmisMi) {
       var aktifZaman = mumZamanDilimiAl(s.sembol);
@@ -4255,7 +4264,7 @@ function sinyalleriGoster() {
       html += '<button type="button" class="cizim-btn" data-arac-tipi="tool" onclick="silgiAraciToggle(this,\'kart-lw-chart\')" title="Silgi: bir cizime dokunun">🧹</button>';
       html += '<button type="button" class="cizim-btn' + (kartFiyatCizgileriGizliMi ? " aktif" : "") + '" onclick="kartFiyatCizgileriToggle(this)" title="Giris/Hedef/Stop/Ekleme cizgilerini gizle/goster">🙈</button>';
       html += '</div>';
-      html += '<div id="kart-lw-chart" data-sembol="' + s.sembol + '" style="width:100%;height:400px;border-radius:10px;overflow:hidden;background:#0a0f1e"></div>';
+      html += '<div id="kart-lw-chart" data-sembol="' + s.sembol + '" style="width:100%;height:calc(100vh - 170px);min-height:320px;border-radius:10px;overflow:hidden;background:#0a0f1e"></div>';
     } else {
       html += '<div class="mum-grafik-yer" data-sembol="' + s.sembol + '" style="width:100%;min-height:40px;text-align:center"><span style="font-size:10px;color:#475569">Grafik yukleniyor...</span></div>';
     }
