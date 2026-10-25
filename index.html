@@ -1671,7 +1671,8 @@ var ZAMAN_DILIMI_AYARLARI = {
 // sekmesiyle AYNI standart (288 mum) - uzaklastirinca grafigin "yarim"
 // gorunmesini onlemek ve destek/direnc seviyelerini daha rahat okuyabilmek
 // icin.
-var KART_ZAMAN_DILIMI_SAYI = { "15m": 288, "1h": 288, "4h": 288, "1d": 288, "1w": 288 };
+var KART_ZAMAN_DILIMI_SAYI = { "15m": 1000, "1h": 1000, "4h": 1000, "1d": 1000, "1w": 1000 };
+var KART_ILK_GORUNEN_MUM = 288;   // grafik ilk acilista son bu kadar mumu gosterir; geri kalani uzaklastirinca gorunur
 
 function mumZamanDilimiAl(sembol) {
   return mumZamanDilimi[sembol] || "1h";
@@ -2380,7 +2381,7 @@ function kartLwGrafikGuncelle(sembol, oncedenYakalananScrollTop) {
   }
 
   var interval = mumZamanDilimiAl(sembol);
-  var sayi = KART_ZAMAN_DILIMI_SAYI[interval] || 288;
+  var sayi = KART_ZAMAN_DILIMI_SAYI[interval] || 1000;
   var klineUrl = "https://fapi.binance.com/fapi/v1/klines?symbol=" + sembol + "&interval=" + interval + "&limit=" + sayi;
 
   var xhr = new XMLHttpRequest();
@@ -2464,7 +2465,11 @@ function kartLwGrafikGuncelle(sembol, oncedenYakalananScrollTop) {
       kartSeries.applyOptions({ priceFormat: fiyatPriceFormatAyari(candleData[candleData.length - 1].close) });
       kartSeries.priceScale().applyOptions({ autoScale: true });
       kartSeries.setData(candleData);
-      kartChart.timeScale().fitContent();
+      if (candleData.length > KART_ILK_GORUNEN_MUM) {
+        kartChart.timeScale().setVisibleLogicalRange({ from: candleData.length - KART_ILK_GORUNEN_MUM, to: candleData.length + 4 });
+      } else {
+        kartChart.timeScale().fitContent();
+      }
     } else {
       // Ayni coin/zaman, AYNI chart instance hala ayakta - sadece veriyi
       // guncelle, kullanicinin yakinlastirma/kaydirma durumuna DOKUNMA
