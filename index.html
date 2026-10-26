@@ -7215,6 +7215,13 @@ var ddChart = null, ddSeries = null, ddPriceLines = [], ddSeciliCoin = "BTCUSDT"
   ddAcikSinyalDetayGizli = false, ddSonAcikSinyal = null, ddSonDestekDeger = null, ddSonDirencDeger = null,
   ddSonCokluDestekler = [], ddSonCokluDirencler = [], ddSonCandleData = null;
 
+// Kullanici grafigi surukluyor/kaydiriyor/yakinlastiriyorsa 10 saniyelik arka plan yenilemesi
+// veriyi DEGISTIRMEZ (mum ve V2 cizgileri surukleme ortasinda ayri kaymasin diye); birakinca sonraki turda gelir.
+var ddPointerBasili = false, ddEtkilesimSon = 0;
+function ddEtkilesimAktifMi() {
+  return ddPointerBasili || (Date.now() - ddEtkilesimSon < 1500);
+}
+
 function ddSekmeIlkYukle() {
   if (!ddIlkYuklendi) {
     ddIlkYuklendi = true;
@@ -7394,6 +7401,8 @@ function ddYukle(symbol) {
     var mumlar;
     try { mumlar = JSON.parse(xhr.responseText); } catch (e) { return; }
     if (!Array.isArray(mumlar) || mumlar.length === 0) { bilgiKutu.innerHTML = '<div class="empty">Veri alinamadi</div>'; return; }
+    // Ayni coin/zaman diliminin arka plan yenilemesi ve kullanici grafikle etkilesimdeyse bu turu atla
+    if (symbol + "_" + ddSeciliZaman === ddSonCizilenAnahtar && ddEtkilesimAktifMi()) return;
 
     var closes = mumlar.map(function(m) { return parseFloat(m[4]); });
 
@@ -7779,7 +7788,25 @@ function ddSmaUygula(yenidenKur) {
       seri = ddChart.addLineSeries(opts);
       ddSmaSeriler.push(seri);
     }
-    seri.setData(veri);
+    var smaGuncellendi = false;
+    if (guncelle) {
+      // Kaydirilmis grafikte setData cizgileri mumlardan geride birakiyordu: sadece son noktalari update() ile guncelle.
+      try {
+        var mevcutSma = seri.data();
+        if (mevcutSma && mevcutSma.length && veri.length) {
+          var sonT = mevcutSma[mevcutSma.length - 1].time;
+          var jj = -1;
+          for (var qq = veri.length - 1; qq >= Math.max(0, veri.length - 4); qq--) {
+            if (veri[qq].time === sonT) { jj = qq; break; }
+          }
+          if (jj >= 0) {
+            for (var q3 = jj; q3 < veri.length; q3++) seri.update(veri[q3]);
+            smaGuncellendi = true;
+          }
+        }
+      } catch (e) { smaGuncellendi = false; }
+    }
+    if (!smaGuncellendi) seri.setData(veri);
   }
   ddSmaSon = son;
   if (!guncelle && aralik) {
@@ -7821,6 +7848,11 @@ function ddGrafikCiz(candleData, destek, direnc, coinDegisti) {
       wickUpColor: "#4ade80", wickDownColor: "#f87171"
     });
     window.addEventListener("resize", function() { if (ddChart) { ddChart.applyOptions({ width: kutu.clientWidth }); ddGrafikBoyutla(); } });
+    kutu.addEventListener("pointerdown", function() { ddPointerBasili = true; ddEtkilesimSon = Date.now(); }, true);
+    kutu.addEventListener("wheel", function() { ddEtkilesimSon = Date.now(); }, { passive: true, capture: true });
+    kutu.addEventListener("touchmove", function() { ddEtkilesimSon = Date.now(); }, { passive: true, capture: true });
+    window.addEventListener("pointerup", function() { ddPointerBasili = false; ddEtkilesimSon = Date.now(); }, true);
+    window.addEventListener("pointercancel", function() { ddPointerBasili = false; ddEtkilesimSon = Date.now(); }, true);
     grafikOlcumAraciKur("dd-chart", function() { return ddChart; }, function() { return ddSeries; });
     grafikOhlcBilgisiKur("dd-chart", ddChart, function() { return ddSeries; });
   }
@@ -7843,9 +7875,29 @@ function ddGrafikCiz(candleData, destek, direnc, coinDegisti) {
   } else {
     // AYNI coin, sadece 10sn'lik otomatik yenileme - kullanicinin o an
     // yakinlastirdigi/kaydirdigi GORUNUMU BOZMADAN sadece veriyi guncelle.
-    var gorunenAralik = ddChart.timeScale().getVisibleLogicalRange();
-    ddSeries.setData(candleData);
-    if (gorunenAralik) ddChart.timeScale().setVisibleLogicalRange(gorunenAralik);
+    // Veriyi bastan yazmak (setData), kaydirilmis grafikte V2 cizgilerinin mumlardan geri kalmasina
+    // yol aciyordu. Bu yuzden son mumlari update() ile guncelliyoruz; sadece mum penceresi
+    // beklenmedik sekilde degistiyse eski yonteme (setData) donuyoruz.
+    var guncellendi = false;
+    try {
+      var mevcutMumlar = ddSeries.data();
+      if (mevcutMumlar && mevcutMumlar.length) {
+        var sonZaman = mevcutMumlar[mevcutMumlar.length - 1].time;
+        var j = -1;
+        for (var q = candleData.length - 1; q >= Math.max(0, candleData.length - 4); q--) {
+          if (candleData[q].time === sonZaman) { j = q; break; }
+        }
+        if (j >= 0) {
+          for (var q2 = j; q2 < candleData.length; q2++) ddSeries.update(candleData[q2]);
+          guncellendi = true;
+        }
+      }
+    } catch (e) { guncellendi = false; }
+    if (!guncellendi) {
+      var gorunenAralik = ddChart.timeScale().getVisibleLogicalRange();
+      ddSeries.setData(candleData);
+      if (gorunenAralik) ddChart.timeScale().setVisibleLogicalRange(gorunenAralik);
+    }
   }
 }
 
