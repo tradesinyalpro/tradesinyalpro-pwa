@@ -6645,11 +6645,18 @@ function srKayitlariGoster() {
       '<span style="font-size:11px;color:#94a3b8">LONG hedef oranı: ' + yonOran(oL) + ' &nbsp;|&nbsp; SHORT hedef oranı: ' + yonOran(oS) + '</span><br>' +
       '<span style="font-size:11px;color:#64748b">Başa baş için yaklaşık %81 hedef oranı gerekir (komisyon dahil). Aynı mumda hem hedef hem stop değerse stop sayılır. 24 saatte sonuçlanmazsa "sonuçsuz" sayılır.</span> ' +
       '<button ' + sifBtn + ' onclick="srSayacSifirla(\'otomatik\')">Otomatik sayaçları sıfırla</button></div>';
-    h += '<div class="section-title">Pozisyon Bildirimleri (butona basılmazsa ' + Math.round((d.sure_sn || 14400) / 3600) + ' saat sonra silinir)</div>';
+    h += '<div class="section-title">Pozisyon Bildirimleri (sonuçlanmamış kartlar sonuçlanana kadar kalır, sonuçlanmışlar sonuçtan ' + Math.round((d.sure_sn || 86400) / 3600) + ' saat sonra silinir)</div>';
     h += '<div class="stat-card" style="margin-bottom:8px;font-size:13px">Benim işaretlediklerim — 🎯 Hedef: <b style="color:#4ade80">' + hedef +
       '</b> &nbsp;|&nbsp; 🛑 Stop: <b style="color:#f87171">' + stop + '</b> &nbsp;|&nbsp; Hedef oranı: <b>' + (oran === "-" ? "-" : "%" + oran) + '</b>' +
       ' &nbsp; <button ' + sifBtn + ' onclick="srSayacSifirla(\'manuel\')">Sayaçları sıfırla</button></div>';
     var k = d.kayitlar || [];
+    // Sonuçlanmamış (takipte) kartlar üstte, sonuçlanmışlar altta; her grup kendi içinde yeniden eskiye
+    var acikKartlar = k.filter(function(z) { return !z.otomatik; }).sort(function(a, b) { return b.zaman - a.zaman; });
+    var kapaliKartlar = k.filter(function(z) { return !!z.otomatik; }).sort(function(a, b) { return b.zaman - a.zaman; });
+    k = acikKartlar.concat(kapaliKartlar);
+    h += '<div class="stat-card" style="margin-bottom:8px;font-size:13px">⏳ Sonuçlanmamış: <b style="color:#fbbf24">' + acikKartlar.length +
+      '</b> &nbsp;|&nbsp; ✅ Sonuçlanmış: <b>' + kapaliKartlar.length + '</b>' +
+      (k.length ? ' &nbsp; <button ' + sifBtn + ' onclick="srTumKartlariSil()">🗑 Tüm kartları sil</button>' : '') + '</div>';
     if (!k.length) {
       h += '<div class="empty" style="padding:10px 0">Şu an bekleyen bildirim kartı yok.</div>';
     }
@@ -6701,6 +6708,20 @@ function srSayacSifirla(hangisi) {
   };
   xhr.onerror = function() { alert("Sunucuya ulaşılamadı."); };
   xhr.send(JSON.stringify({ hangisi: hangisi }));
+}
+
+function srTumKartlariSil() {
+  if (!confirm("Panelde görünen TÜM kartlar silinsin mi?\n\nSayaçlar silinmez. Sonuçlanmamış kartlar panelden kalkar ama otomatik takip arka planda sürer.")) return;
+  var xhr = new XMLHttpRequest();
+  xhr.open("POST", API + "/admin/sr-kayit-hepsini-sil", true);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status !== 200) alert("Kartlar silinemedi (kod " + xhr.status + ").");
+    srKayitlariGoster();
+  };
+  xhr.onerror = function() { alert("Sunucuya ulaşılamadı."); };
+  xhr.send("{}");
 }
 
 function srKayitSonuc(id, sonuc) {
