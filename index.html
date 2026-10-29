@@ -6657,46 +6657,81 @@ function srKayitlariGoster() {
     h += '<div class="stat-card" style="margin-bottom:8px;font-size:13px">⏳ Sonuçlanmamış: <b style="color:#fbbf24">' + acikKartlar.length +
       '</b> &nbsp;|&nbsp; ✅ Sonuçlanmış: <b>' + kapaliKartlar.length + '</b>' +
       (k.length ? ' &nbsp; <button ' + sifBtn + ' onclick="srTumKartlariSil()">🗑 Tüm kartları sil</button>' : '') + '</div>';
-    if (!k.length) {
-      h += '<div class="empty" style="padding:10px 0">Şu an bekleyen bildirim kartı yok.</div>';
-    }
     srKartlar = {};
-    for (var i = 0; i < k.length; i++) {
-      var x = k[i];
-      // Sonuçlanmamış kartlarla sonuçlanmışlar arasına kalın kırmızı ayırıcı çizgi
-      if (i === acikKartlar.length && acikKartlar.length > 0) {
-        h += '<div style="border-top:9px solid #ef4444;margin:14px 0"></div>';
-      }
-      srKartlar[x.id] = x;
-      var lMi = x.yon === "LONG";
-      var renk = lMi ? "#4ade80" : "#f87171";
-      var dk = Math.max(0, Math.floor((sunucuZaman - x.zaman) / 60));
-      var once = dk < 1 ? "az önce" : (dk < 60 ? dk + " dk önce" : Math.floor(dk / 60) + " sa " + (dk % 60) + " dk önce");
-      var coin = String(x.sembol || "").replace(/[<>&"]/g, "");
-      var btn = 'style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;margin:4px 6px 0 0"';
-      var durum, butonlar;
-      if (x.otomatik) {
-        var sa = new Date((x.otomatik_zaman || 0) * 1000).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
-        durum = x.otomatik === "hedef"
-          ? '<span style="color:#4ade80">✅ Hedef oldu (otomatik, ' + sa + ')</span>'
-          : '<span style="color:#f87171">❌ Stop oldu (otomatik, ' + sa + ')</span>';
-        butonlar = '<button ' + btn + ' onclick="srKayitSonuc(' + x.id + ',\'sil\')">🗑 Kartı sil</button>';
-      } else {
-        durum = '<span style="color:#fbbf24">⏳ Takipte</span>';
-        butonlar = '<button ' + btn + ' onclick="srKayitSonuc(' + x.id + ',\'hedef\')">🎯 Hedef oldu</button>' +
-          '<button ' + btn + ' onclick="srKayitSonuc(' + x.id + ',\'stop\')">🛑 Stop oldu</button>' +
-          '<button ' + btn + ' onclick="srKayitSonuc(' + x.id + ',\'sil\')">🗑 Pozisyona girmedim (sil)</button>';
-      }
-      h += '<div class="stat-card" style="margin-bottom:8px;border-left:3px solid ' + renk + ';font-size:12px;line-height:1.7">' +
-        '<div style="font-size:14px"><b>' + (lMi ? '🟢 LONG' : '🔴 SHORT') + ' · ' + coin + '</b> <span style="color:#64748b;font-size:11px">' + once + '</span></div>' +
-        (lMi ? 'Destek' : 'Direnç') + ': <b>' + srFiyatYaz(x.seviye) + '</b> &nbsp;|&nbsp; Giriş (bildirim fiyatı): <b>' + srFiyatYaz(x.fiyat) + '</b> &nbsp;|&nbsp; 15 dk RSI: <b>' + Number(x.rsi).toFixed(1) + '</b><br>' +
-        '🎯 Hedef: <b>' + srFiyatYaz(x.hedef) + '</b> &nbsp;|&nbsp; 🛑 Stop: <b>' + srFiyatYaz(x.stop) + '</b> &nbsp;|&nbsp; ' + durum + '<br>' +
-        butonlar + '<button ' + btn + ' onclick="srPaylas(' + x.id + ')">📣 Paylaşım metni</button></div>';
-    }
+    for (var q = 0; q < k.length; q++) srKartlar[k[q].id] = k[q];
+    srSonVeri = { acik: acikKartlar, kapali: kapaliKartlar, zaman: sunucuZaman };
+    // Arama kutusu (yenilemede yazılan metin ve imleç korunur)
+    h += '<div style="margin-bottom:8px"><input id="sr-arama-kutu" type="search" placeholder="🔍 Coin ara (örn: BTC)" value="' + String(srAramaMetni).replace(/[<>&"]/g, "") + '" oninput="srAramaDegisti(this.value)" autocomplete="off" autocapitalize="characters" style="width:100%;box-sizing:border-box;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:9px 12px;border-radius:8px;font-size:14px"></div>';
+    h += '<div id="sr-kart-liste"></div>';
+    var ak = document.activeElement;
+    var odakVar = !!(ak && ak.id === "sr-arama-kutu");
+    var imlec = odakVar && ak.selectionStart != null ? ak.selectionStart : 0;
     kutu.innerHTML = h;
+    srKartListesiCiz();
+    if (odakVar) {
+      var yeniKutu = document.getElementById("sr-arama-kutu");
+      if (yeniKutu) { yeniKutu.focus(); try { yeniKutu.setSelectionRange(imlec, imlec); } catch (e) {} }
+    }
   };
   xhr.onerror = function() {};
   xhr.send();
+}
+
+var srAramaMetni = "";
+var srSonVeri = null;
+
+function srAramaDegisti(v) {
+  srAramaMetni = String(v || "");
+  srKartListesiCiz();
+}
+
+function srKartListesiCiz() {
+  var liste = document.getElementById("sr-kart-liste");
+  if (!liste || !srSonVeri) return;
+  var arama = String(srAramaMetni || "").trim().toUpperCase();
+  function uygun(z) { return !arama || String(z.sembol || "").toUpperCase().indexOf(arama) !== -1; }
+  var acikKartlar = srSonVeri.acik.filter(uygun);
+  var kapaliKartlar = srSonVeri.kapali.filter(uygun);
+  var k = acikKartlar.concat(kapaliKartlar);
+  var sunucuZaman = srSonVeri.zaman;
+  var h = "";
+  if (!srSonVeri.acik.length && !srSonVeri.kapali.length) {
+    h += '<div class="empty" style="padding:10px 0">Şu an bekleyen bildirim kartı yok.</div>';
+  } else if (!k.length) {
+    h += '<div class="empty" style="padding:10px 0">Sonuç bulunamadı.</div>';
+  }
+  for (var i = 0; i < k.length; i++) {
+    var x = k[i];
+    // Sonuçlanmamış kartlarla sonuçlanmışlar arasına kalın kırmızı ayırıcı çizgi
+    if (i === acikKartlar.length && acikKartlar.length > 0) {
+      h += '<div style="border-top:9px solid #ef4444;margin:14px 0"></div>';
+    }
+    var lMi = x.yon === "LONG";
+    var renk = lMi ? "#4ade80" : "#f87171";
+    var dk = Math.max(0, Math.floor((sunucuZaman - x.zaman) / 60));
+    var once = dk < 1 ? "az önce" : (dk < 60 ? dk + " dk önce" : Math.floor(dk / 60) + " sa " + (dk % 60) + " dk önce");
+    var coin = String(x.sembol || "").replace(/[<>&"]/g, "");
+    var btn = 'style="background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;margin:4px 6px 0 0"';
+    var durum, butonlar;
+    if (x.otomatik) {
+      var sa = new Date((x.otomatik_zaman || 0) * 1000).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+      durum = x.otomatik === "hedef"
+        ? '<span style="color:#4ade80">✅ Hedef oldu (otomatik, ' + sa + ')</span>'
+        : '<span style="color:#f87171">❌ Stop oldu (otomatik, ' + sa + ')</span>';
+      butonlar = '<button ' + btn + ' onclick="srKayitSonuc(' + x.id + ',\'sil\')">🗑 Kartı sil</button>';
+    } else {
+      durum = '<span style="color:#fbbf24">⏳ Takipte</span>';
+      butonlar = '<button ' + btn + ' onclick="srKayitSonuc(' + x.id + ',\'hedef\')">🎯 Hedef oldu</button>' +
+        '<button ' + btn + ' onclick="srKayitSonuc(' + x.id + ',\'stop\')">🛑 Stop oldu</button>' +
+        '<button ' + btn + ' onclick="srKayitSonuc(' + x.id + ',\'sil\')">🗑 Pozisyona girmedim (sil)</button>';
+    }
+    h += '<div class="stat-card" style="margin-bottom:8px;border-left:3px solid ' + renk + ';font-size:12px;line-height:1.7">' +
+      '<div style="font-size:14px"><b>' + (lMi ? '🟢 LONG' : '🔴 SHORT') + ' · ' + coin + '</b> <span style="color:#64748b;font-size:11px">' + once + '</span></div>' +
+      (lMi ? 'Destek' : 'Direnç') + ': <b>' + srFiyatYaz(x.seviye) + '</b> &nbsp;|&nbsp; Giriş (bildirim fiyatı): <b>' + srFiyatYaz(x.fiyat) + '</b> &nbsp;|&nbsp; 15 dk RSI: <b>' + Number(x.rsi).toFixed(1) + '</b><br>' +
+      '🎯 Hedef: <b>' + srFiyatYaz(x.hedef) + '</b> &nbsp;|&nbsp; 🛑 Stop: <b>' + srFiyatYaz(x.stop) + '</b> &nbsp;|&nbsp; ' + durum + '<br>' +
+      butonlar + '<button ' + btn + ' onclick="srPaylas(' + x.id + ')">📣 Paylaşım metni</button></div>';
+  }
+  liste.innerHTML = h;
 }
 
 function srSayacSifirla(hangisi) {
