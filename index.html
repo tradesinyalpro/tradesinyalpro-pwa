@@ -6818,51 +6818,53 @@ function srMetinKur(x, kip, kisa) {
   var base = Number(x.fiyat) || 1;
   var hr = Math.round(Math.abs(Number(x.hedef) - base) / base * 800);
   var sr = Math.round(Math.abs(Number(x.stop) - base) / base * 800);
-  // Her cümle ayrı satırda, başında uygun ikonla. "kisa" = isteğe bağlı satırlar yazılmaz (280 karakter için).
+  // Her cümle ayrı satırda, başında uygun ikonla. Cümleler en az 5-6 kelimelik tam cümledir
+  // (2-3 kelimelik kısa kalıplar işlem çağrısı gibi durur, X spam saymasın diye kullanılmaz).
+  // "kisa" = isteğe bağlı satırlar yazılmaz (280 karakter için).
   var satirlar = [];
   if (kip === "hedef") {
     satirlar.push(srRastgele([
-      "✅ " + c + " " + yon + " hedefe ulaştı.",
-      c + " " + yon + " pozisyonu hedefte kapandı ✅",
-      "Hedef geldi ✅ " + c + " " + yon,
-      c + " için hedefe ulaşıldı ✅",
-      "Planlandığı gibi kapandı ✅ " + c + " " + yon
+      "✅ " + c + " için açtığım " + yon + " pozisyon hedefe ulaştı.",
+      c + " " + yon + " pozisyonu planlandığı gibi hedefte kapandı ✅",
+      "Beklediğim hedef geldi ve " + c + " " + yon + " pozisyonu kapandı ✅",
+      c + " için hedefe ulaşıldı, pozisyonu kapattım ✅",
+      "Planlandığı gibi kapandı ✅ " + c + " " + yon + " pozisyonu hedefe ulaştı"
     ]));
     satirlar.push("📍 Giriş: " + g);
     satirlar.push("🎯 Hedef: " + h);
     satirlar.push("💰 Kazanç: ≈ %" + hr + " (8x izole, marjin üzerinden)");
   } else if (kip === "stop") {
     satirlar.push(srRastgele([
-      "❌ " + c + " " + yon + " stop oldu.",
-      c + " " + yon + " pozisyonu stopta kapandı ❌",
-      "Stop çalıştı ❌ " + c + " " + yon,
-      c + " için stop oldu ❌",
-      "Bu sefer stop ❌ " + c + " " + yon
+      "❌ " + c + " için açtığım " + yon + " pozisyon stop oldu.",
+      c + " " + yon + " pozisyonu stopta kapandı, bu sefer olmadı ❌",
+      "Stop çalıştı ve " + c + " " + yon + " pozisyonu kapandı ❌",
+      c + " için stop oldu, pozisyonu kapattım ❌",
+      "Bu sefer plan tutmadı, " + c + " " + yon + " pozisyonu stop oldu ❌"
     ]));
     satirlar.push("📍 Giriş: " + g);
     satirlar.push("🛑 Stop: " + s);
     satirlar.push("📉 Kayıp: %" + sr + " (8x izole, marjin üzerinden)");
     if (!kisa && Math.random() < 0.5) satirlar.push(srRastgele([
-      "💬 Bu sefer olmadı.",
-      "💬 Risk yönetimi bunun için."
+      "💬 Bu sefer olmadı, bir sonraki fırsata bakıyorum.",
+      "💬 Risk yönetimi tam da bunun için var."
     ]));
   } else {
     // [başlık, yorum] çiftleri: yorum cümlesi giriş satırından ÖNCE gelir
     var cift = lMi ? srRastgele([
-      [c + " destek bölgesine geldi, long denedim 🟢", "Destekten tepki arıyorum."],
-      [c + " için long pozisyon açtım 🟢", "Destekten tepki arıyorum."],
-      ["Bugünün long denemesi " + c + " oldu 🟢", "Fiyat desteğe yaklaşınca tepki gelir mi diye bakıyorum."],
-      [c + " desteğe oturdu, long girdim 🟢", "Buradan tepki gelmesini bekliyorum."],
-      ["Radarımdaki " + c + " desteğe gelince long açtım 🟢", "Destekten tepki arıyorum."],
-      [c + " aşağıda tutunabilir diye long denedim 🟢", "Destek bölgesinde nasıl bir tepki geleceğini izliyorum."],
+      [c + " destek bölgesine geldi, bu yüzden long denedim 🟢", "Bu destek bölgesinden tepki gelip gelmeyeceğini izliyorum."],
+      [c + " için destek bölgesinden long pozisyon açtım 🟢", "Fiyatın bu destekte tutunup tutunamayacağını izliyorum."],
+      ["Bugünün long denemesi " + c + " oldu, desteğe yakın girdim 🟢", "Fiyat desteğe yaklaşınca tepki gelir mi diye bakıyorum."],
+      [c + " desteğe oturunca ben de long pozisyon girdim 🟢", "Buradan bir tepki gelmesini bekliyorum."],
+      ["Radarımdaki " + c + " desteğe gelince long pozisyon açtım 🟢", "Destek bölgesinden nasıl bir tepki geleceğini izliyorum."],
+      [c + " aşağıda tutunabilir diye long pozisyon denedim 🟢", "Destek bölgesinde alıcıların nasıl davranacağını izliyorum."],
       [c + " fiyatı desteğe temas edince long pozisyon açtım 🟢", "Burada alıcıların tepki verip vermeyeceğini izliyorum."]
     ]) : srRastgele([
-      [c + " direnç bölgesine geldi, short denedim 🔴", "Dirençten tepki arıyorum."],
-      [c + " için short pozisyon açtım 🔴", "Dirençten tepki arıyorum."],
-      ["Bugünün short denemesi " + c + " oldu 🔴", "Fiyat dirence yaklaşınca tepki gelir mi diye bakıyorum."],
-      [c + " dirence dayandı, short girdim 🔴", "Buradan tepki gelmesini bekliyorum."],
-      ["Radarımdaki " + c + " dirence gelince short açtım 🔴", "Dirençten tepki arıyorum."],
-      [c + " yukarıda zorlanabilir diye short denedim 🔴", "Direnç bölgesinde nasıl bir tepki geleceğini izliyorum."],
+      [c + " direnç bölgesine geldi, bu yüzden short denedim 🔴", "Bu direnç bölgesinden tepki gelip gelmeyeceğini izliyorum."],
+      [c + " için direnç bölgesinden short pozisyon açtım 🔴", "Fiyatın bu dirençte zorlanıp zorlanmayacağını izliyorum."],
+      ["Bugünün short denemesi " + c + " oldu, dirence yakın girdim 🔴", "Fiyat dirence yaklaşınca tepki gelir mi diye bakıyorum."],
+      [c + " dirence dayanınca ben de short pozisyon girdim 🔴", "Buradan bir tepki gelmesini bekliyorum."],
+      ["Radarımdaki " + c + " dirence gelince short pozisyon açtım 🔴", "Direnç bölgesinden nasıl bir tepki geleceğini izliyorum."],
+      [c + " yukarıda zorlanabilir diye short pozisyon denedim 🔴", "Direnç bölgesinde satıcıların nasıl davranacağını izliyorum."],
       [c + " fiyatı dirence temas edince short pozisyon açtım 🔴", "Burada satıcıların tepki verip vermeyeceğini izliyorum."]
     ]);
     satirlar.push(cift[0]);
@@ -6883,11 +6885,11 @@ function srMetinKur(x, kip, kisa) {
       "💼 Marjin kişiseldir, risk herkesin kendi kararı."
     ]));
     if (!kisa && Math.random() < 0.6) satirlar.push(srRastgele([
-      "👀 Sonucu buradan paylaşırım.",
-      "👀 Gelişmeyi buradan aktaracağım.",
-      "👀 Nasıl biteceğini göreceğiz.",
-      "👀 Sonucu da buradan yazarım.",
-      "👀 Pozisyonu takip ediyorum."
+      "👀 Sonucu burada sizlerle paylaşırım.",
+      "👀 Gelişmeyi buradan sizlere aktaracağım.",
+      "👀 Pozisyonun nasıl biteceğini birlikte göreceğiz.",
+      "👀 Sonucu da buradan sizinle paylaşırım.",
+      "👀 Pozisyonu yakından takip ediyorum."
     ]));
   }
   satirlar.push(SR_UYARI);
@@ -7403,7 +7405,7 @@ function ddBorsaAc(borsa) {
     // Telefonda app.binance.com: Binance uygulamasinin "desteklenen web adresleri" listesinde bu alan adi var
     url = (telefon ? "https://app.binance.com/en/futures/" : "https://www.binance.com/en/futures/") + sem;
   } else if (borsa === "bybit") {
-    url = "https://www.bybit.com/trade/usdt/" + sem;
+    url = "https://www.bybit.com/en/trade/usdt/" + sem;
   } else if (borsa === "bitget") {
     url = "https://www.bitget.com/futures/usdt/" + sem;
   } else if (borsa === "okx") {
