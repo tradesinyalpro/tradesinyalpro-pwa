@@ -6810,7 +6810,7 @@ function srTweetUzunluk(s) {
   return n;
 }
 
-function srMetinKur(x, kip) {
+function srMetinKur(x, kip, kisa) {
   var c = srEtiket(x.sembol);
   var lMi = x.yon === "LONG";
   var yon = lMi ? "long" : "short";
@@ -6818,72 +6818,80 @@ function srMetinKur(x, kip) {
   var base = Number(x.fiyat) || 1;
   var hr = Math.round(Math.abs(Number(x.hedef) - base) / base * 800);
   var sr = Math.round(Math.abs(Number(x.stop) - base) / base * 800);
-  var govde;
+  // Her cümle ayrı satırda, başında uygun ikonla. "kisa" = isteğe bağlı satırlar yazılmaz (280 karakter için).
+  var satirlar = [];
   if (kip === "hedef") {
-    govde = srRastgele([
-      "✅ " + c + " " + yon + " hedefe ulaştı. " + g + " → " + h + " (8x izole, marjin üzerinden ≈ %" + hr + ")",
-      c + " " + yon + " pozisyonu hedefte kapandı ✅ Giriş " + g + ", çıkış " + h + ".",
-      "Hedef geldi ✅ " + c + " " + yon + ": " + g + " → " + h + ".",
-      c + " için hedefe ulaşıldı ✅ (" + yon + ", giriş " + g + ", hedef " + h + ")",
-      "Planlandığı gibi kapandı ✅ " + c + " " + yon + ", " + g + " → " + h + " (8x izole)."
-    ]);
+    satirlar.push(srRastgele([
+      "✅ " + c + " " + yon + " hedefe ulaştı.",
+      c + " " + yon + " pozisyonu hedefte kapandı ✅",
+      "Hedef geldi ✅ " + c + " " + yon,
+      c + " için hedefe ulaşıldı ✅",
+      "Planlandığı gibi kapandı ✅ " + c + " " + yon
+    ]));
+    satirlar.push("📍 Giriş: " + g);
+    satirlar.push("🎯 Hedef: " + h);
+    satirlar.push("💰 Kazanç: ≈ %" + hr + " (8x izole, marjin üzerinden)");
   } else if (kip === "stop") {
-    govde = srRastgele([
-      "❌ " + c + " " + yon + " stop oldu. " + g + " → " + s + " (8x izole, marjin üzerinden %" + sr + " kayıp)",
-      c + " " + yon + " pozisyonu stopta kapandı ❌ Giriş " + g + ", çıkış " + s + ". Bu sefer olmadı.",
-      "Stop çalıştı ❌ " + c + " " + yon + ": " + g + " → " + s + ".",
-      c + " için stop oldu ❌ (" + yon + ", giriş " + g + ", stop " + s + "). Risk yönetimi bunun için.",
-      "Bu sefer stop ❌ " + c + " " + yon + ", " + g + " → " + s + " (8x izole)."
-    ]);
+    satirlar.push(srRastgele([
+      "❌ " + c + " " + yon + " stop oldu.",
+      c + " " + yon + " pozisyonu stopta kapandı ❌",
+      "Stop çalıştı ❌ " + c + " " + yon,
+      c + " için stop oldu ❌",
+      "Bu sefer stop ❌ " + c + " " + yon
+    ]));
+    satirlar.push("📍 Giriş: " + g);
+    satirlar.push("🛑 Stop: " + s);
+    satirlar.push("📉 Kayıp: %" + sr + " (8x izole, marjin üzerinden)");
+    if (!kisa && Math.random() < 0.5) satirlar.push(srRastgele([
+      "💬 Bu sefer olmadı.",
+      "💬 Risk yönetimi bunun için."
+    ]));
   } else {
-    var baslik = lMi ? srRastgele([
-      c + " destek bölgesine geldi, long denedim 🟢",
-      c + " için long pozisyon açtım 🟢 Destekten tepki arıyorum.",
-      "Bugünün long denemesi " + c + " 🟢 Fiyat desteğe yaklaştı.",
-      c + " desteğe oturdu, long girdim 🟢",
-      "Radarımdaki " + c + " desteğe gelince long açtım 🟢",
-      c + " aşağıda tutunabilir diye long denedim 🟢",
-      "Long pozisyon: " + c + " 🟢 Desteğe temas var."
+    // [başlık, yorum] çiftleri: yorum cümlesi giriş satırından ÖNCE gelir
+    var cift = lMi ? srRastgele([
+      [c + " destek bölgesine geldi, long denedim 🟢", "Destekten tepki arıyorum."],
+      [c + " için long pozisyon açtım 🟢", "Destekten tepki arıyorum."],
+      ["Bugünün long denemesi " + c + " 🟢", "Fiyat desteğe yaklaştı."],
+      [c + " desteğe oturdu, long girdim 🟢", "Buradan tepki bekliyorum."],
+      ["Radarımdaki " + c + " desteğe gelince long açtım 🟢", "Destekten tepki arıyorum."],
+      [c + " aşağıda tutunabilir diye long denedim 🟢", "Destek bölgesini izliyorum."],
+      ["Long pozisyon: " + c + " 🟢", "Desteğe temas var."]
     ]) : srRastgele([
-      c + " direnç bölgesine geldi, short denedim 🔴",
-      c + " için short pozisyon açtım 🔴 Dirençten tepki arıyorum.",
-      "Bugünün short denemesi " + c + " 🔴 Fiyat dirence yaklaştı.",
-      c + " dirence dayandı, short girdim 🔴",
-      "Radarımdaki " + c + " dirence gelince short açtım 🔴",
-      c + " yukarıda zorlanabilir diye short denedim 🔴",
-      "Short pozisyon: " + c + " 🔴 Dirence temas var."
+      [c + " direnç bölgesine geldi, short denedim 🔴", "Dirençten tepki arıyorum."],
+      [c + " için short pozisyon açtım 🔴", "Dirençten tepki arıyorum."],
+      ["Bugünün short denemesi " + c + " 🔴", "Fiyat dirence yaklaştı."],
+      [c + " dirence dayandı, short girdim 🔴", "Buradan tepki bekliyorum."],
+      ["Radarımdaki " + c + " dirence gelince short açtım 🔴", "Dirençten tepki arıyorum."],
+      [c + " yukarıda zorlanabilir diye short denedim 🔴", "Direnç bölgesini izliyorum."],
+      ["Short pozisyon: " + c + " 🔴", "Dirence temas var."]
     ]);
-    var deger = srRastgele([
-      "Giriş " + g + ", hedef " + h + ", stop " + s + ".",
-      "Giriş: " + g + " · Hedef: " + h + " · Stop: " + s,
-      "Giriş " + g + " | TP " + h + " | SL " + s,
-      "🎯 " + h + " · 🛑 " + s + " · giriş " + g,
-      "Hedef " + h + ", stop " + s + ". Giriş " + g + "."
-    ]);
-    var risk = srRastgele([
-      "8x izole. Stop'ta marjin kaybı %" + sr + ".",
-      "Kaldıraç 8x izole, stop zararı %" + sr + " (marjin üzerinden).",
-      "8x izole · stop olursa marjinde %" + sr + " kayıp.",
-      "8x izole. Hedefte kazanç ≈ %" + hr + ", stopta kayıp %" + sr + " (marjin üzerinden)."
-    ]);
-    var parcalar = [baslik];
-    if (Math.random() < 0.5) { parcalar.push(deger); parcalar.push(risk); } else { parcalar.push(risk); parcalar.push(deger); }
-    if (Math.random() < 0.7) parcalar.push(srRastgele([
-      "Marjin ve risk herkese göre değişir.",
-      "Risk yönetimi herkesin kendi sorumluluğunda.",
-      "Tutar ve risk kişiye göre değişir.",
-      "Marjin kişiseldir, risk herkesin kendi kararı."
+    satirlar.push(cift[0]);
+    satirlar.push("💬 " + cift[1]);
+    satirlar.push("📍 Giriş: " + g);
+    satirlar.push("🎯 Hedef: " + h);
+    satirlar.push("🛑 Stop: " + s);
+    satirlar.push(srRastgele([
+      "⚙️ 8x izole. Stop'ta marjin kaybı %" + sr + ".",
+      "⚙️ Kaldıraç 8x izole, stop zararı %" + sr + " (marjin üzerinden).",
+      "⚙️ 8x izole · stop olursa marjinde %" + sr + " kayıp.",
+      "⚙️ 8x izole. Hedefte kazanç ≈ %" + hr + ", stopta kayıp %" + sr + "."
     ]));
-    if (Math.random() < 0.6) parcalar.push(srRastgele([
-      "Sonucu paylaşırım.",
-      "Gelişmeyi buradan aktaracağım.",
-      "Nasıl biteceğini göreceğiz.",
-      "Sonucu da yazarım.",
-      "Takipteyim."
+    if (!kisa && Math.random() < 0.7) satirlar.push(srRastgele([
+      "💼 Marjin ve risk herkese göre değişir.",
+      "💼 Risk yönetimi herkesin kendi sorumluluğunda.",
+      "💼 Tutar ve risk kişiye göre değişir.",
+      "💼 Marjin kişiseldir, risk herkesin kendi kararı."
     ]));
-    govde = parcalar.join(Math.random() < 0.7 ? "\n" : " ");
+    if (!kisa && Math.random() < 0.6) satirlar.push(srRastgele([
+      "👀 Sonucu paylaşırım.",
+      "👀 Gelişmeyi buradan aktaracağım.",
+      "👀 Nasıl biteceğini göreceğiz.",
+      "👀 Sonucu da yazarım.",
+      "👀 Takipteyim."
+    ]));
   }
-  return govde + "\n" + SR_UYARI;
+  satirlar.push(SR_UYARI);
+  return satirlar.join("\n");
 }
 
 function srPaylasUret() {
@@ -6892,8 +6900,15 @@ function srPaylasUret() {
   if (!x || !ta) return;
   var m = "";
   for (var i = 0; i < 40; i++) {
-    m = srMetinKur(x, srPaylasDurum.kip);
+    m = srMetinKur(x, srPaylasDurum.kip, false);
     if (m !== srPaylasDurum.son && srTweetUzunluk(m) <= 280) break;
+  }
+  // Hâlâ 280'i aşıyorsa isteğe bağlı satırlar olmadan dene
+  if (srTweetUzunluk(m) > 280) {
+    for (var j = 0; j < 20; j++) {
+      m = srMetinKur(x, srPaylasDurum.kip, true);
+      if (m !== srPaylasDurum.son && srTweetUzunluk(m) <= 280) break;
+    }
   }
   srPaylasDurum.son = m;
   ta.value = m;
