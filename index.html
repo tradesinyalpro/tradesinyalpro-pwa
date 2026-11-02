@@ -6851,19 +6851,19 @@ function srMetinKur(x, kip, kisa) {
     var cift = lMi ? srRastgele([
       [c + " destek bölgesine geldi, long denedim 🟢", "Destekten tepki arıyorum."],
       [c + " için long pozisyon açtım 🟢", "Destekten tepki arıyorum."],
-      ["Bugünün long denemesi " + c + " 🟢", "Fiyat desteğe yaklaştı."],
-      [c + " desteğe oturdu, long girdim 🟢", "Buradan tepki bekliyorum."],
+      ["Bugünün long denemesi " + c + " oldu 🟢", "Fiyat desteğe yaklaşınca tepki gelir mi diye bakıyorum."],
+      [c + " desteğe oturdu, long girdim 🟢", "Buradan tepki gelmesini bekliyorum."],
       ["Radarımdaki " + c + " desteğe gelince long açtım 🟢", "Destekten tepki arıyorum."],
-      [c + " aşağıda tutunabilir diye long denedim 🟢", "Destek bölgesini izliyorum."],
-      ["Long pozisyon: " + c + " 🟢", "Desteğe temas var."]
+      [c + " aşağıda tutunabilir diye long denedim 🟢", "Destek bölgesinde nasıl bir tepki geleceğini izliyorum."],
+      [c + " fiyatı desteğe temas edince long pozisyon açtım 🟢", "Burada alıcıların tepki verip vermeyeceğini izliyorum."]
     ]) : srRastgele([
       [c + " direnç bölgesine geldi, short denedim 🔴", "Dirençten tepki arıyorum."],
       [c + " için short pozisyon açtım 🔴", "Dirençten tepki arıyorum."],
-      ["Bugünün short denemesi " + c + " 🔴", "Fiyat dirence yaklaştı."],
-      [c + " dirence dayandı, short girdim 🔴", "Buradan tepki bekliyorum."],
+      ["Bugünün short denemesi " + c + " oldu 🔴", "Fiyat dirence yaklaşınca tepki gelir mi diye bakıyorum."],
+      [c + " dirence dayandı, short girdim 🔴", "Buradan tepki gelmesini bekliyorum."],
       ["Radarımdaki " + c + " dirence gelince short açtım 🔴", "Dirençten tepki arıyorum."],
-      [c + " yukarıda zorlanabilir diye short denedim 🔴", "Direnç bölgesini izliyorum."],
-      ["Short pozisyon: " + c + " 🔴", "Dirence temas var."]
+      [c + " yukarıda zorlanabilir diye short denedim 🔴", "Direnç bölgesinde nasıl bir tepki geleceğini izliyorum."],
+      [c + " fiyatı dirence temas edince short pozisyon açtım 🔴", "Burada satıcıların tepki verip vermeyeceğini izliyorum."]
     ]);
     satirlar.push(cift[0]);
     satirlar.push("💬 " + cift[1]);
@@ -6883,11 +6883,11 @@ function srMetinKur(x, kip, kisa) {
       "💼 Marjin kişiseldir, risk herkesin kendi kararı."
     ]));
     if (!kisa && Math.random() < 0.6) satirlar.push(srRastgele([
-      "👀 Sonucu paylaşırım.",
+      "👀 Sonucu buradan paylaşırım.",
       "👀 Gelişmeyi buradan aktaracağım.",
       "👀 Nasıl biteceğini göreceğiz.",
-      "👀 Sonucu da yazarım.",
-      "👀 Takipteyim."
+      "👀 Sonucu da buradan yazarım.",
+      "👀 Pozisyonu takip ediyorum."
     ]));
   }
   satirlar.push(SR_UYARI);
