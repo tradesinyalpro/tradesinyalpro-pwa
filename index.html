@@ -619,6 +619,11 @@
       <button class="bot-btn" onclick="balinaFiltre('hisse',this)">ABD Hisseleri</button>
       <button class="bot-btn" onclick="balinaFiltre('hyperliquid',this)">Cüzdan Takip</button>
     </div>
+    <div id="balina-arama-wrap" style="margin-bottom:10px">
+      <input id="balina-arama" type="text" placeholder="Coin ara (örn: SOL) - bu sekmede varsa direkt o gelsin"
+        oninput="balinaGoster()" autocomplete="off"
+        style="width:100%;background:#0a0f1e;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px;box-sizing:border-box">
+    </div>
     <div id="hyperliquid-arama-wrap" style="display:none;margin-bottom:10px">
       <input id="hyperliquid-arama" type="text" placeholder="Coin ara (orn: BTC) - o coindeki tum balinalari gor"
         oninput="hyperliquidGoster()" autocomplete="off"
@@ -5288,6 +5293,8 @@ function balinaFiltre(kategori, el) {
   altcoinDetaySembol = null;
   balinaCoinDetay = null;
   hyperliquidCuzdanDetay = null;
+  var blAramaTemizle = document.getElementById("balina-arama");
+  if (blAramaTemizle) blAramaTemizle.value = "";
   var btnlar = document.querySelectorAll("#balina .bot-btn");
   for (var i = 0; i < btnlar.length; i++) btnlar[i].classList.remove("active");
   el.classList.add("active");
@@ -5365,6 +5372,8 @@ function balinaGoster() {
   // (tumHyperliquid) besleniyor - diger 3 sekmenin (Kripto/Altcoin/Hisse)
   // Binance tabanli tumBalina mantigina hic girmeden erken donuyoruz.
   if (balinaKategori === "hyperliquid") {
+    var blAramaGizle = document.getElementById("balina-arama-wrap");
+    if (blAramaGizle) blAramaGizle.style.display = "none";
     hyperliquidGoster();
     return;
   }
@@ -5372,6 +5381,10 @@ function balinaGoster() {
   // Diger 3 kategoride hyperliquid'e ozel arama kutusu gorunmesin.
   var hlAramaKutu = document.getElementById("hyperliquid-arama-wrap");
   if (hlAramaKutu) hlAramaKutu.style.display = "none";
+
+  var blAramaWrap = document.getElementById("balina-arama-wrap");
+  var detayAcik = (balinaKategori === "altcoin" && altcoinDetaySembol) || (balinaKategori !== "altcoin" && balinaCoinDetay);
+  if (blAramaWrap) blAramaWrap.style.display = detayAcik ? "none" : "";
 
   // Backend artik islemleri coin bazinda ({"BTCUSDT":[...], ...}) gonderiyor,
   // her coin kendi icinde en fazla 20 kayit tutuyor. Mevcut filtreleme
@@ -5415,6 +5428,25 @@ function balinaGoster() {
     return;
   }
 
+  // --- Coin arama (sadece bu sekmedeki coinler) ---
+  var blAramaGirdi = document.getElementById("balina-arama");
+  var aramaM = blAramaGirdi ? blAramaGirdi.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "") : "";
+  if (aramaM) {
+    islemler = islemler.filter(function(t) { return String(t.sembol || "").toUpperCase().indexOf(aramaM) !== -1; });
+    Object.keys(ozet).forEach(function(s) {
+      if (s.toUpperCase().indexOf(aramaM) === -1) delete ozet[s];
+    });
+    var sabitSiraA = tumBalina.sembol_sirasi || [];
+    var aramaVarMi = islemler.length > 0 || (balinaKategori === "altcoin" && sabitSiraA.some(function(s) {
+      return String(s).toUpperCase().indexOf(aramaM) !== -1;
+    }));
+    if (!aramaVarMi) {
+      html += '<div class="empty">"' + aramaM + '" için sonuç bulunamadı.</div>';
+      document.getElementById("balina-icerik").innerHTML = html;
+      return;
+    }
+  }
+
   // --- Genel Alim/Satim Baskisi ---
   // Sadece SON 24 SAAT icinde en az bir $100k+ islemi olan (yani ayni kategoride
   // asagidaki balina listesinde zaten gorunen) coinler bu ozet listede yer alsin -
@@ -5452,10 +5484,10 @@ function balinaGoster() {
 
   // --- Son Balina Hareketleri ---
   if (balinaKategori === "altcoin") {
-    if (islemler.length === 0) {
+    if (islemler.length === 0 && !aramaM) {
       html += '<div class="empty">Henuz altcoin balina hareketi tespit edilmedi</div>';
     } else {
-      html += altcoinTabloHtml(islemler);
+      html += altcoinTabloHtml(islemler, aramaM);
     }
   } else {
     html += balinaIkiSutunHtml(islemler);
@@ -5708,7 +5740,7 @@ function baskinlikBarHtml(kayitlar, boyut) {
     '<span style="font-size:9px;color:#64748b">%' + b.alim + '/%' + b.satim + '</span></div>';
 }
 
-function altcoinTabloHtml(islemler) {
+function altcoinTabloHtml(islemler, aramaM) {
   var sabitSira = tumBalina.sembol_sirasi || [];
 
   // Her sembol icin islemleri EN YENIDEN eskiye sirali tutuyoruz
@@ -5734,6 +5766,12 @@ function altcoinTabloHtml(islemler) {
 
   if (goruntulenecekler.length === 0) {
     return '<div class="empty">Coin listesi henuz yuklenmedi, birazdan gelecek</div>';
+  }
+  if (aramaM) {
+    goruntulenecekler = goruntulenecekler.filter(function(s) { return String(s).toUpperCase().indexOf(aramaM) !== -1; });
+    if (goruntulenecekler.length === 0) {
+      return '<div class="empty">"' + aramaM + '" için sonuç bulunamadı.</div>';
+    }
   }
 
   var maxSutun = 1;
