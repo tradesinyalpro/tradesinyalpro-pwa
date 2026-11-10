@@ -5366,7 +5366,7 @@ function balinaGoster() {
     html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">';
     html += '<span onclick="balinaCoinDetayKapat()" style="cursor:pointer;font-size:13px;color:#60a5fa">&larr; Geri</span>';
     html += '<div class="section-title" style="margin:0">#' + balinaCoinDetay + '</div></div>';
-    html += balinaIkiSutunHtml(coinIslemleri);
+    html += balinaIkiSutunHtml(coinIslemleri, balinaCoinDetay);
     document.getElementById("balina-icerik").innerHTML = html;
     return;
   }
@@ -5645,31 +5645,74 @@ function balinaDolarYaz(n) {
   return "$" + Math.round(n || 0).toLocaleString();
 }
 
-// "Toplam: LONG $x | SHORT $y" satiri (altcoin detay / arama icin)
-function balinaToplamSatirHtml(kayitlar, etiket) {
-  var t = balinaToplamDolar(kayitlar);
-  return '<div style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px 18px;margin:6px 0 10px;font-size:14px;font-weight:700">' +
-    (etiket ? '<span style="color:#94a3b8;font-weight:600">' + etiket + '</span>' : '') +
-    '<span style="color:#4ade80">LONG toplam: ' + balinaDolarYaz(t.long) + '</span>' +
-    '<span style="color:#f87171">SHORT toplam: ' + balinaDolarYaz(t.short) + '</span></div>';
+// SUNUCUDAN gelen son 24 saat toplamlari: tumBalina.toplam_24s = {"BTCUSDT": {"ana": [long, short], "altcoin": [long, short]}}
+// "ana" = Kripto / ABD Hisseleri sekmesi, "altcoin" = Altcoinler sekmesi
+function balina24sToplam(sembol, grup) {
+  var t = (tumBalina.toplam_24s || {})[sembol];
+  if (!t || !t[grup]) return { long: 0, short: 0 };
+  return { long: Number(t[grup][0]) || 0, short: Number(t[grup][1]) || 0 };
 }
 
-function balinaIkiSutunHtml(islemler) {
+// Sunucu 24 saatlik toplam gondermiyorsa (eski surum) false
+function balina24sVarMi() {
+  return tumBalina.toplam_24s !== undefined && tumBalina.toplam_24s !== null;
+}
+
+// Takip yeni basladiysa "Son 3 saat (birikiyor)", 24 saati doldurduysa "Son 24 saat"
+function balina24sEtiket() {
+  var k = Number(tumBalina.kova_kapsam_sn);
+  if (!isFinite(k) || k >= 24 * 3600 - 600) return "Son 24 saat";
+  if (k < 3600) return "Son " + Math.max(1, Math.floor(k / 60)) + " dk (birikiyor)";
+  return "Son " + Math.floor(k / 3600) + " saat (birikiyor)";
+}
+
+// "LONG toplam: $x | SHORT toplam: $y" satiri (altcoin detay / arama icin).
+// Sunucu 24 saatlik veri veriyorsa onu, vermiyorsa listedeki son kayitlarin toplamini gosterir.
+function balinaToplamSatirHtml(kayitlar, etiket, sembol, grup) {
+  var t500 = balinaToplamDolar(kayitlar);
+  var yeni = sembol && balina24sVarMi();
+  var t = yeni ? balina24sToplam(sembol, grup) : t500;
+  var baslik = yeni ? balina24sEtiket() : "";
+  if (etiket) baslik = etiket + (baslik ? " · " + baslik : "");
+  var h = '<div style="margin:6px 0 10px;text-align:center">';
+  h += '<div style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px 18px;font-size:14px;font-weight:700">' +
+    (baslik ? '<span style="color:#94a3b8;font-weight:600">' + baslik + '</span>' : '') +
+    '<span style="color:#4ade80">LONG toplam: ' + balinaDolarYaz(t.long) + '</span>' +
+    '<span style="color:#f87171">SHORT toplam: ' + balinaDolarYaz(t.short) + '</span></div>';
+  if (yeni) {
+    h += '<div style="font-size:11px;color:#64748b;margin-top:3px">Listedeki son ' + kayitlar.length + ' islem: LONG ' +
+      balinaDolarYaz(t500.long) + ' / SHORT ' + balinaDolarYaz(t500.short) + '</div>';
+  }
+  return h + '</div>';
+}
+
+// sembol verilirse (coin detayi) Long/Short basliklarinin saginda toplam $ yazar.
+function balinaIkiSutunHtml(islemler, sembol) {
   if (islemler.length === 0) {
     return '<div class="empty">Henuz balina hareketi tespit edilmedi</div>';
   }
   var longIslemler = islemler.filter(function(t) { return t.yon === "LONG"; });
   var shortIslemler = islemler.filter(function(t) { return t.yon !== "LONG"; });
 
+  var toplamD = null, etiket24 = "";
+  if (sembol) {
+    if (balina24sVarMi()) { toplamD = balina24sToplam(sembol, "ana"); etiket24 = balina24sEtiket(); }
+    else toplamD = balinaToplamDolar(islemler);
+  }
+  function sagTutar(v) {
+    if (!toplamD) return "";
+    return '<span style="text-align:right;line-height:1.15"><span style="font-size:15px;font-weight:800">' + balinaDolarYaz(v) + '</span>' +
+      (etiket24 ? '<br><span style="font-size:9px;font-weight:600;color:#64748b">' + etiket24 + '</span>' : '') + '</span>';
+  }
+
   var html = '<div class="balina-iki-sutun">';
   html += '<div class="balina-sutun">';
-  var toplamD = balinaToplamDolar(islemler);
-  html += '<div class="section-title" style="color:#4ade80;display:flex;justify-content:space-between;align-items:center;gap:8px"><span>Long (' + longIslemler.length + ')</span><span style="font-size:15px;font-weight:800">' + balinaDolarYaz(toplamD.long) + '</span></div>';
+  html += '<div class="section-title" style="color:#4ade80;display:flex;justify-content:space-between;align-items:center;gap:8px"><span>Long (' + longIslemler.length + ')</span>' + sagTutar(toplamD ? toplamD.long : 0) + '</div>';
   if (longIslemler.length === 0) html += '<div class="empty">Henuz LONG hareketi yok</div>';
   for (var k = 0; k < longIslemler.length; k++) html += balinaKartHtml(longIslemler[k]);
   html += '</div>';
   html += '<div class="balina-sutun">';
-  html += '<div class="section-title" style="color:#f87171;display:flex;justify-content:space-between;align-items:center;gap:8px"><span>Short (' + shortIslemler.length + ')</span><span style="font-size:15px;font-weight:800">' + balinaDolarYaz(toplamD.short) + '</span></div>';
+  html += '<div class="section-title" style="color:#f87171;display:flex;justify-content:space-between;align-items:center;gap:8px"><span>Short (' + shortIslemler.length + ')</span>' + sagTutar(toplamD ? toplamD.short : 0) + '</div>';
   if (shortIslemler.length === 0) html += '<div class="empty">Henuz SHORT hareketi yok</div>';
   for (var k = 0; k < shortIslemler.length; k++) html += balinaKartHtml(shortIslemler[k]);
   html += '</div>';
@@ -5782,7 +5825,7 @@ function altcoinTabloHtml(islemler, aramaM) {
   if (aramaM && goruntulenecekler.length <= 5) {
     for (var q = 0; q < goruntulenecekler.length; q++) {
       var kTam = gruplarTam[goruntulenecekler[q]] || [];
-      if (kTam.length > 0) html += balinaToplamSatirHtml(kTam, "#" + goruntulenecekler[q] + " (son " + kTam.length + " islem)");
+      if (kTam.length > 0) html += balinaToplamSatirHtml(kTam, "#" + goruntulenecekler[q], goruntulenecekler[q], "altcoin");
     }
   }
   return html;
@@ -5792,7 +5835,7 @@ function altcoinDetayHtml(sembol, islemlerSozluk) {
   var kayitlar = (islemlerSozluk[sembol] || []).filter(function(t) { return t.grup === "altcoin"; });
   var html = '<div style="margin-bottom:12px"><button class="refresh-btn" onclick="altcoinDetayKapat()">&larr; Tabloya Don</button></div>';
   html += '<div class="section-title">#' + sembol + ' - Son ' + kayitlar.length + ' Islem</div>';
-  if (kayitlar.length > 0) html += balinaToplamSatirHtml(kayitlar, "");
+  if (kayitlar.length > 0) html += balinaToplamSatirHtml(kayitlar, "", sembol, "altcoin");
   html += '<div style="margin-bottom:10px">' + baskinlikBarHtml(kayitlar, "buyuk") + '</div>';
   if (kayitlar.length === 0) {
     html += '<div class="empty">Bu coin icin henuz islem yok</div>';
