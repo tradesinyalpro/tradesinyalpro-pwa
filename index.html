@@ -5631,6 +5631,29 @@ function balinaKartHtml(t) {
   return kart;
 }
 
+// Kayitlarin LONG ve SHORT toplam dolar degeri (islem SAYISI degil, $ tutari)
+function balinaToplamDolar(kayitlar) {
+  var l = 0, sh = 0;
+  for (var i = 0; i < kayitlar.length; i++) {
+    var d = Number(kayitlar[i].deger) || 0;
+    if (kayitlar[i].yon === "LONG") l += d; else sh += d;
+  }
+  return { long: l, short: sh };
+}
+
+function balinaDolarYaz(n) {
+  return "$" + Math.round(n || 0).toLocaleString();
+}
+
+// "Toplam: LONG $x | SHORT $y" satiri (altcoin detay / arama icin)
+function balinaToplamSatirHtml(kayitlar, etiket) {
+  var t = balinaToplamDolar(kayitlar);
+  return '<div style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px 18px;margin:6px 0 10px;font-size:14px;font-weight:700">' +
+    (etiket ? '<span style="color:#94a3b8;font-weight:600">' + etiket + '</span>' : '') +
+    '<span style="color:#4ade80">LONG toplam: ' + balinaDolarYaz(t.long) + '</span>' +
+    '<span style="color:#f87171">SHORT toplam: ' + balinaDolarYaz(t.short) + '</span></div>';
+}
+
 function balinaIkiSutunHtml(islemler) {
   if (islemler.length === 0) {
     return '<div class="empty">Henuz balina hareketi tespit edilmedi</div>';
@@ -5640,12 +5663,13 @@ function balinaIkiSutunHtml(islemler) {
 
   var html = '<div class="balina-iki-sutun">';
   html += '<div class="balina-sutun">';
-  html += '<div class="section-title" style="color:#4ade80">Long (' + longIslemler.length + ')</div>';
+  var toplamD = balinaToplamDolar(islemler);
+  html += '<div class="section-title" style="color:#4ade80;display:flex;justify-content:space-between;align-items:center;gap:8px"><span>Long (' + longIslemler.length + ')</span><span style="font-size:15px;font-weight:800">' + balinaDolarYaz(toplamD.long) + '</span></div>';
   if (longIslemler.length === 0) html += '<div class="empty">Henuz LONG hareketi yok</div>';
   for (var k = 0; k < longIslemler.length; k++) html += balinaKartHtml(longIslemler[k]);
   html += '</div>';
   html += '<div class="balina-sutun">';
-  html += '<div class="section-title" style="color:#f87171">Short (' + shortIslemler.length + ')</div>';
+  html += '<div class="section-title" style="color:#f87171;display:flex;justify-content:space-between;align-items:center;gap:8px"><span>Short (' + shortIslemler.length + ')</span><span style="font-size:15px;font-weight:800">' + balinaDolarYaz(toplamD.short) + '</span></div>';
   if (shortIslemler.length === 0) html += '<div class="empty">Henuz SHORT hareketi yok</div>';
   for (var k = 0; k < shortIslemler.length; k++) html += balinaKartHtml(shortIslemler[k]);
   html += '</div>';
@@ -5755,6 +5779,12 @@ function altcoinTabloHtml(islemler, aramaM) {
     html += '</tr>';
   }
   html += '</tbody></table></div>';
+  if (aramaM && goruntulenecekler.length <= 5) {
+    for (var q = 0; q < goruntulenecekler.length; q++) {
+      var kTam = gruplarTam[goruntulenecekler[q]] || [];
+      if (kTam.length > 0) html += balinaToplamSatirHtml(kTam, "#" + goruntulenecekler[q] + " (son " + kTam.length + " islem)");
+    }
+  }
   return html;
 }
 
@@ -5762,6 +5792,7 @@ function altcoinDetayHtml(sembol, islemlerSozluk) {
   var kayitlar = (islemlerSozluk[sembol] || []).filter(function(t) { return t.grup === "altcoin"; });
   var html = '<div style="margin-bottom:12px"><button class="refresh-btn" onclick="altcoinDetayKapat()">&larr; Tabloya Don</button></div>';
   html += '<div class="section-title">#' + sembol + ' - Son ' + kayitlar.length + ' Islem</div>';
+  if (kayitlar.length > 0) html += balinaToplamSatirHtml(kayitlar, "");
   html += '<div style="margin-bottom:10px">' + baskinlikBarHtml(kayitlar, "buyuk") + '</div>';
   if (kayitlar.length === 0) {
     html += '<div class="empty">Bu coin icin henuz islem yok</div>';
