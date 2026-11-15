@@ -603,11 +603,12 @@
 
 
   <div id="balina" style="display:none">
-    <div class="bot-filter">
+    <div class="bot-filter" style="flex-wrap:wrap;overflow-x:visible">
       <button class="bot-btn active" onclick="balinaFiltre('kripto',this)">Kripto</button>
       <button class="bot-btn" onclick="balinaFiltre('altcoin',this)">Altcoinler</button>
       <button class="bot-btn" onclick="balinaFiltre('hisse',this)">ABD Hisseleri</button>
       <button class="bot-btn" onclick="balinaFiltre('hyperliquid',this)">Cüzdan Takip</button>
+      <button class="bot-btn" onclick="balinaFiltre('likidasyon',this)">Likidasyon</button>
     </div>
     <div id="balina-arama-wrap" style="margin-bottom:10px">
       <input id="balina-arama" type="text" placeholder="Coin ara (örn: SOL) - bu sekmede varsa direkt o gelsin"
@@ -5231,17 +5232,343 @@ function piyasaGoster() {
   document.getElementById("piyasa-icerik").innerHTML = html;
 }
 
+// ===== LIKIDASYON SEKMESI =====
+// Veri: sunucudaki /likidasyon (balina botunun Binance vadeli "forceOrder" akisindan topladigi GERCEKLESEN tasfiyeler).
+// Yon: LONG = long pozisyon tasfiye oldu, SHORT = short pozisyon tasfiye oldu.
+// Yukselen/Dusen 10: Binance vadeli (USDT, surekli) 24 saatlik degisim - sadece kripto, tarayicidan dogrudan cekilir.
+var likPencere = "24s";
+var likDetaySembol = null;
+var tumLikidasyon = null;
+var likHata = false;
+var yukselenDusen = null;
+var _kriptoPerpSeti = null;
+var LIK_PENCERE_SN = { "1s": 3600, "4s": 14400, "24s": 86400 };
+var LIK_PENCERE_AD = { "1s": "Son 1 saat", "4s": "Son 4 saat", "24s": "Son 24 saat" };
+var LIK_STABIL = { USDC: 1, FDUSD: 1, TUSD: 1, BUSD: 1, USDP: 1, USDE: 1, DAI: 1, EUR: 1, AEUR: 1, XUSD: 1 };
+var LIK_COIN_DISI = { XAU: 1, XAG: 1, XPT: 1, XPD: 1, EWZ: 1, MU: 1, SPY: 1, QQQ: 1, TSLA: 1, AAPL: 1, NVDA: 1, MSFT: 1,
+  AMZN: 1, GOOGL: 1, GOOG: 1, META: 1, NFLX: 1, AMD: 1, INTC: 1, COIN: 1, MSTR: 1, HOOD: 1, CRCL: 1, PLTR: 1, SMCI: 1,
+  ORCL: 1, AVGO: 1, TSM: 1, BABA: 1, UBER: 1, SNDK: 1, LITE: 1, IBIT: 1, XAUT: 1, PAXG: 1 };
+
+function likDolarKisa(n) {
+  n = Number(n) || 0;
+  if (n >= 1e9) return "$" + (n / 1e9).toFixed(2).replace(".", ",") + " Mr";
+  if (n >= 1e6) return "$" + (n / 1e6).toFixed(1).replace(".", ",") + " M";
+  if (n >= 1e3) return "$" + Math.round(n / 1e3) + " bin";
+  return "$" + Math.round(n);
+}
+
+function likFiyatYaz(p) {
+  p = Number(p) || 0;
+  var d = p >= 100 ? 2 : (p >= 1 ? 4 : (p >= 0.01 ? 5 : 8));
+  return p.toFixed(d);
+}
+
+function likSaatYaz(epoch) {
+  return new Date(epoch * 1000).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Europe/Istanbul" });
+}
+
+function likEtiket() {
+  var sn = LIK_PENCERE_SN[likPencere];
+  var tol = sn >= 86400 ? 600 : 0;
+  var k = tumLikidasyon ? Number(tumLikidasyon.kapsam_sn) : NaN;
+  if (!isFinite(k) || k >= sn - tol) return LIK_PENCERE_AD[likPencere];
+  if (k < 3600) return "Son " + Math.max(1, Math.floor(k / 60)) + " dk (birikiyor)";
+  return "Son " + Math.floor(k / 3600) + " saat (birikiyor)";
+}
+
+function likPencereSec(k) {
+  likPencere = k;
+  balinaGoster();
+}
+
+function likPencereDugmeleriHtml() {
+  var etiketler = { "1s": "1s", "4s": "4s", "24s": "24s" };
+  var h = '<div style="display:flex;gap:6px;margin:8px 0">';
+  Object.keys(etiketler).forEach(function(k) {
+    var aktif = k === likPencere;
+    h += '<span onclick="likPencereSec(\'' + k + '\')" style="cursor:pointer;font-size:11px;padding:5px 12px;border-radius:14px;border:1px solid ' +
+      (aktif ? '#3b82f6;background:#1e3a8a;color:#fff' : '#334155;background:#1e293b;color:#94a3b8') + '">' + etiketler[k] + '</span>';
+  });
+  return h + '</div>';
+}
+
+function likToplamKutuHtml(l, sh, etiket) {
+  var top = l + sh;
+  var lp = top > 0 ? Math.round(l / top * 100) : 50;
+  var h = '<div class="stat-card" style="margin-bottom:10px">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:8px">';
+  h += '<div><div style="font-size:10px;color:#64748b">LONG tasfiye</div><div style="font-size:18px;font-weight:800;color:#4ade80">' + likDolarKisa(l) + '</div></div>';
+  h += '<div style="font-size:10px;color:#64748b;text-align:center">' + etiket + '</div>';
+  h += '<div style="text-align:right"><div style="font-size:10px;color:#64748b">SHORT tasfiye</div><div style="font-size:18px;font-weight:800;color:#f87171">' + likDolarKisa(sh) + '</div></div></div>';
+  if (top > 0) {
+    h += '<div class="balina-ozet-bar" style="margin-top:8px"><div class="balina-ozet-alim" style="width:' + lp + '%"></div><div class="balina-ozet-satim" style="width:' + (100 - lp) + '%"></div></div>';
+    h += '<div style="display:flex;justify-content:space-between;font-size:10px;margin-top:3px"><span style="color:#4ade80">%' + lp + '</span><span style="color:#f87171">%' + (100 - lp) + '</span></div>';
+  }
+  return h + '</div>';
+}
+
+function likYonRozet(yon) {
+  var g = yon === "LONG";
+  return '<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:5px;background:' + (g ? '#052e16;color:#4ade80' : '#450a0a;color:#f87171') + '">' + yon + '</span>';
+}
+
+function likSonListeHtml(liste, sembolGoster, aramaM) {
+  var h = '<div class="stat-card" style="padding:6px 10px">';
+  var sayi = 0;
+  for (var i = 0; i < liste.length && sayi < 15; i++) {
+    var o = liste[i];
+    if (aramaM && String(o.sembol || "").toUpperCase().indexOf(aramaM) === -1) continue;
+    sayi++;
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:12px;padding:5px 0;border-top:' + (sayi > 1 ? '1px solid #172033' : 'none') + '">';
+    h += '<span style="color:#94a3b8;min-width:58px">' + likSaatYaz(o.epoch) + '</span>';
+    if (sembolGoster) h += '<b style="cursor:pointer" onclick="likDetayAc(\'' + o.sembol + '\')">#' + o.sembol + '</b>';
+    h += likYonRozet(o.yon);
+    h += '<span>' + balinaDolarYaz(o.deger) + '</span>';
+    h += '<span style="color:#64748b;font-size:10px">@ ' + likFiyatYaz(o.fiyat) + '</span></div>';
+  }
+  if (sayi === 0) h += '<div class="empty" style="padding:8px">Henuz tasfiye yok</div>';
+  return h + '</div>';
+}
+
+function likGuncelFiyat(sembol) {
+  if (yukselenDusen && yukselenDusen.fiyatlar && yukselenDusen.fiyatlar[sembol]) return yukselenDusen.fiyatlar[sembol];
+  var f = parseFloat(futuresFiyatlar[sembol]);
+  return isFinite(f) ? f : 0;
+}
+
+function yukselenDusenHtml() {
+  var h = '<div class="stat-card" style="margin-bottom:10px;padding:8px">';
+  if (!yukselenDusen) {
+    return h + '<div class="sig-time" style="text-align:center">Yukselen / dusen listesi yukleniyor...</div></div>';
+  }
+  function kolon(liste, renk, baslik) {
+    var k = '<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:800;color:' + renk + ';margin-bottom:4px">' + baslik + '</div>';
+    for (var i = 0; i < liste.length; i++) {
+      var x = liste[i];
+      var ad = x.s.replace(/USDT$/, "");
+      k += '<div onclick="likDetayAc(\'' + x.s + '\')" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:4px;font-size:11px;padding:4px 5px;border-radius:6px;margin-bottom:2px;background:' + (renk === '#4ade80' ? '#0a2a1a' : '#2a0e12') + '">';
+      k += '<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="color:#64748b;font-size:9px;margin-right:3px">' + (i + 1) + '</span>' + ad + '</span>';
+      k += '<span style="white-space:nowrap"><span style="color:#64748b;font-size:9px;margin-right:4px">$' + likFiyatYaz(x.fy) + '</span><b style="color:' + renk + '">' + (x.deg > 0 ? '+' : '') + x.deg.toFixed(1) + '%</b></span></div>';
+    }
+    return k + '</div>';
+  }
+  h += '<div style="display:flex;gap:8px">' + kolon(yukselenDusen.yukselen, '#4ade80', '&#9650; Yukselen 10') + kolon(yukselenDusen.dusen, '#f87171', '&#9660; Dusen 10') + '</div>';
+  h += '<div style="text-align:center;font-size:9px;color:#64748b;margin-top:4px">Binance vadeli, 24 saatlik degisim · her 10 sn yenilenir</div>';
+  return h + '</div>';
+}
+
+function likidasyonGoster() {
+  var el = document.getElementById("balina-icerik");
+  if (likDetaySembol) { likDetayGoster(el); return; }
+  var arama = document.getElementById("balina-arama");
+  var aramaM = arama ? arama.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "") : "";
+  var html = yukselenDusenHtml();
+  html += '<div class="section-title">Likidasyon (Gerceklesen Tasfiyeler)</div>';
+  html += '<div style="font-size:10px;color:#64748b;margin-bottom:4px">LONG = long pozisyonlar tasfiye oldu · SHORT = short pozisyonlar tasfiye oldu</div>';
+  if (!tumLikidasyon) {
+    html += likHata ? '<div class="empty">Likidasyon verisi su an alinamiyor (sunucu guncellenmemis olabilir).</div>' : '<div class="loading">Yukleniyor...</div>';
+    el.innerHTML = html;
+    return;
+  }
+  html += likPencereDugmeleriHtml();
+  var top = (tumLikidasyon.toplam || {})[likPencere] || {};
+  var genelL = 0, genelS = 0;
+  Object.keys(top).forEach(function(s) { genelL += top[s][0]; genelS += top[s][1]; });
+  html += likToplamKutuHtml(genelL, genelS, likEtiket());
+
+  var satirlar = Object.keys(top).filter(function(s) { return !aramaM || s.toUpperCase().indexOf(aramaM) !== -1; });
+  satirlar.sort(function(a, b) { return (top[b][0] + top[b][1]) - (top[a][0] + top[a][1]); });
+  html += '<div class="section-title">Coinlere Gore (en cok tasfiye olanlar)</div>';
+  if (satirlar.length === 0) {
+    html += '<div class="empty">' + (aramaM ? '"' + aramaM + '" icin tasfiye bulunamadi.' : 'Bu aralikta henuz tasfiye verisi yok (birikiyor).') + '</div>';
+  } else {
+    html += '<div class="stat-card" style="padding:4px 10px"><table style="width:100%;border-collapse:collapse;font-size:11px">';
+    html += '<tr style="color:#64748b;font-size:10px"><th style="text-align:left;padding:5px 2px">Coin</th><th style="text-align:left">LONG</th><th style="text-align:left">SHORT</th><th style="text-align:left">Fark</th></tr>';
+    satirlar.slice(0, 15).forEach(function(s) {
+      var l = top[s][0], sh = top[s][1], t = l + sh;
+      var oran = t > 0 ? l / t : 0.5;
+      var fark = oran >= 0.6 ? '<span style="padding:2px 6px;border-radius:5px;font-size:10px;font-weight:700;background:#052e16;color:#4ade80">LONG agir</span>'
+        : (oran <= 0.4 ? '<span style="padding:2px 6px;border-radius:5px;font-size:10px;font-weight:700;background:#450a0a;color:#f87171">SHORT agir</span>'
+        : '<span style="padding:2px 6px;border-radius:5px;font-size:10px;font-weight:700;background:#1e293b;color:#94a3b8">Dengeli</span>');
+      html += '<tr onclick="likDetayAc(\'' + s + '\')" style="cursor:pointer;border-top:1px solid #172033"><td style="padding:6px 2px;font-weight:700">#' + s + '</td>' +
+        '<td style="color:#4ade80">' + likDolarKisa(l) + '</td><td style="color:#f87171">' + likDolarKisa(sh) + '</td><td>' + fark + '</td></tr>';
+    });
+    html += '</table></div>';
+  }
+  html += '<div class="section-title">Son Tasfiyeler (canli)</div>';
+  html += likSonListeHtml(tumLikidasyon.son || [], true, aramaM);
+  el.innerHTML = html;
+}
+
+function likHistogramHtml(sembol) {
+  if (!tumLikidasyon || tumLikidasyon.sembol !== sembol || !tumLikidasyon.histogram) {
+    return '<div class="loading">Yukleniyor...</div>';
+  }
+  var h = tumLikidasyon.histogram[likPencere] || [];
+  if (h.length === 0) return '<div class="empty">Bu aralikta fiyat seviyesi verisi yok.</div>';
+  var mn = h[0][0], mx = h[h.length - 1][0];
+  var N = mx > mn ? 20 : 1;
+  var kovalar = [];
+  for (var i = 0; i < N; i++) kovalar.push([0, 0]);
+  var adim = (mx - mn) / N;
+  for (var j = 0; j < h.length; j++) {
+    var idx = N === 1 ? 0 : Math.min(N - 1, Math.floor((h[j][0] - mn) / adim));
+    kovalar[idx][0] += h[j][1];
+    kovalar[idx][1] += h[j][2];
+  }
+  var maks = 0;
+  kovalar.forEach(function(k) { if (k[0] + k[1] > maks) maks = k[0] + k[1]; });
+  var fiyat = likGuncelFiyat(sembol);
+  var out = '<div class="stat-card" style="padding:10px"><div style="position:relative;display:flex;align-items:flex-end;gap:3px;height:100px">';
+  kovalar.forEach(function(k) {
+    var t = k[0] + k[1];
+    var yuks = (maks > 0 && t > 0) ? Math.max(2, Math.round(t / maks * 100)) : 0;
+    var lh = t > 0 ? k[0] / t * 100 : 0;
+    out += '<div title="' + likDolarKisa(k[0]) + ' LONG / ' + likDolarKisa(k[1]) + ' SHORT" style="flex:1;height:' + yuks + 'px;display:flex;flex-direction:column-reverse;border-radius:2px 2px 0 0;overflow:hidden">' +
+      '<div style="height:' + lh + '%;background:#4ade80"></div><div style="height:' + (100 - lh) + '%;background:#f87171"></div></div>';
+  });
+  if (fiyat > 0 && N > 1 && fiyat >= mn && fiyat <= mx) {
+    out += '<div style="position:absolute;top:0;bottom:0;left:' + ((fiyat - mn) / (mx - mn) * 100).toFixed(1) + '%;width:0;border-left:2px dashed #fbbf24"></div>';
+  }
+  out += '</div><div style="display:flex;justify-content:space-between;font-size:9px;color:#64748b;margin-top:3px"><span>' + likFiyatYaz(mn) + '</span><span>' + likFiyatYaz(mx) + '</span></div>';
+  if (fiyat > 0) out += '<div style="text-align:center;font-size:10px;color:#fbbf24;margin-top:2px">Su an: ' + likFiyatYaz(fiyat) + (fiyat >= mn && fiyat <= mx ? '' : ' (aralik disinda)') + '</div>';
+  out += '<div style="text-align:center;font-size:9px;color:#64748b;margin-top:2px">Yesil: LONG tasfiye · Kirmizi: SHORT tasfiye</div>';
+  return out + '</div>';
+}
+
+function likDetayGoster(el) {
+  var s = likDetaySembol;
+  var html = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">';
+  html += '<span onclick="likDetayKapat()" style="cursor:pointer;font-size:13px;color:#60a5fa">&larr; Geri</span>';
+  html += '<div class="section-title" style="margin:0">#' + s + ' · LIKIDASYON</div></div>';
+  if (!tumLikidasyon || tumLikidasyon.sembol !== s) {
+    el.innerHTML = html + (likHata ? '<div class="empty">Likidasyon verisi su an alinamiyor.</div>' : '<div class="loading">Yukleniyor...</div>');
+    return;
+  }
+  html += likPencereDugmeleriHtml();
+  var t = (tumLikidasyon.toplam || {})[likPencere] || {};
+  var v = t[s] || [0, 0];
+  html += likToplamKutuHtml(v[0], v[1], likEtiket());
+  html += '<div class="section-title">Fiyat Seviyesine Gore (hangi fiyatta ne kadar tasfiye oldu)</div>';
+  html += likHistogramHtml(s);
+  html += '<div class="section-title">Son Tasfiyeler</div>';
+  html += likSonListeHtml(tumLikidasyon.son_coin || [], false, "");
+  html += '<div style="text-align:center;font-size:9px;color:#64748b;margin-top:6px">Veri: Binance vadeli gerceklesmis tasfiyeler</div>';
+  el.innerHTML = html;
+}
+
+function likDetayAc(sembol) {
+  likDetaySembol = sembol;
+  history.pushState({ likDetay: sembol }, "", "");
+  balinaGoster();
+  likidasyonYukle();
+  window.scrollTo(0, 0);
+}
+
+function likDetayKapat() {
+  likDetaySembol = null;
+  balinaGoster();
+  likidasyonYukle();
+}
+
+function likidasyonYukle() {
+  var s = likDetaySembol;
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/likidasyon" + (s ? "?sembol=" + encodeURIComponent(s) : ""), true);
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      try {
+        var v = JSON.parse(xhr.responseText);
+        likHata = false;
+        if ((likDetaySembol || "") === (s || "")) tumLikidasyon = v;
+      } catch (e) { return; }
+    } else if (!tumLikidasyon) {
+      likHata = true;
+    }
+    if (aktifSekme === "balina" && balinaKategori === "likidasyon") balinaGoster();
+  };
+  xhr.onerror = function() { if (!tumLikidasyon) { likHata = true; if (aktifSekme === "balina" && balinaKategori === "likidasyon") balinaGoster(); } };
+  xhr.send();
+}
+
+// Sadece kripto (COIN) surekli vadeli USDT sozlesmeleri: hisse/emtia/endeks/stabil hariç
+function kriptoPerpSetiYukle(cb) {
+  if (_kriptoPerpSeti) { cb(); return; }
+  var x = new XMLHttpRequest();
+  x.open("GET", "https://fapi.binance.com/fapi/v1/exchangeInfo", true);
+  x.onload = function() {
+    if (x.status === 200) {
+      try {
+        var j = JSON.parse(x.responseText);
+        var set = {};
+        (j.symbols || []).forEach(function(c) {
+          if (c.contractType !== "PERPETUAL" || c.quoteAsset !== "USDT" || c.status !== "TRADING") return;
+          if (c.underlyingType && c.underlyingType !== "COIN") return;
+          var alt = (c.underlyingSubType || []).join(",").toLowerCase();
+          if (/stock|equity|commodity|tradfi|etf|index|metal|forex/.test(alt)) return;
+          if (LIK_STABIL[c.baseAsset] || LIK_COIN_DISI[c.baseAsset]) return;
+          set[c.symbol] = 1;
+        });
+        if (Object.keys(set).length > 50) _kriptoPerpSeti = set;
+      } catch (e) {}
+    }
+    cb();
+  };
+  x.onerror = function() { cb(); };
+  x.send();
+}
+
+function yukselenDusenYukle() {
+  kriptoPerpSetiYukle(function() {
+    if (!_kriptoPerpSeti) return;
+    var x = new XMLHttpRequest();
+    x.open("GET", "https://fapi.binance.com/fapi/v1/ticker/24hr", true);
+    x.onload = function() {
+      if (x.status !== 200) return;
+      try {
+        var liste = JSON.parse(x.responseText);
+        var l = [], fiyatlar = {};
+        for (var i = 0; i < liste.length; i++) {
+          var t = liste[i];
+          if (!_kriptoPerpSeti[t.symbol]) continue;
+          var deg = parseFloat(t.priceChangePercent), fy = parseFloat(t.lastPrice);
+          if (!isFinite(deg) || !isFinite(fy)) continue;
+          l.push({ s: t.symbol, fy: fy, deg: deg });
+          fiyatlar[t.symbol] = fy;
+        }
+        if (l.length < 20) return;
+        var azalan = l.slice().sort(function(a, b) { return b.deg - a.deg; });
+        var artan = l.slice().sort(function(a, b) { return a.deg - b.deg; });
+        yukselenDusen = { yukselen: azalan.slice(0, 10), dusen: artan.slice(0, 10), fiyatlar: fiyatlar, zaman: Date.now() };
+        if (aktifSekme === "balina" && balinaKategori === "likidasyon") balinaGoster();
+      } catch (e) {}
+    };
+    x.send();
+  });
+}
+
+// Likidasyon sekmesi acikken: 10 sn'de bir yukselen/dusen, diger 10 sn'de likidasyon verisi (sekme gizliyse hic istek atmaz)
+var _likTik = 0;
+setInterval(function() {
+  if (aktifSekme !== "balina" || balinaKategori !== "likidasyon" || document.hidden) return;
+  _likTik++;
+  if (_likTik % 2 === 0) yukselenDusenYukle(); else likidasyonYukle();
+}, 5000);
+
 function balinaFiltre(kategori, el) {
   balinaKategori = kategori;
   altcoinDetaySembol = null;
   balinaCoinDetay = null;
   hyperliquidCuzdanDetay = null;
+  likDetaySembol = null;
   var blAramaTemizle = document.getElementById("balina-arama");
   if (blAramaTemizle) blAramaTemizle.value = "";
   var btnlar = document.querySelectorAll("#balina .bot-btn");
   for (var i = 0; i < btnlar.length; i++) btnlar[i].classList.remove("active");
   el.classList.add("active");
   balinaGoster();
+  if (kategori === "likidasyon") { likidasyonYukle(); yukselenDusenYukle(); }
 }
 
 var altcoinDetaySembol = null;
@@ -5282,10 +5609,12 @@ window.addEventListener("popstate", function(e) {
   var oncekiBalinaCoinDetay = balinaCoinDetay;
   balinaCoinDetay = (e.state && e.state.balinaCoinDetay) ? e.state.balinaCoinDetay : null;
   hyperliquidCuzdanDetay = (e.state && e.state.hyperliquidCuzdanDetay) ? e.state.hyperliquidCuzdanDetay : null;
+  likDetaySembol = (e.state && e.state.likDetay) ? e.state.likDetay : null;
   performansDetayBot = (e.state && e.state.performansDetay) ? e.state.performansDetay : null;
   if (aktifSekme === "balina") {
     balinaGoster();
     if (oncekiBalinaCoinDetay && !balinaCoinDetay) window.scrollTo(0, balinaListeScrollY);
+    if (balinaKategori === "likidasyon") likidasyonYukle();
   }
   if (aktifSekme === "performans") performansGoster();
 });
@@ -5324,6 +5653,14 @@ function balinaGoster() {
   // Diger 3 kategoride hyperliquid'e ozel arama kutusu gorunmesin.
   var hlAramaKutu = document.getElementById("hyperliquid-arama-wrap");
   if (hlAramaKutu) hlAramaKutu.style.display = "none";
+
+  // Likidasyon sekmesi (Binance vadeli tasfiyeleri + yukselen/dusen) ayri veri kaynagindan beslenir.
+  if (balinaKategori === "likidasyon") {
+    var likAramaWrap = document.getElementById("balina-arama-wrap");
+    if (likAramaWrap) likAramaWrap.style.display = likDetaySembol ? "none" : "";
+    likidasyonGoster();
+    return;
+  }
 
   var blAramaWrap = document.getElementById("balina-arama-wrap");
   var detayAcik = (balinaKategori === "altcoin" && altcoinDetaySembol) || (balinaKategori !== "altcoin" && balinaCoinDetay);
@@ -5366,6 +5703,8 @@ function balinaGoster() {
     html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">';
     html += '<span onclick="balinaCoinDetayKapat()" style="cursor:pointer;font-size:13px;color:#60a5fa">&larr; Geri</span>';
     html += '<div class="section-title" style="margin:0">#' + balinaCoinDetay + '</div></div>';
+    html += balinaPencereDugmeleriHtml();
+    if (balina24sVarMi()) html += '<div style="margin-bottom:10px">' + baskinlikBarHtml([], "buyuk", balina24sToplam(balinaCoinDetay, "ana")) + '</div>';
     html += balinaIkiSutunHtml(coinIslemleri, balinaCoinDetay);
     document.getElementById("balina-icerik").innerHTML = html;
     return;
@@ -5645,25 +5984,55 @@ function balinaDolarYaz(n) {
   return "$" + Math.round(n || 0).toLocaleString();
 }
 
-// SUNUCUDAN gelen son 24 saat toplamlari: tumBalina.toplam_24s = {"BTCUSDT": {"ana": [long, short], "altcoin": [long, short]}}
-// "ana" = Kripto / ABD Hisseleri sekmesi, "altcoin" = Altcoinler sekmesi
+// SUNUCUDAN gelen zaman dilimi toplamlari: tumBalina.toplam_pencere = {"5d": {"BTCUSDT": {"ana": [long, short], "altcoin": [long, short]}}, "30d": ..., "1s": ..., "4s": ..., "24s": ...}
+// "ana" = Kripto / ABD Hisseleri sekmesi, "altcoin" = Altcoinler sekmesi. Eski sunucu sadece toplam_24s gonderir.
+var BALINA_PENCERE_SN = { "5d": 300, "30d": 1800, "1s": 3600, "4s": 14400, "24s": 86400 };
+var BALINA_PENCERE_AD = { "5d": "Son 5 dk", "30d": "Son 30 dk", "1s": "Son 1 saat", "4s": "Son 4 saat", "24s": "Son 24 saat" };
+var balinaPencere = "24s";
+
+function balinaPencereVar() {
+  return tumBalina.toplam_pencere !== undefined && tumBalina.toplam_pencere !== null;
+}
+
 function balina24sToplam(sembol, grup) {
-  var t = (tumBalina.toplam_24s || {})[sembol];
+  var kaynak = balinaPencereVar() ? (tumBalina.toplam_pencere[balinaPencere] || {}) : (tumBalina.toplam_24s || {});
+  var t = kaynak[sembol];
   if (!t || !t[grup]) return { long: 0, short: 0 };
   return { long: Number(t[grup][0]) || 0, short: Number(t[grup][1]) || 0 };
 }
 
-// Sunucu 24 saatlik toplam gondermiyorsa (eski surum) false
+// Sunucu zaman dilimi toplami gondermiyorsa (eski surum) false
 function balina24sVarMi() {
-  return tumBalina.toplam_24s !== undefined && tumBalina.toplam_24s !== null;
+  return balinaPencereVar() || (tumBalina.toplam_24s !== undefined && tumBalina.toplam_24s !== null);
 }
 
-// Takip yeni basladiysa "Son 3 saat (birikiyor)", 24 saati doldurduysa "Son 24 saat"
+// Takip yeni basladiysa "Son 3 saat (birikiyor)", secili pencereyi doldurduysa "Son 4 saat" gibi
 function balina24sEtiket() {
+  var anahtar = balinaPencereVar() ? balinaPencere : "24s";
+  var sn = BALINA_PENCERE_SN[anahtar];
+  var tol = sn >= 86400 ? 600 : 0;
   var k = Number(tumBalina.kova_kapsam_sn);
-  if (!isFinite(k) || k >= 24 * 3600 - 600) return "Son 24 saat";
+  if (!isFinite(k) || k >= sn - tol) return BALINA_PENCERE_AD[anahtar];
   if (k < 3600) return "Son " + Math.max(1, Math.floor(k / 60)) + " dk (birikiyor)";
   return "Son " + Math.floor(k / 3600) + " saat (birikiyor)";
+}
+
+function balinaPencereSec(k) {
+  balinaPencere = k;
+  balinaGoster();
+}
+
+// 5dk / 30dk / 1s / 4s / 24s secim dugmeleri (sunucu desteklemiyorsa gorunmez)
+function balinaPencereDugmeleriHtml() {
+  if (!balinaPencereVar()) return "";
+  var etiketler = { "5d": "5dk", "30d": "30dk", "1s": "1s", "4s": "4s", "24s": "24s" };
+  var h = '<div style="display:flex;gap:6px;justify-content:center;margin:6px 0 8px">';
+  Object.keys(etiketler).forEach(function(k) {
+    var aktif = k === balinaPencere;
+    h += '<span onclick="balinaPencereSec(\'' + k + '\')" style="cursor:pointer;font-size:11px;padding:5px 11px;border-radius:14px;border:1px solid ' +
+      (aktif ? '#3b82f6;background:#1e3a8a;color:#fff' : '#334155;background:#1e293b;color:#94a3b8') + '">' + etiketler[k] + '</span>';
+  });
+  return h + '</div>';
 }
 
 // "LONG toplam: $x | SHORT toplam: $y" satiri (altcoin detay / arama icin).
@@ -5720,8 +6089,9 @@ function balinaIkiSutunHtml(islemler, sembol) {
   return html;
 }
 
-function baskinlikHesapla(kayitlar) {
+function baskinlikHesapla(kayitlar, hazirToplam) {
   var alimHacim = 0, satimHacim = 0;
+  if (hazirToplam) { alimHacim = hazirToplam.long; satimHacim = hazirToplam.short; kayitlar = []; }
   for (var i = 0; i < kayitlar.length; i++) {
     var d = kayitlar[i].deger || 0;
     if (kayitlar[i].yon === "LONG") alimHacim += d; else satimHacim += d;
@@ -5732,8 +6102,8 @@ function baskinlikHesapla(kayitlar) {
   return { alim: alim, satim: 100 - alim };
 }
 
-function baskinlikBarHtml(kayitlar, boyut) {
-  var b = baskinlikHesapla(kayitlar);
+function baskinlikBarHtml(kayitlar, boyut, hazirToplam) {
+  var b = baskinlikHesapla(kayitlar, hazirToplam);
   if (!b) return "";
   if (boyut === "buyuk") {
     return '<div style="text-align:center">' +
@@ -5835,8 +6205,10 @@ function altcoinDetayHtml(sembol, islemlerSozluk) {
   var kayitlar = (islemlerSozluk[sembol] || []).filter(function(t) { return t.grup === "altcoin"; });
   var html = '<div style="margin-bottom:12px"><button class="refresh-btn" onclick="altcoinDetayKapat()">&larr; Tabloya Don</button></div>';
   html += '<div class="section-title">#' + sembol + ' - Son ' + kayitlar.length + ' Islem</div>';
+  html += balinaPencereDugmeleriHtml();
   if (kayitlar.length > 0) html += balinaToplamSatirHtml(kayitlar, "", sembol, "altcoin");
-  html += '<div style="margin-bottom:10px">' + baskinlikBarHtml(kayitlar, "buyuk") + '</div>';
+  var cubukToplam = balina24sVarMi() ? balina24sToplam(sembol, "altcoin") : null;
+  html += '<div style="margin-bottom:10px">' + baskinlikBarHtml(kayitlar, "buyuk", cubukToplam) + '</div>';
   if (kayitlar.length === 0) {
     html += '<div class="empty">Bu coin icin henuz islem yok</div>';
     return html;
