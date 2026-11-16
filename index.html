@@ -5375,6 +5375,7 @@ function likidasyonGoster() {
   var genelL = 0, genelS = 0;
   Object.keys(top).forEach(function(s) { genelL += top[s][0]; genelS += top[s][1]; });
   html += likToplamKutuHtml(genelL, genelS, likEtiket());
+  html += likTumBorsaKutuHtml(true);
 
   var satirlar = Object.keys(top).filter(function(s) { return !aramaM || s.toUpperCase().indexOf(aramaM) !== -1; });
   satirlar.sort(function(a, b) { return (top[b][0] + top[b][1]) - (top[a][0] + top[a][1]); });
@@ -5438,8 +5439,8 @@ function likHistogramHtml(sembol) {
 
 var LIK_BORSA_AD = { binance: "Binance", bybit: "Bybit", okx: "OKX", bitget: "Bitget", gate: "Gate" };
 
-function likTumBorsaKutuHtml() {
-  var b = tumLikidasyon && tumLikidasyon.borsalar;
+function likTumBorsaKutuHtml(genel) {
+  var b = tumLikidasyon && (genel ? tumLikidasyon.borsalar_genel : tumLikidasyon.borsalar);
   if (!b) return "";
   var w = b[likPencere] || {};
   var sirali = ["binance", "bybit", "okx", "bitget", "gate"];
