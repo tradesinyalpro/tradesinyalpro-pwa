@@ -6506,6 +6506,66 @@ function coinAramaAktifKartHtml(s, bot) {
   return kart;
 }
 
+// Genel arama sonucunda: Binance balina islemleri (son 24 saat) - dokununca Balina Takip sekmesindeki coin detayina gider
+function coinAramaBalina24Html(sembol) {
+  var tp = tumBalina && tumBalina.toplam_pencere;
+  var kayit = tp && tp["24s"] && tp["24s"][sembol];
+  if (!kayit) return "";
+  var gruplar = [["ana", "kripto", "Kripto (buyuk islemler)"], ["altcoin", "altcoin", "Altcoin (kucuk esik)"]];
+  var satirlar = "";
+  for (var i = 0; i < gruplar.length; i++) {
+    var t = kayit[gruplar[i][0]];
+    if (!t) continue;
+    var l = Number(t[0]) || 0, sh = Number(t[1]) || 0, top = l + sh;
+    if (top <= 0) continue;
+    var lp = Math.round(l / top * 100);
+    satirlar += '<div class="stat-card" style="margin-bottom:8px;cursor:pointer" onclick="coinAramaBalinayaGit(\'' + sembol + '\',\'' + gruplar[i][1] + '\')">' +
+      '<div style="display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;margin-bottom:4px"><span>' + gruplar[i][2] + '</span><span style="color:#60a5fa">5dk / 30dk / 1s / 4s / 24s &rsaquo;</span></div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700"><span style="color:#4ade80">LONG ' + likDolarKisa(l) + '</span><span style="color:#f87171">SHORT ' + likDolarKisa(sh) + '</span></div>' +
+      '<div class="balina-ozet-bar" style="margin-top:6px"><div class="balina-ozet-alim" style="width:' + lp + '%"></div><div class="balina-ozet-satim" style="width:' + (100 - lp) + '%"></div></div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:10px;margin-top:3px"><span style="color:#4ade80">%' + lp + '</span><span style="color:#f87171">%' + (100 - lp) + '</span></div></div>';
+  }
+  if (!satirlar) return "";
+  return '<div class="section-title">Balina Takibi (Binance, son 24 saat)</div>' + satirlar +
+    '<div style="font-size:9px;color:#64748b;margin:-2px 0 6px">Binance vadeli buyuk alim/satim islemlerinin toplami (pozisyon acilisi degil)</div>';
+}
+
+function coinAramaTasfiyeYukle(sembol) {
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", API + "/likidasyon?sembol=" + encodeURIComponent(sembol), true);
+  xhr.setRequestHeader("X-Auth-Token", authToken || "");
+  xhr.onload = function() {
+    if (xhr.status !== 200) return;
+    var alan = document.getElementById("coin-arama-lik-alani");
+    if (!alan) return;
+    var input = document.getElementById("coin-arama-input");
+    if (!input || input.value.trim().toUpperCase() !== sembol) return;
+    var v;
+    try { v = JSON.parse(xhr.responseText); } catch (e) { return; }
+    var b = v.borsalar && v.borsalar["24s"];
+    if (!b) return;
+    var sirali = ["binance", "bybit", "okx", "bitget", "gate"];
+    var tl = 0, ts = 0;
+    sirali.forEach(function(k) { if (b[k]) { tl += b[k][0]; ts += b[k][1]; } });
+    if (tl + ts <= 0) return;
+    var h = '<div class="section-title">Tasfiye (Binance + Bybit + OKX + Bitget + Gate, son 24 saat)</div>';
+    h += '<div style="cursor:pointer" onclick="coinAramaLikidasyonaGit(\'' + sembol + '\')">';
+    h += likToplamKutuHtml(tl, ts, "Tum borsalar &rsaquo;");
+    h += '</div>';
+    h += '<div style="font-size:9px;color:#64748b;margin:-2px 0 6px">Yeni borsalar eklendigi icin ilk gunlerde 24 saatin tamamini kapsamayabilir.</div>';
+    alan.innerHTML = h;
+  };
+  xhr.send();
+}
+
+function coinAramaLikidasyonaGit(sembol) {
+  var balinaTab = document.querySelector('.tab[onclick*="balina"]');
+  if (balinaTab) sekmeAc("balina", balinaTab);
+  var hedefBtn = document.querySelector('#balina .bot-btn[onclick*="likidasyon"]');
+  if (hedefBtn) balinaFiltre("likidasyon", hedefBtn);
+  likDetayAc(sembol);
+}
+
 function coinAramaBalinayaGit(sembol, kategori) {
   var hedefKategori = kategori || "kripto";
   var balinaTab = document.querySelector('.tab[onclick*="balina"]');
@@ -6731,6 +6791,9 @@ function coinAramaTekSembolGoster(sembol) {
     html += '</div>';
   }
 
+  html += coinAramaBalina24Html(sembol);
+  html += '<div id="coin-arama-lik-alani"></div>';
+
   if (fundingRateleri[sembol] !== undefined) {
     var fr = fundingRateleri[sembol];
     var frRenk = fr >= 0 ? "#4ade80" : "#f87171";
@@ -6755,6 +6818,7 @@ function coinAramaTekSembolGoster(sembol) {
   sonucDiv.innerHTML = html;
   coinAramaIstatistikYukle(sembol);
   coinAramaDestekDirencYukle(sembol);
+  coinAramaTasfiyeYukle(sembol);
 }
 
 function coinAramaDestekDirencYukle(sembol) {
