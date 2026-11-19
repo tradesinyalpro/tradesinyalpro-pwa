@@ -1266,7 +1266,7 @@ function sohbetGoster() {
     var benMi = m.kullanici_adi === girisliKullanici;
     var silButon = adminMi ? ('<span onclick="sohbetSil(' + m.id + ')" style="cursor:pointer;color:#f87171;font-size:11px">Sil</span>') : "";
     html += '<div style="background:' + (benMi ? "#0c1a3d" : "#111827") + ';border-radius:10px;padding:8px 12px">' +
-      '<div style="font-size:11px;font-weight:600;color:#93c5fd;margin-bottom:2px">' + htmlKacis(m.kullanici_adi) + '</div>' +
+      '<div style="font-size:11px;font-weight:600;color:#93c5fd;margin-bottom:2px">' + htmlKacis(m.gorunen_ad || m.kullanici_adi) + '</div>' +
       '<div style="font-size:13px;color:#e2e8f0;word-break:break-word">' + htmlKacis(m.metin) + '</div>' +
       '<div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:4px">' + silButon +
       '<span style="font-size:9px;color:#64748b">' + tarihSaatKisa(m.zaman) + '</span></div>' +
