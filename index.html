@@ -451,7 +451,6 @@
   <div id="piyasa" style="display:none;padding:8px 12px">
     <div class="bot-filter" style="margin-bottom:10px">
       <button class="bot-btn active" id="piyasa-kripto-btn" onclick="piyasaGorunumDegistir('kripto')">Kripto</button>
-      <button class="bot-btn" id="piyasa-hisse-btn" onclick="piyasaGorunumDegistir('hisse')">ABD Hisse</button>
       <button class="bot-btn" id="piyasa-altin-btn" onclick="piyasaGorunumDegistir('altin')">Altin</button>
     </div>
 
@@ -520,67 +519,9 @@
         <div id="altin-icerik"><div class="loading">Yukleniyor...</div></div>
       </div>
     </div>
-
-    <div id="piyasa-hisse-panel" style="display:none">
-      <div style="font-size:11px;color:#64748b;margin:2px 4px 8px">TradingView'in ucretsiz widget'i - fiyatlar borsaya gore ~15 dakika gecikmeli olabilir.</div>
-      <div class="signal-card" style="padding:12px 8px 4px">
-        <div class="tradingview-widget-container" style="height:820px">
-          <div class="tradingview-widget-container__widget"></div>
-          <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-market-overview.js" async>
-          {
-            "colorTheme": "dark",
-            "dateRange": "1D",
-            "showChart": false,
-            "locale": "tr",
-            "isTransparent": true,
-            "showSymbolLogo": true,
-            "showFloatingTooltip": false,
-            "width": "100%",
-            "height": "820",
-            "plotLineColorGrowing": "rgba(74, 222, 128, 1)",
-            "plotLineColorFalling": "rgba(248, 113, 113, 1)",
-            "gridLineColor": "rgba(30, 41, 59, 0)",
-            "scaleFontColor": "rgba(148, 163, 184, 1)",
-            "belowLineFillColorGrowing": "rgba(74, 222, 128, 0.12)",
-            "belowLineFillColorFalling": "rgba(248, 113, 113, 0.12)",
-            "belowLineFillColorGrowingBottom": "rgba(74, 222, 128, 0)",
-            "belowLineFillColorFallingBottom": "rgba(248, 113, 113, 0)",
-            "symbolActiveColor": "rgba(59, 130, 246, 0.12)",
-            "tabs": [
-              {
-                "title": "ABD Hisse",
-                "symbols": [
-                  { "s": "NASDAQ:AAPL", "d": "Apple" },
-                  { "s": "NASDAQ:MSFT", "d": "Microsoft" },
-                  { "s": "NASDAQ:GOOGL", "d": "Google" },
-                  { "s": "NASDAQ:AMZN", "d": "Amazon" },
-                  { "s": "NASDAQ:NVDA", "d": "Nvidia" },
-                  { "s": "NASDAQ:META", "d": "Meta" },
-                  { "s": "NASDAQ:TSLA", "d": "Tesla" },
-                  { "s": "NASDAQ:CRWD", "d": "CrowdStrike" },
-                  { "s": "NYSE:SNOW", "d": "Snowflake" },
-                  { "s": "NASDAQ:OKTA", "d": "Okta" },
-                  { "s": "NYSE:RDDT", "d": "Reddit" },
-                  { "s": "NASDAQ:HOOD", "d": "Robinhood" },
-                  { "s": "NASDAQ:SOFI", "d": "SoFi" },
-                  { "s": "NASDAQ:COIN", "d": "Coinbase" },
-                  { "s": "NASDAQ:PLTR", "d": "Palantir" }
-                ],
-                "originalTitle": "ABD Hisse"
-              }
-            ]
-          }
-          </script>
-        </div>
-      </div>
-    </div>
   </div>
 
   <div id="analiz" style="display:none">
-    <div class="bot-filter" id="analiz-alt-filtre">
-      <button class="bot-btn active" onclick="analizAltSekmeDegistir('kripto',this)">Kripto Analiz</button>
-      <button class="bot-btn" onclick="analizAltSekmeDegistir('hisse',this)">ABD Hisse Analiz</button>
-    </div>
     <div id="kripto-analiz-bolumu" style="padding:16px">
       <div id="kripto-analiz-mesajlari" style="display:flex;flex-direction:column;gap:8px;min-height:200px;margin-bottom:12px"></div>
       <div style="display:flex;gap:8px;position:sticky;bottom:0;background:#0a0f1e;padding:8px 0">
@@ -590,15 +531,6 @@
         <button class="refresh-btn" onclick="kriptoAnalizGonder()">Analiz Et</button>
       </div>
     </div>
-    <div id="hisse-analiz-bolumu" style="padding:16px;display:none">
-      <div id="hisse-analiz-mesajlari" style="display:flex;flex-direction:column;gap:8px;min-height:200px;margin-bottom:12px"></div>
-      <div style="display:flex;gap:8px;position:sticky;bottom:0;background:#0a0f1e;padding:8px 0">
-        <input id="hisse-analiz-input" type="text" placeholder="Hisse kodu (orn: NVDA, AAPL) ya da /piyasa" maxlength="20"
-          style="flex:1;background:#111827;border:1px solid #1e293b;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-size:14px"
-          onkeypress="if(event.key==='Enter')hisseAnalizGonder()">
-        <button class="refresh-btn" onclick="hisseAnalizGonder()">Analiz Et</button>
-      </div>
-    </div>
   </div>
 
 
@@ -606,7 +538,6 @@
     <div class="bot-filter" style="flex-wrap:wrap;overflow-x:visible">
       <button class="bot-btn active" onclick="balinaFiltre('kripto',this)">Kripto</button>
       <button class="bot-btn" onclick="balinaFiltre('altcoin',this)">Altcoinler</button>
-      <button class="bot-btn" onclick="balinaFiltre('hisse',this)">ABD Hisseleri</button>
       <button class="bot-btn" onclick="balinaFiltre('hyperliquid',this)">Cüzdan Takip</button>
       <button class="bot-btn" onclick="balinaFiltre('likidasyon',this)">Likidasyon</button>
     </div>
@@ -6901,7 +6832,7 @@ function sekmeAc(id, el) {
   // Analiz sekmesi (coin/hisse/piyasa analizleri) - onceki mesaj gecmisini
   // gostermek icin sekme her acildiginda render edilir, otomatik veri
   // cekmez (sadece kullanicinin kendi sorgusuyla tetiklenir).
-  if (id === "analiz") { kriptoAnalizGoster(); hisseAnalizGoster(); }
+  if (id === "analiz") { kriptoAnalizGoster(); }
   if (id === "yonetici") {
     if (yoneticiAltSekme === "bist") yoneticiBistAnalizGoster();
     else if (yoneticiAltSekme === "pozisyon") srKayitlariGoster();
@@ -8603,23 +8534,16 @@ function altinFiyatlariGoster() {
 function piyasaGorunumDegistir(hangisi) {
   var kriptoPanel = document.getElementById("piyasa-kripto-panel");
   var altinPanel = document.getElementById("piyasa-altin-panel");
-  var hissePanel = document.getElementById("piyasa-hisse-panel");
   var kriptoBtn = document.getElementById("piyasa-kripto-btn");
   var altinBtn = document.getElementById("piyasa-altin-btn");
-  var hisseBtn = document.getElementById("piyasa-hisse-btn");
   kriptoPanel.style.display = "none";
   altinPanel.style.display = "none";
-  hissePanel.style.display = "none";
   kriptoBtn.classList.remove("active");
   altinBtn.classList.remove("active");
-  hisseBtn.classList.remove("active");
   if (hangisi === "altin") {
     altinPanel.style.display = "block";
     altinBtn.classList.add("active");
     altinFiyatlariGoster();
-  } else if (hangisi === "hisse") {
-    hissePanel.style.display = "block";
-    hisseBtn.classList.add("active");
   } else {
     kriptoPanel.style.display = "block";
     kriptoBtn.classList.add("active");
