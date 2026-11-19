@@ -5703,14 +5703,18 @@ function balinaGoster() {
 
   // Kategorisi olmayan eski kayitlar guvenli varsayilan olarak "kripto" sayilir
   var islemler, ozet = {};
+  // Kripto sekmesi sadece BTC/ETH (diger kripto coinler yalnizca Altcoinler sekmesinde)
+  var kriptoAnaCoin = function(s) { return s === "BTCUSDT" || s === "ETHUSDT"; };
   if (balinaKategori === "altcoin") {
     islemler = tumIslemler.filter(function(t) { return t.grup === "altcoin"; });
   } else {
     islemler = tumIslemler.filter(function(t) {
+      if (balinaKategori === "kripto" && !kriptoAnaCoin(t.sembol)) return false;
       return (t.kategori || "kripto") === balinaKategori && t.grup !== "altcoin";
     });
     islemler.sort(function(a, b) { return (b.zaman || "").localeCompare(a.zaman || ""); });
     Object.keys(tumOzet).forEach(function(s) {
+      if (balinaKategori === "kripto" && !kriptoAnaCoin(s)) return;
       if ((tumOzet[s].kategori || "kripto") === balinaKategori) ozet[s] = tumOzet[s];
     });
   }
@@ -6511,7 +6515,8 @@ function coinAramaBalina24Html(sembol) {
   var tp = tumBalina && tumBalina.toplam_pencere;
   var kayit = tp && tp["24s"] && tp["24s"][sembol];
   if (!kayit) return "";
-  var gruplar = [["ana", "kripto", "Kripto (buyuk islemler)"], ["altcoin", "altcoin", "Altcoin (kucuk esik)"]];
+  var anaCoin = (sembol === "BTCUSDT" || sembol === "ETHUSDT");
+  var gruplar = anaCoin ? [["ana", "kripto", "Kripto (buyuk islemler)"]] : [["altcoin", "altcoin", "Altcoin"]];
   var satirlar = "";
   for (var i = 0; i < gruplar.length; i++) {
     var t = kayit[gruplar[i][0]];
@@ -6779,12 +6784,14 @@ function coinAramaTekSembolGoster(sembol) {
 
   var ozet = (tumBalina.ozet || {})[sembol];
   if (ozet) {
+    var aramaAnaCoin = (sembol === "BTCUSDT" || sembol === "ETHUSDT");
     html += '<div class="section-title">Anlik Balina Baskisi (5dk)</div>';
     html += '<div class="stat-card">';
     html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
     html += '<span style="font-size:11px;color:#64748b">Detay icin:</span>';
-    html += '<span><span style="font-size:10px;color:#60a5fa;cursor:pointer;text-decoration:underline" onclick="coinAramaBalinayaGit(\'' + sembol + '\',\'kripto\')">Kripto</span>' +
-      '<span style="font-size:10px;color:#60a5fa;cursor:pointer;text-decoration:underline;margin-left:8px" onclick="coinAramaBalinayaGit(\'' + sembol + '\',\'altcoin\')">Altcoin</span></span>';
+    html += aramaAnaCoin
+      ? '<span style="font-size:10px;color:#60a5fa;cursor:pointer;text-decoration:underline" onclick="coinAramaBalinayaGit(\'' + sembol + '\',\'kripto\')">Kripto</span>'
+      : '<span style="font-size:10px;color:#60a5fa;cursor:pointer;text-decoration:underline" onclick="coinAramaBalinayaGit(\'' + sembol + '\',\'altcoin\')">Altcoin</span>';
     html += '</div>';
     html += '<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:#4ade80">Alim %' + ozet.alim_yuzde + '</span><span style="color:#f87171">Satim %' + ozet.satim_yuzde + '</span></div>';
     html += '<div style="height:8px;border-radius:4px;overflow:hidden;display:flex;margin-top:8px"><div style="background:#4ade80;width:' + ozet.alim_yuzde + '%"></div><div style="background:#f87171;width:' + ozet.satim_yuzde + '%"></div></div>';
