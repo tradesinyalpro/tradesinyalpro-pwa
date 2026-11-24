@@ -623,14 +623,15 @@
       <button class="bot-btn" data-arac="yatay" onclick="grfAracSec('yatay',this)">➖ Yatay</button>
       <button class="bot-btn" data-arac="dikdortgen" onclick="grfAracSec('dikdortgen',this)">▭ Dikdörtgen</button>
       <button class="bot-btn" data-arac="olcum" onclick="grfAracSec('olcum',this)">📏 Ölçüm</button>
-      <button class="bot-btn" data-arac="sil" onclick="grfAracSec('sil',this)">🗑 Sil</button>
+      <button class="bot-btn" id="grf-sil-btn" style="display:none;color:#f87171;border-color:#7f1d1d" onclick="grfSeciliSil()">🗑 Seçili çizimi sil</button>
       <button class="bot-btn" onclick="grfGeriAl()">↶ Geri al</button>
       <button class="bot-btn" onclick="grfTemizle()">Tümünü temizle</button>
     </div>
-    <div id="grf-arac-ipucu" style="font-size:11.5px;color:#64748b;margin-bottom:6px">İmleç: grafiği kaydırın ve yakınlaştırın.</div>
+    <div id="grf-arac-ipucu" style="font-size:11.5px;color:#64748b;margin-bottom:6px">İmleç: sol tuşla tutup kaydırın, tekerlekle yakınlaştırın (fiyat rakamlarının üstünde tekerlek: dikey yakınlaştırma). Bir çizime tıklarsanız seçilir ve silebilirsiniz.</div>
     <div id="grf-kutu" style="position:relative;width:100%;height:460px;border-radius:10px;overflow:hidden;background:#0a0f1e">
       <div id="grf-chart" style="position:absolute;left:0;top:0;right:0;bottom:0"></div>
       <canvas id="grf-canvas" style="position:absolute;left:0;top:0;pointer-events:none;z-index:5"></canvas>
+      <div id="grf-yakala" style="position:absolute;left:0;top:0;width:0;height:0;z-index:6;pointer-events:none;touch-action:none"></div>
     </div>
     <div style="font-size:10.5px;color:#64748b;margin-top:5px">Çizimleriniz sadece bu cihazda (tarayıcınızda) saklanır; coin ve zaman dilimi bazında ayrı tutulur.</div>
     <div id="grf-hedef-bilgi"></div>
@@ -6950,11 +6951,21 @@ function grfKurulum() {
   GRF.canvas = document.getElementById("grf-canvas");
   GRF.ctx = GRF.canvas.getContext("2d");
   try { grafikOhlcBilgisiKur("grf-chart", GRF.chart, function() { return GRF.seri; }); } catch (e) {}
-  var c = GRF.canvas;
+  GRF.secili = -1;
+  // Yakalama katmani SADECE cizim alanini kaplar (fiyat ekseni ve zaman ekseni her zaman grafigin kendisine aittir)
+  var c = document.getElementById("grf-yakala");
+  GRF.yakala = c;
   c.addEventListener("pointerdown", grfPointerDown);
   c.addEventListener("pointermove", grfPointerMove);
   c.addEventListener("pointerup", grfPointerUp);
   c.addEventListener("pointercancel", grfPointerUp);
+  c.addEventListener("wheel", grfTekerlek, { passive: false });
+  // Imlec modunda bir cizime tiklayinca secilir (sürükleme/kaydirma ile karismasin diye hareket mesafesine bakilir)
+  var kc = document.getElementById("grf-chart");
+  kc.addEventListener("pointerdown", grfSecimBasla, true);
+  kc.addEventListener("pointerup", grfSecimBitir, true);
+  document.addEventListener("keydown", grfTusa);
+  kc.addEventListener("wheel", grfEksenTekerlek, { passive: false, capture: true });
 }
 
 function grfBoyutla() {
@@ -7000,6 +7011,7 @@ function grfYukle(coinDegisti) {
     grfHacimUygula();
     GRF.cizimler = grfCizimYukle();
     GRF.gecici = null;
+    grfSeciliAyarla(-1);
     GRF.bantlar = grfBantlariBul();
     var n = GRF.mumlar.length;
     GRF.chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 130), to: n + 22 });
@@ -7357,29 +7369,29 @@ function grfAracSec(a, el) {
   var b = document.querySelectorAll("#grf-arac-alani .bot-btn[data-arac]");
   for (var i = 0; i < b.length; i++) b[i].classList.toggle("active", b[i].getAttribute("data-arac") === a);
   var aktif = a !== "sec";
-  GRF.canvas.style.pointerEvents = aktif ? "auto" : "none";
-  GRF.canvas.style.touchAction = aktif ? "none" : "auto";
+  GRF.yakala.style.pointerEvents = aktif ? "auto" : "none";
+  GRF.yakala.style.cursor = aktif ? "crosshair" : "default";
+  if (aktif) grfSeciliAyarla(-1);
   var ip = document.getElementById("grf-arac-ipucu");
   var ipucu = {
-    sec: "İmleç: grafiği kaydırın ve yakınlaştırın.",
+    sec: "İmleç: sol tuşla tutup kaydırın, tekerlekle yakınlaştırın (fiyat rakamlarının üstünde tekerlek: dikey yakınlaştırma). Bir çizime tıklarsanız seçilir ve silebilirsiniz.",
     trend: "Trend çizgisi: iki nokta için parmağınızı sürükleyin.",
     yatay: "Yatay çizgi: koymak istediğiniz yere dokunun.",
     dikdortgen: "Dikdörtgen: köşegen boyunca sürükleyin.",
-    olcum: "Ölçüm: sürükleyin, fiyat farkı, yüzde ve süre görünür.",
-    sil: "Silme: silmek istediğiniz çizime dokunun."
+    olcum: "Ölçüm: sürükleyin, fiyat farkı, yüzde ve süre görünür."
   };
   if (ip) ip.textContent = ipucu[a];
   GRF.versiyon++;
 }
 
 function grfGeriAl() {
-  if (GRF.cizimler.length) { GRF.cizimler.pop(); grfCizimKaydet(); GRF.versiyon++; }
+  if (GRF.cizimler.length) { GRF.cizimler.pop(); grfSeciliAyarla(-1); grfCizimKaydet(); GRF.versiyon++; }
 }
 
 function grfTemizle() {
   if (!GRF.cizimler.length) return;
   if (!confirm("Bu coin ve zaman dilimindeki tüm çizimleriniz silinsin mi?")) return;
-  GRF.cizimler = []; grfCizimKaydet(); GRF.versiyon++;
+  GRF.cizimler = []; grfSeciliAyarla(-1); grfCizimKaydet(); GRF.versiyon++;
 }
 
 function grfCizimAnahtar() { return "grf_cizim_" + GRF.coin + "_" + GRF.zaman; }
@@ -7412,8 +7424,7 @@ function grfPointerDown(e) {
   var n = grfNoktaAl(e);
   if (!n) return;
   e.preventDefault();
-  try { GRF.canvas.setPointerCapture(e.pointerId); } catch (x) {}
-  if (GRF.arac === "sil") { grfSilDene(n); return; }
+  try { GRF.yakala.setPointerCapture(e.pointerId); } catch (x) {}
   if (GRF.arac === "yatay") {
     GRF.cizimler.push({ tip: "yatay", p1: n.p });
     grfCizimKaydet(); GRF.versiyon++;
@@ -7456,30 +7467,89 @@ function grfNoktaSegmentUzaklik(px, py, x1, y1, x2, y2) {
   return Math.sqrt((px - cx) * (px - cx) + (py - cy) * (py - cy));
 }
 
-function grfSilDene(n) {
-  var enYakin = -1, enUzak = 16;
+function grfCizimBul(px, py) {
+  var enYakin = -1, enUzak = 12;
   for (var i = 0; i < GRF.cizimler.length; i++) {
     var c = GRF.cizimler[i], d = 9999;
     if (c.tip === "yatay") {
-      var yy = grfY(c.p1); if (yy !== null) d = Math.abs(n.y - yy);
+      var yy = grfY(c.p1); if (yy !== null) d = Math.abs(py - yy);
     } else {
       var x1 = grfX(c.t1), y1 = grfY(c.p1), x2 = grfX(c.t2), y2 = grfY(c.p2);
       if (x1 === null || x2 === null || y1 === null || y2 === null) continue;
-      if (c.tip === "trend") d = grfNoktaSegmentUzaklik(n.x, n.y, x1, y1, x2, y2);
+      if (c.tip === "trend") d = grfNoktaSegmentUzaklik(px, py, x1, y1, x2, y2);
       else {
         var sol = Math.min(x1, x2), sag = Math.max(x1, x2), ust = Math.min(y1, y2), alt = Math.max(y1, y2);
-        if (n.x >= sol && n.x <= sag && n.y >= ust && n.y <= alt) d = 0;
-        else d = Math.min(grfNoktaSegmentUzaklik(n.x, n.y, sol, ust, sag, ust), grfNoktaSegmentUzaklik(n.x, n.y, sag, ust, sag, alt),
-          grfNoktaSegmentUzaklik(n.x, n.y, sag, alt, sol, alt), grfNoktaSegmentUzaklik(n.x, n.y, sol, alt, sol, ust));
+        if (px >= sol && px <= sag && py >= ust && py <= alt) d = 0;
+        else d = Math.min(grfNoktaSegmentUzaklik(px, py, sol, ust, sag, ust), grfNoktaSegmentUzaklik(px, py, sag, ust, sag, alt),
+          grfNoktaSegmentUzaklik(px, py, sag, alt, sol, alt), grfNoktaSegmentUzaklik(px, py, sol, alt, sol, ust));
       }
     }
     if (d < enUzak) { enUzak = d; enYakin = i; }
   }
-  if (enYakin >= 0) {
-    GRF.cizimler.splice(enYakin, 1);
-    grfCizimKaydet();
-    GRF.versiyon++;
-  }
+  return enYakin;
+}
+
+function grfSeciliAyarla(i) {
+  GRF.secili = i;
+  var b = document.getElementById("grf-sil-btn");
+  if (b) b.style.display = i >= 0 ? "" : "none";
+  GRF.versiyon++;
+}
+
+function grfSeciliSil() {
+  if (GRF.secili < 0 || GRF.secili >= GRF.cizimler.length) { grfSeciliAyarla(-1); return; }
+  GRF.cizimler.splice(GRF.secili, 1);
+  grfCizimKaydet();
+  grfSeciliAyarla(-1);
+}
+
+function grfSecimBasla(e) {
+  if (GRF.arac !== "sec") return;
+  GRF.dBas = { x: e.clientX, y: e.clientY };
+}
+
+function grfSecimBitir(e) {
+  if (GRF.arac !== "sec" || !GRF.dBas) return;
+  var oku = GRF.dBas; GRF.dBas = null;
+  var hareket = Math.sqrt((e.clientX - oku.x) * (e.clientX - oku.x) + (e.clientY - oku.y) * (e.clientY - oku.y));
+  if (hareket > 6) return; // kaydirma/surukleme idi, secim degil
+  var r = document.getElementById("grf-chart").getBoundingClientRect();
+  var x = e.clientX - r.left, y = e.clientY - r.top;
+  var ts = GRF.chart.timeScale();
+  if (x > ts.width()) return; // fiyat ekseni
+  grfSeciliAyarla(grfCizimBul(x, y));
+}
+
+function grfTusa(e) {
+  if (aktifSekme !== "grafik" || GRF.secili < 0) return;
+  var t = e.target && e.target.tagName;
+  if (t === "INPUT" || t === "TEXTAREA") return;
+  if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); grfSeciliSil(); }
+}
+
+// Fiyat ekseni (sagdaki rakamlar) ustunde tekerlek: dikey yakinlastir/uzaklastir
+function grfEksenTekerlek(e) {
+  var r = document.getElementById("grf-chart").getBoundingClientRect();
+  var x = e.clientX - r.left;
+  if (x <= GRF.chart.timeScale().width()) return; // cizim alani: grafigin kendi tekerlegi calisir
+  e.preventDefault(); e.stopPropagation();
+  var m = GRF.dikeyMarj === undefined ? 0.15 : GRF.dikeyMarj;
+  m = Math.max(0.02, Math.min(0.42, m + (e.deltaY > 0 ? 0.04 : -0.04)));
+  GRF.dikeyMarj = m;
+  GRF.seri.priceScale().applyOptions({ autoScale: true, scaleMargins: { top: m, bottom: m } });
+  GRF.versiyon++;
+}
+
+// Cizim araci seciliyken tekerlek yine de yakinlastirir (yakalama katmani olayi yuttugu icin elle yapiyoruz)
+function grfTekerlek(e) {
+  e.preventDefault();
+  var ts = GRF.chart.timeScale(), a = ts.getVisibleLogicalRange();
+  if (!a) return;
+  var r = GRF.yakala.getBoundingClientRect();
+  var c = ts.coordinateToLogical(e.clientX - r.left);
+  if (c === null) c = (a.from + a.to) / 2;
+  var f = e.deltaY > 0 ? 1.12 : 0.89;
+  ts.setVisibleLogicalRange({ from: c - (c - a.from) * f, to: c + (a.to - c) * f });
 }
 
 // ---------- Cizim (canvas katmani) ----------
@@ -7521,6 +7591,7 @@ function grfCiz() {
   var ts = GRF.chart.timeScale();
   var plotW = ts.width();
   var plotH = H - ((ts.height && ts.height()) || 26);
+  if (GRF.yakala) { GRF.yakala.style.width = plotW + "px"; GRF.yakala.style.height = plotH + "px"; }
   ctx.save();
   ctx.beginPath(); ctx.rect(0, 0, plotW, plotH); ctx.clip();
   var i, b, x, y1, y2;
@@ -7582,7 +7653,7 @@ function grfCiz() {
     if (c.tip === "yatay") {
       var yh = grfY(c.p1);
       if (yh === null) continue;
-      ctx.strokeStyle = "#60a5fa"; ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "#60a5fa"; ctx.lineWidth = (i === GRF.secili) ? 3.5 : 1.5;
       ctx.beginPath(); ctx.moveTo(0, yh); ctx.lineTo(plotW, yh); ctx.stroke();
       grfEtiket(ctx, fiyatEtiketFormatla(c.p1), plotW - 4, yh - 9, "#93c5fd", true);
       continue;
@@ -7590,12 +7661,13 @@ function grfCiz() {
     var xa = grfX(c.t1), ya = grfY(c.p1), xb = grfX(c.t2), yb = grfY(c.p2);
     if (xa === null || ya === null || xb === null || yb === null) continue;
     if (c.tip === "trend") {
-      ctx.strokeStyle = "#f0b90b"; ctx.lineWidth = 2;
+      var secT = (i === GRF.secili);
+      ctx.strokeStyle = "#f0b90b"; ctx.lineWidth = secT ? 3.5 : 2;
       ctx.beginPath(); ctx.moveTo(xa, ya); ctx.lineTo(xb, yb); ctx.stroke();
-      ctx.fillStyle = "#f0b90b";
-      ctx.beginPath(); ctx.arc(xa, ya, 3, 0, 6.3); ctx.arc(xb, yb, 3, 0, 6.3); ctx.fill();
+      ctx.fillStyle = secT ? "#ffffff" : "#f0b90b";
+      ctx.beginPath(); ctx.arc(xa, ya, secT ? 5 : 3, 0, 6.3); ctx.arc(xb, yb, secT ? 5 : 3, 0, 6.3); ctx.fill();
     } else if (c.tip === "dikdortgen") {
-      ctx.fillStyle = "rgba(168,85,247,0.15)"; ctx.strokeStyle = "#a855f7"; ctx.lineWidth = 1.5;
+      ctx.fillStyle = "rgba(168,85,247,0.15)"; ctx.strokeStyle = "#a855f7"; ctx.lineWidth = (i === GRF.secili) ? 3.5 : 1.5;
       ctx.fillRect(Math.min(xa, xb), Math.min(ya, yb), Math.abs(xb - xa), Math.abs(yb - ya));
       ctx.strokeRect(Math.min(xa, xb), Math.min(ya, yb), Math.abs(xb - xa), Math.abs(yb - ya));
     } else if (c.tip === "olcum") {
